@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+     "strict": true,
+     "allowUnreachableCode": false,
+     "exactOptionalPropertyTypes": true,
+     "noImplicitAny": true,
+     "noImplicitOverride": true,
+     "noImplicitReturns": true,
+     "noImplicitThis": true,
+     "noFallthroughCasesInSwitch": true,
+     "noUncheckedIndexedAccess": true,
+     "target": "es5",
+    "lib": ["es2017", "dom"],
+  }
+}

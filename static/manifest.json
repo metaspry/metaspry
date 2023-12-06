@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "Metagify",
+  "description": "Metagify Side",
+  "version": "1.0",
+  "background": {
+    "service_worker": "scripts/background.js"
+  },
+  "side_panel": {
+    "default_path": "index.html"
+  },
+  "action": {
+    "default_title": "Metagify"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"], 
+      "js": ["scripts/content.js"], 
+      "run_at": "document_idle"
+    }
+  ],
+  "offline_enabled": true,
+  "minimum_chrome_version": "114",
+  "permissions": ["tabs", "activeTab", "contextMenus", "storage", "sidePanel", "activeTab", "scripting"],
+  "host_permissions": [
+    "*://*/" 
+  ]
+}

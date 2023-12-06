@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* For WebKit browsers (Chrome, Safari) */
+::-webkit-scrollbar {
+  @apply w-2
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-gray-200
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-400 rounded
+}
