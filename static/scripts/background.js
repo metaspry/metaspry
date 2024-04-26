@@ -141,6 +141,7 @@ function continueGPT3Prompt(content) {
 // Add a message listener
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.message === 'openGPT3Prompt') {
+    chrome.storage.local.set({ gpt3ready: false });
     openGPT3Prompt(request.content);
     sendResponse({ received: true });
   }

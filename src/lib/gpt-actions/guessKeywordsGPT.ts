@@ -1,17 +1,22 @@
 
 export async function guessKeywordsGPT(html: HTMLElement): Promise<void> {
-  // get html content from the page
-  const content = html.querySelector('body')?.innerText || '';
-  const cleanedContent = content.replace(/\s+/g, ' ').trim();
-  
-  // process content to send to GPT-3
-  let contentArray = cutContent(cleanedContent);
+  // Extract cleaned text content from HTML body
+  let content = getHTMLText(html.innerHTML || '');
+
+  // Before sending the content add a initial prompt to GPT-3
+  let initialPrompt = 'PLEASE WAIT UNTILL I SEND YOU A LAST MESSAGE THAT WILL CONTAIN "GPT3READY FOR METAGIFY" THEN WHEN YOU GET THAT MESSAGE FROM ME, GUESS THE KEYWORDS FROM TEXT I WILL SEND YOU. DO NOT REPLY WITH ANYTHING ELSE THAN "PROCEED" UNTILL YOU GET THAT MESSAGE. \n\n';
+  content = initialPrompt + content;
+
+  // Process content to send to GPT-3
+  let contentArray = cutContent(content);
   let initialContent = contentArray[0];
 
   // local storage listener for gpt3ready boolean
   // each time gpt3ready is true, send next content to GPT-3
   chrome.storage.local.onChanged.addListener((changes) => {
+    console.log('listener added');
     if (changes.gpt3ready?.newValue) {
+      console.log('gpt3ready is true');
       contentArray.shift();
       if (contentArray.length > 0) {
         initialContent = contentArray[0] || '';
@@ -26,6 +31,7 @@ export async function guessKeywordsGPT(html: HTMLElement): Promise<void> {
   });
 
   console.log('initial content');
+  console.log(initialContent);
   // send content to GPT-3
   await openGPT3Prompt(initialContent || '');
 }
@@ -54,25 +60,32 @@ async function continueGPT3Prompt(content: string): Promise<boolean> {
   });
 }
 
-function addInitialPrompt(content: string): string {
-  return `I will send you messages of content please do not respond to each of them untill I say "end of message you can guess keywords".
-  Try to guess keywords from the following content:
-  \n\n${content}`;
-}
-
-function addEndOfMessage(content: string): string {
-  return `${content}\n\nend of message you can guess keywords`;
-}
-
 function cutContent(content: string): string[] {
-  let combinedContent = addInitialPrompt(addEndOfMessage(content));
-  const maxCharacters = 2000;
+  const maxCharacters = 4000;
   const contentArray = [];
-  while (combinedContent.length > maxCharacters) {
-    contentArray.push(combinedContent.substring(0, maxCharacters));
-    combinedContent = combinedContent.substring(maxCharacters);
+  while (content.length > maxCharacters) {
+    contentArray.push(content.substring(0, maxCharacters));
+    content = content.substring(maxCharacters);
   }
-  contentArray.push(combinedContent);
+  contentArray.push(content);
+
+  contentArray.push('GPT3READY FOR METAGIFY');
 
   return contentArray;
+}
+
+function getHTMLText(html: string): string {
+  // Create a temporary element
+  const tempElement = document.createElement('div');
+  tempElement.innerHTML = html;
+
+  // Remove script and style elements
+  const scriptAndStyleElements = tempElement.querySelectorAll('script, style');
+  scriptAndStyleElements.forEach(el => el.remove());
+
+  // Extract cleaned text content
+  const cleanedContent = tempElement.textContent || tempElement.innerText || '';
+  const finalContent = cleanedContent.replace(/\s+/g, ' ').trim();
+
+  return finalContent;
 }

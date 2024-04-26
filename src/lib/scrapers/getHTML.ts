@@ -5,7 +5,6 @@ export async function getHTML(): Promise<HTMLElement | null> {
         // Parse the received HTML string to create an HTMLElement
         const tempElement = document.createElement('html');
         tempElement.innerHTML = response.html;
-        
         // Check if the element exists
         if (tempElement) {
           resolve(tempElement);

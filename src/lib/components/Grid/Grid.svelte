@@ -8,7 +8,11 @@
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <!-- svelte-ignore a11y-no-static-element-interactions -->
     <div on:click={item.onClick}
-      class="border-[0.5px] border-gray-200 rounded-2xl p-4 flex-grow flex-shrink min-w-[160px] cursor-pointer">
+      class="{item.cssClass} 
+      border-[0.5px] border-gray-200 rounded-2xl p-4 flex-grow flex-shrink min-w-[160px] cursor-pointer
+      hover:shadow-md transition-shadow duration-300 ease-in-out hover:bg-gray-50
+      active:shadow-inner active:bg-gray-100 active:scale-95 active:duration-200 active:ease-in-out
+      ">
       <div class="h-full flex flex-col">
         <div class="flex-1">
           {#if item.number}
