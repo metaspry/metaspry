@@ -30,4 +30,20 @@
   >
     Retry
   </button>
+  <p class="mt-3 text-xs text-slate-500 dark:text-slate-400">
+    Stuck?
+    <a
+      href="https://metaspry.com/docs/"
+      target="_blank"
+      rel="noopener noreferrer"
+      class="text-indigo-600 hover:underline dark:text-indigo-300"
+    >metaspry.com/docs</a>
+    ·
+    <a
+      href="https://github.com/metaspry/metaspry/issues/new/choose"
+      target="_blank"
+      rel="noopener noreferrer"
+      class="text-indigo-600 hover:underline dark:text-indigo-300"
+    >Report a bug</a>
+  </p>
 </div>

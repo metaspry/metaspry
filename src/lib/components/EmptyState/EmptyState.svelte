@@ -34,4 +34,13 @@
   >
     Try again
   </button>
+  <p class="mt-3 text-xs text-slate-500 dark:text-slate-400">
+    Need help?
+    <a
+      href="https://metaspry.com/docs/"
+      target="_blank"
+      rel="noopener noreferrer"
+      class="text-indigo-600 hover:underline dark:text-indigo-300"
+    >metaspry.com/docs</a>
+  </p>
 </div>

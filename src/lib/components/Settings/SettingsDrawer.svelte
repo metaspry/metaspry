@@ -98,5 +98,56 @@
       on:click={resetSettings}
       class="self-start rounded-full border border-white/40 bg-white/40 px-3 py-1 text-xs font-medium text-slate-700 backdrop-blur-md hover:bg-white/70 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
     >Restore defaults</button>
+
+    <section class="mt-2 flex flex-col gap-2 border-t border-white/40 pt-4 dark:border-white/10">
+      <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">About</h4>
+      <ul class="flex flex-col gap-1.5 text-sm">
+        <li>
+          <a
+            href="https://metaspry.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="inline-flex items-center gap-1.5 text-indigo-600 hover:underline dark:text-indigo-300"
+          >
+            metaspry.com
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M7 17 17 7M9 7h8v8" />
+            </svg>
+          </a>
+        </li>
+        <li>
+          <a
+            href="https://metaspry.com/docs/"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-slate-600 hover:text-indigo-600 hover:underline dark:text-slate-300 dark:hover:text-indigo-300"
+          >Docs</a>
+        </li>
+        <li>
+          <a
+            href="https://metaspry.com/roadmap/"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-slate-600 hover:text-indigo-600 hover:underline dark:text-slate-300 dark:hover:text-indigo-300"
+          >Roadmap</a>
+        </li>
+        <li>
+          <a
+            href="https://metaspry.com/blog/"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-slate-600 hover:text-indigo-600 hover:underline dark:text-slate-300 dark:hover:text-indigo-300"
+          >Blog</a>
+        </li>
+        <li>
+          <a
+            href="https://github.com/metaspry/metaspry/issues/new/choose"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-slate-600 hover:text-indigo-600 hover:underline dark:text-slate-300 dark:hover:text-indigo-300"
+          >Report a bug</a>
+        </li>
+      </ul>
+    </section>
   </aside>
 {/if}
