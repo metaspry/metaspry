@@ -226,11 +226,19 @@ Chrome Web Store requires PNG only. JPEG / SVG / WebP are rejected.
 
 Suggested screenshots (in order):
 
-1. **Audit tab** - the 0-100 score with rule list. Use `example.com` or `vercel.com`.
-2. **Previews tab** - Twitter / Facebook / LinkedIn / iMessage mockups side-by-side.
+1. **Audit tab** - the 0-100 score with rule list. Use `coograph.com` (real workflow shot).
+2. **Previews tab** - Twitter / Facebook / LinkedIn mockups side-by-side.
 3. **Tags tab** - filtered to `og:` with the search input populated.
 4. **Site tab** - robots.txt + sitemap-index expanded.
-5. **Compare tab** - two scans side-by-side.
+5. **Compare tab** - two scans side-by-side (coograph.com vs metaspry.com).
+
+Full capture runbook in [`docs/store-screenshots.md`](docs/store-screenshots.md). It walks through Chrome window sizing, side-panel framing, what to show per tab, and how to normalize raw snips to exact 1280x800 PNG via `scripts/process-screenshots.mjs`.
+
+```powershell
+# After saving raw captures into promo/raw-screenshots/
+node scripts/process-screenshots.mjs
+# -> promo/screenshot-01.png ... screenshot-05.png  (1280x800, 24-bit, no alpha)
+```
 
 ### Version bump checklist (every release)
 
