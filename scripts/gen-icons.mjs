@@ -1,18 +1,18 @@
 #!/usr/bin/env node
 /**
  * Render the Metaspry brand mark to all icon sizes Chrome + the Web Store need.
+ * The "M" path is identical to src/components/Logo.astro on the website so
+ * extension and site stay visually consistent.
  *
  * Outputs (all PNG):
  *   static/icons/icon-16.png    toolbar
  *   static/icons/icon-32.png    toolbar HiDPI / Windows
  *   static/icons/icon-48.png    chrome://extensions card
  *   static/icons/icon-128.png   install screen + Chrome Web Store icon
- *   static/icons/icon-512.png   Web Store hero (uploads as 128 by store, but
- *                               keep a hi-res master for the listing page)
+ *   static/icons/icon-512.png   hi-res master for the listing page
  *   static/icons/promo-440x280.png  Chrome Web Store "small promo tile"
  *
- * Run from this repo's root: `node scripts/gen-icons.mjs`
- * Requires sharp (already a peer of @sveltejs adapter).
+ * Run: `npm run gen-icons`
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
@@ -25,12 +25,17 @@ const ACCENT = '#7c69ef';
 const ACCENT_STRONG = '#5b4ed8';
 const BG_LIGHT = '#fbfbff';
 
-// Square brand-mark SVG. Rounded purple tile with a stylized "M" mark that
-// reads at 16px (most-zoomed-out usage in Chrome's toolbar).
+// Brand-mark M path — same as src/components/Logo.astro on the website.
+// Path bounding box: x=4..20 (width 16), y=5..19 (height 14) in 24x24 viewBox.
+// Visually centered within the viewBox; nested <svg> with matching viewBox
+// guarantees centered placement inside the tile at any tile size.
+const M_PATH = 'M4 19V5h2.5L12 13l5.5-8H20v14h-3v-9l-4.2 6h-1.6L7 10v9H4z';
+
 function tileSvg(size) {
-  const corner = Math.round(size * 0.22); // ~22% radius matches the website logo
-  // Path is a clean angular "M" — chosen for readability at small sizes
-  // rather than the more decorative version on the marketing site.
+  const corner = Math.round(size * 0.22);
+  // Glyph occupies the inner 60% of the tile, centered.
+  const glyphSize = size * 0.6;
+  const glyphOffset = (size - glyphSize) / 2;
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}">
   <defs>
@@ -40,17 +45,20 @@ function tileSvg(size) {
     </linearGradient>
   </defs>
   <rect x="0" y="0" width="${size}" height="${size}" rx="${corner}" ry="${corner}" fill="url(#grad)"/>
-  <g transform="translate(${size * 0.21}, ${size * 0.27}) scale(${size * 0.012})">
-    <path d="M0 40V0h6l13 20L32 0h6v40h-8V14l-9 13h-4l-9-13v26z" fill="#ffffff"/>
-  </g>
+  <svg x="${glyphOffset}" y="${glyphOffset}" width="${glyphSize}" height="${glyphSize}" viewBox="0 0 24 24">
+    <path d="${M_PATH}" fill="#ffffff"/>
+  </svg>
 </svg>`;
 }
 
-// Promo tile (440x280) for the Chrome Web Store small promo slot. Centered
-// brand mark on the same pastel gradient the marketing site uses, plus
-// product name and 1-line benefit copy.
 function promoSvg() {
   const w = 440, h = 280;
+  const tileSize = 100;
+  const tileX = 40;
+  const tileY = (h - tileSize) / 2;
+  const corner = 22;
+  const glyphSize = tileSize * 0.6;
+  const glyphOffset = (tileSize - glyphSize) / 2;
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" font-family="ui-sans-serif, Inter, sans-serif">
   <defs>
@@ -65,13 +73,11 @@ function promoSvg() {
     </linearGradient>
   </defs>
   <rect width="${w}" height="${h}" fill="url(#bg)"/>
-  <g transform="translate(40, 95)">
-    <rect width="90" height="90" rx="22" fill="url(#tile)"/>
-    <g transform="translate(19, 25) scale(1.3)">
-      <path d="M0 40V0h6l13 20L32 0h6v40h-8V14l-9 13h-4l-9-13v26z" fill="#ffffff"/>
-    </g>
-  </g>
-  <g transform="translate(160, 110)">
+  <rect x="${tileX}" y="${tileY}" width="${tileSize}" height="${tileSize}" rx="${corner}" fill="url(#tile)"/>
+  <svg x="${tileX + glyphOffset}" y="${tileY + glyphOffset}" width="${glyphSize}" height="${glyphSize}" viewBox="0 0 24 24">
+    <path d="${M_PATH}" fill="#ffffff"/>
+  </svg>
+  <g transform="translate(${tileX + tileSize + 30}, ${tileY + 18})">
     <text x="0" y="0" fill="#0f172a" font-size="34" font-weight="700" letter-spacing="-0.8">Metaspry</text>
     <text x="0" y="32" fill="#475569" font-size="16" font-weight="500">Audit any page's meta tags.</text>
     <text x="0" y="56" fill="#475569" font-size="16" font-weight="500">Free Chrome extension.</text>
@@ -95,13 +101,6 @@ for (const s of sizes) {
 }
 await render(promoSvg(), `${OUT_DIR}/promo-440x280.png`, 440, 280);
 
-console.log('\nAdd to manifest.json:\n');
-console.log(JSON.stringify({
-  icons: {
-    16: 'icons/icon-16.png',
-    32: 'icons/icon-32.png',
-    48: 'icons/icon-48.png',
-    128: 'icons/icon-128.png',
-  },
-  action: { default_icon: { 16: 'icons/icon-16.png', 32: 'icons/icon-32.png' } },
-}, null, 2));
+// Also write the source SVG at 512 for the website to mirror.
+writeFileSync(`${OUT_DIR}/icon.svg`, tileSvg(512));
+console.log(`wrote ${OUT_DIR}/icon.svg (master)`);
