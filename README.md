@@ -172,7 +172,7 @@ The Chrome Web Store review form asks "why does the extension need this?" for ea
 | `scripting` | Inject a one-shot DOM scraper into the active tab to capture meta tags from the page the user is viewing. Required because `chrome.tabs.executeScript` was removed in MV3. |
 | `sidePanel` | Render the audit UI as a side panel (the default surface). Users can switch to a popup in settings. |
 | `storage` | Save scan history, settings (length thresholds, rule weights), pinned tags, and side-panel-vs-popup preference locally via `chrome.storage.local`. Nothing is synced or transmitted. |
-| `contextMenus` | Add a right-click "Audit this page with Metaspry" entry to launch a scan from the page context. |
+| `contextMenus` | Required to add a single "Spy this page with Metaspry" entry to the browser's right-click menu. Clicking that entry opens the extension's side panel (or popup, per the user's preferred mode) on the current page. Only one top-level item is added; the extension does not modify, replace, or read any other context menu entries. |
 | `host_permissions: *://*/*` | Fetch `robots.txt`, `sitemap.xml`, and `llms.txt` from the same host as the page the user is auditing. Required because these files live at the host root, not necessarily the page URL. No cross-host fetches are made. |
 
 ### Single purpose
