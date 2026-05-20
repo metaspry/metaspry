@@ -164,6 +164,22 @@
     if (tab && isActiveTab(tab.id)) activeTab = tab.id;
   }
 
+  // Popup focus-loss hint state. Persisted so a user who's dismissed it
+  // doesn't see it again every time the popup opens.
+  let popupHintDismissed = false;
+  function loadPopupHintDismissed() {
+    if (typeof chrome === 'undefined' || !chrome.storage?.local) return;
+    chrome.storage.local.get('popupHintDismissed', (r) => {
+      popupHintDismissed = r.popupHintDismissed === true;
+    });
+  }
+  function dismissPopupHint() {
+    popupHintDismissed = true;
+    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+      chrome.storage.local.set({ popupHintDismissed: true });
+    }
+  }
+
   function onRuntimeMessage(_msg: any) {
     // Reserved for future cross-surface coordination. Mode-switch reopening
     // is handled in switchMode() below, inside the user-gesture click, so
@@ -208,6 +224,7 @@
     if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
       chrome.runtime.onMessage.addListener(onRuntimeMessage);
     }
+    loadPopupHintDismissed();
     registerShortcuts({
       focusSearch,
       selectTab: selectTabByIndex,
@@ -288,6 +305,36 @@
         </button>
       </div>
     </header>
+
+    {#if $mode === 'popup' && !popupHintDismissed}
+      <aside
+        class="mt-3 flex items-center gap-2 rounded-xl border border-amber-300/50 bg-amber-50/80 px-3 py-2 text-xs text-amber-900 backdrop-blur-md dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200"
+        role="note"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 flex-shrink-0">
+          <path d="M12 9v4M12 17h.01" />
+          <circle cx="12" cy="12" r="10" stroke-width="1.5" />
+        </svg>
+        <span class="flex-1">
+          Popup closes when you switch tabs.
+          <button
+            type="button"
+            on:click={() => switchMode('sidepanel')}
+            class="font-semibold underline underline-offset-2 hover:opacity-80"
+          >Use side panel</button>
+        </span>
+        <button
+          type="button"
+          aria-label="Dismiss"
+          on:click={dismissPopupHint}
+          class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full transition hover:bg-amber-200/60 dark:hover:bg-amber-500/20"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-3 w-3">
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
+        </button>
+      </aside>
+    {/if}
 
     {#if view === "landing"}
       <div class="flex flex-col gap-1">

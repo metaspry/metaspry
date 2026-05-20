@@ -22,7 +22,10 @@
   }
 
   function openInNewTab(url: string) {
-    chrome.tabs.create({ url });
+    // active: false opens the new tab in the background so the popup retains
+    // focus. Without it Chrome immediately closes the popup when the new tab
+    // takes focus, leaving the user with an unaudited new page and no UI.
+    chrome.tabs.create({ url, active: false });
   }
 
   function onWindowClick(event: MouseEvent) {
