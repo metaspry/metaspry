@@ -59,6 +59,14 @@
           <button type="button" on:click={clearHistory} class="text-rose-500 hover:underline dark:text-rose-400">Clear</button>
         {/if}
       </header>
+      {#if $history.length > 0}
+        <p class="flex items-center gap-1 border-b border-white/40 px-3 py-1.5 text-[10px] text-slate-500 dark:border-white/10 dark:text-slate-400">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-3 w-3" aria-hidden="true">
+            <path d="M7 17 17 7M8 7h9v9" />
+          </svg>
+          Click to open in a new tab
+        </p>
+      {/if}
       {#if $history.length === 0}
         <p class="px-3 py-4 text-center text-xs text-slate-500 dark:text-slate-400">No history yet.</p>
       {:else}
@@ -67,12 +75,28 @@
             <li class="border-b border-white/40 last:border-b-0 dark:border-white/5">
               <button
                 type="button"
+                title="Open in new tab"
                 on:click={() => openInNewTab(entry.url)}
-                class="flex w-full items-center gap-2 px-3 py-2 text-left transition hover:bg-white/60 dark:hover:bg-white/5"
+                class="group/row flex w-full items-center gap-2 px-3 py-2 text-left transition hover:bg-white/60 dark:hover:bg-white/5"
               >
                 <span class="rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums {bandColor(entry.score)}">{entry.score}</span>
                 <span class="min-w-0 flex-1">
-                  <span class="block truncate text-xs font-medium text-slate-900 dark:text-slate-50">{entry.title || entry.hostname}</span>
+                  <span class="flex items-center gap-1">
+                    <span class="truncate text-xs font-medium text-slate-900 dark:text-slate-50">{entry.title || entry.hostname}</span>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                      class="h-3 w-3 flex-shrink-0 text-slate-400 opacity-0 transition group-hover/row:opacity-100 dark:text-slate-500"
+                    >
+                      <path d="M7 17 17 7M8 7h9v9" />
+                    </svg>
+                  </span>
                   <span class="block truncate text-[10px] text-slate-500 dark:text-slate-400">{entry.hostname}</span>
                 </span>
                 <span class="text-[10px] text-slate-400 dark:text-slate-500">{rel(entry.timestamp)}</span>
