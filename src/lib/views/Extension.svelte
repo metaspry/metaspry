@@ -164,7 +164,20 @@
     if (tab && isActiveTab(tab.id)) activeTab = tab.id;
   }
 
+  function onRuntimeMessage(msg: any) {
+    // Background broadcasts mode-changed when the user toggles between
+    // sidepanel/popup. We close ourselves so the next icon (or context-menu)
+    // click reopens the extension cleanly in the new surface instead of
+    // leaving the old one mounted with stale action behavior.
+    if (msg?.message === 'mode-changed') {
+      try { window.close(); } catch { /* not all surfaces can self-close */ }
+    }
+  }
+
   onMount(() => {
+    if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
+      chrome.runtime.onMessage.addListener(onRuntimeMessage);
+    }
     registerShortcuts({
       focusSearch,
       selectTab: selectTabByIndex,
