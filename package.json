@@ -6,7 +6,8 @@
 		"dev": "vite dev",
 		"build": "vite build && node removeInlineScript.cjs",
 		"preview": "vite preview",
-		"watch-src": "nodemon --watch src --ext svelte --exec \"npm run build\""
+		"watch-src": "nodemon --watch src --ext svelte --exec \"npm run build\"",
+		"gen-icons": "node scripts/gen-icons.mjs"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-auto": "^2.0.0",
@@ -15,6 +16,7 @@
 		"autoprefixer": "^10.4.16",
 		"onchange": "^7.1.0",
 		"postcss": "^8.4.31",
+		"sharp": "^0.34.5",
 		"svelte": "^4.0.5",
 		"tailwindcss": "^3.3.5",
 		"vite": "^4.4.2"

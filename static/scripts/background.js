@@ -2,10 +2,16 @@
 // Source of truth lives in chrome.storage.local under key "mode".
 const POPUP_PATH = 'index.html';
 const CONTEXT_MENU_ID = 'metaspry-open';
+const CONTEXT_MENU_TITLE = 'Spy this page with Metaspry';
+
+// In-memory mirror of the stored mode. Reading from chrome.storage in the
+// contextMenus.onClicked handler is async, and the user-gesture window for
+// chrome.action.openPopup / chrome.sidePanel.open is short. Keep it hot.
+let currentMode = 'sidepanel';
 
 function applyMode(mode) {
-  const next = mode === 'popup' ? 'popup' : 'sidepanel';
-  if (next === 'popup') {
+  currentMode = mode === 'popup' ? 'popup' : 'sidepanel';
+  if (currentMode === 'popup') {
     chrome.action.setPopup({ popup: POPUP_PATH });
     chrome.sidePanel
       .setPanelBehavior({ openPanelOnActionClick: false })
@@ -24,45 +30,35 @@ function readAndApplyMode() {
   });
 }
 
-// --- Context menu: "Open Metaspry" on any page right-click -----------------
+// --- Context menu: page right-click ----------------------------------------
 
 function ensureContextMenu() {
-  // Remove first then create, so re-installs on update don't throw
-  // "duplicate id" errors when the menu already exists from a prior install.
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
       id: CONTEXT_MENU_ID,
-      title: 'Open Metaspry',
+      title: CONTEXT_MENU_TITLE,
       contexts: ['page', 'selection', 'link', 'image', 'frame'],
     });
   });
 }
 
-async function openExtension(tab) {
-  const { mode } = await chrome.storage.local.get('mode');
-  const isPopup = mode === 'popup';
-
-  if (isPopup) {
-    // openPopup() is restricted to user-gesture contexts. contextMenus.onClicked
-    // qualifies. Chrome 127+.
-    try {
-      await chrome.action.openPopup();
-      return;
-    } catch (err) {
-      console.warn('action.openPopup failed, falling back to side panel:', err);
-    }
-  }
-
-  if (!tab) {
-    const [active] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-    tab = active;
+function openExtensionFromGesture(tab) {
+  // Called synchronously inside a user-gesture handler so chrome.sidePanel.open
+  // / chrome.action.openPopup retain gesture context. NO awaits before the
+  // open() call.
+  if (currentMode === 'popup') {
+    chrome.action.openPopup().catch((err) => {
+      // Older Chrome (<127) or non-popup-allowed context — fall back to
+      // side panel so the right-click never feels broken.
+      console.warn('action.openPopup unavailable, falling back to side panel:', err);
+      if (tab?.windowId != null) {
+        chrome.sidePanel.open({ windowId: tab.windowId }).catch(console.error);
+      }
+    });
+    return;
   }
   if (tab?.windowId != null) {
-    try {
-      await chrome.sidePanel.open({ windowId: tab.windowId });
-    } catch (err) {
-      console.error('sidePanel.open failed:', err);
-    }
+    chrome.sidePanel.open({ windowId: tab.windowId }).catch(console.error);
   }
 }
 
@@ -77,19 +73,13 @@ chrome.runtime.onStartup.addListener(() => {
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area !== 'local' || !changes.mode) {
-    return;
-  }
+  if (area !== 'local' || !changes.mode) return;
   applyMode(changes.mode.newValue);
-  // Tell any open extension surfaces to close themselves so the next icon
-  // click reopens cleanly in the new mode rather than reusing the orphaned UI.
-  chrome.runtime.sendMessage({ message: 'mode-changed', mode: changes.mode.newValue })
-    .catch(() => { /* no listeners is fine */ });
 });
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId !== CONTEXT_MENU_ID) return;
-  openExtension(tab);
+  openExtensionFromGesture(tab);
 });
 
 readAndApplyMode();

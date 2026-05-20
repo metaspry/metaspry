@@ -164,14 +164,44 @@
     if (tab && isActiveTab(tab.id)) activeTab = tab.id;
   }
 
-  function onRuntimeMessage(msg: any) {
-    // Background broadcasts mode-changed when the user toggles between
-    // sidepanel/popup. We close ourselves so the next icon (or context-menu)
-    // click reopens the extension cleanly in the new surface instead of
-    // leaving the old one mounted with stale action behavior.
-    if (msg?.message === 'mode-changed') {
-      try { window.close(); } catch { /* not all surfaces can self-close */ }
+  function onRuntimeMessage(_msg: any) {
+    // Reserved for future cross-surface coordination. Mode-switch reopening
+    // is handled in switchMode() below, inside the user-gesture click, so
+    // chrome.sidePanel.open / chrome.action.openPopup retain gesture context.
+  }
+
+  function switchMode(next: Mode) {
+    if (next === $mode) return;
+    const current = $mode;
+
+    // The click that fired this handler is a valid user gesture. We MUST
+    // call chrome.sidePanel.open / chrome.action.openPopup synchronously
+    // before any awaits, otherwise Chrome drops the gesture and rejects
+    // with "must be called in response to a user gesture".
+    try {
+      if (next === 'popup') {
+        chrome.action.openPopup().catch((err) => console.warn('openPopup:', err));
+      } else {
+        chrome.windows.getCurrent().then((win) => {
+          if (win?.id != null) {
+            chrome.sidePanel.open({ windowId: win.id }).catch((err) => console.warn('sidePanel.open:', err));
+          }
+        });
+      }
+    } catch (err) {
+      console.warn('switchMode open failed:', err);
     }
+
+    // Persist the new mode so background script updates action behavior.
+    setMode(next);
+
+    // Close the surface we were in. window.close() works for popup; the
+    // side panel doesn't always honor it, but it's safe to call.
+    setTimeout(() => {
+      try { window.close(); } catch { /* ignore */ }
+    }, 50);
+
+    void current;
   }
 
   onMount(() => {
@@ -205,7 +235,7 @@
               type="button"
               role="radio"
               aria-checked={$mode === opt.value}
-              on:click={() => setMode(opt.value)}
+              on:click={() => switchMode(opt.value)}
               class="rounded-full px-2.5 py-1 transition {$mode === opt.value
                 ? 'bg-white text-indigo-600 shadow-sm dark:bg-slate-900 dark:text-indigo-300'
                 : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100'}"
