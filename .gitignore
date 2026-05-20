@@ -8,3 +8,10 @@ node_modules
 !.env.example
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Code-graph (local generated index)
+.code-graph/
+.github/code-graph/node_modules/
+
+# Coograph (local session logs)
+.coograph/

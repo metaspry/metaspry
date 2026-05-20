@@ -1,5 +1,5 @@
 {
-	"name": "metagify",
+	"name": "metaspry",
 	"version": "0.0.1",
 	"private": true,
 	"scripts": {
@@ -22,7 +22,6 @@
 	"type": "module",
 	"dependencies": {
 		"@types/chrome": "^0.0.251",
-		"compromise": "^14.10.1",
 		"nodemon": "^3.0.1"
 	}
 }

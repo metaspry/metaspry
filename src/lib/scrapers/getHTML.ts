@@ -1,19 +1,22 @@
-export async function getHTML(): Promise<HTMLElement | null> {
+export interface PageHtml {
+  html: HTMLElement | null;
+  url: string;
+}
+
+export async function getHTML(): Promise<PageHtml> {
   return new Promise((resolve, reject) => {
     chrome.runtime.sendMessage({ message: 'getHTML' }, (response) => {
-      if (response && response.html) {
-        // Parse the received HTML string to create an HTMLElement
+      if (!response) {
+        reject(new Error('No response from background script.'));
+        return;
+      }
+      const url = typeof response.url === 'string' ? response.url : '';
+      if (response.html) {
         const tempElement = document.createElement('html');
         tempElement.innerHTML = response.html;
-        // Check if the element exists
-        if (tempElement) {
-          resolve(tempElement);
-        
-        } else {
-          reject(new Error('HTML element not found'));
-        }
+        resolve({ html: tempElement, url });
       } else {
-        reject(new Error('No response or HTML content found'));
+        resolve({ html: null, url });
       }
     });
   });
