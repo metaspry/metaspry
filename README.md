@@ -133,33 +133,32 @@ Reference copy + asset checklist for the [Developer Dashboard](https://chrome.go
 
 ### Detailed description
 
-> The one-click meta-tag analyzer for modern websites. See exactly what Google, Twitter, LinkedIn, Discord, Slack, and iMessage see when they crawl your page - locally, with no account, no telemetry.
+> Updated 2026-05-21 to remove the duplicated platform enumeration that the Chrome Web Store rejected as keyword spam (violation ref Yellow Argon). Each brand name now appears at most once.
+
+> The one-click meta-tag analyzer for modern websites. See how social platforms and search engines will render your page - locally, with no account, no telemetry.
 >
 > Open any page, click the toolbar icon, and the side panel shows:
 >
-> • TAGS - every <meta> element on the page, categorized into OG / Twitter / SEO / basic / other. Search, copy, and pin tags across pages.
+> • TAGS - every <meta> element on the page, categorized for quick scanning. Search, copy, and pin tags across pages.
 >
-> • PREVIEWS - exact mockups for Facebook, Twitter (summary + large image), LinkedIn, Discord, Slack, Google SERP, and iMessage. Rendered from the page's own tags, fallback chains documented.
+> • PREVIEWS - exact mockups of how your share card looks on Facebook, X (formerly Twitter), LinkedIn, Discord, Slack, Google search results, and iMessage. Rendered from the page's own tags, with documented fallback chains.
 >
-> • AUDIT - weighted 0-100 score across 12+ rules covering required, recommended, and best-practice meta-tag hygiene. Includes live og:image dimension checking.
+> • AUDIT - weighted 0-100 score across 12+ rules covering required, recommended, and best-practice meta-tag hygiene. Includes live image dimension checking.
 >
 > • SITE - robots.txt, sitemap.xml (recursive sitemap-index expansion, 7 fallback paths), and llms.txt fetched and parsed from the page's host.
 >
 > WHY METASPRY
 >
 > - Free forever. No account, no signup, no card.
-> - Local-first. Three HTTPS fetches per scan (robots / sitemap / llms) issued from your browser to the page's own host. No third-party calls.
+> - Local-first. Three HTTPS fetches per scan (the three site files above) issued from your browser to the page's own host. No third-party calls.
 > - Privacy-respecting. No telemetry, no analytics, no tracking.
-> - Works offline (cached page meta).
-> - Open roadmap. Vote on features at https://metaspry.com/roadmap
+> - Works offline once a page is cached.
+> - Open roadmap on metaspry.com.
 >
-> Built for engineers, SEO specialists, content teams, and indie builders who care what crawlers actually see.
+> Built for engineers, SEO specialists, content teams, and indie builders.
 >
-> Full docs: https://metaspry.com/docs
-> Roadmap + changelog: https://metaspry.com/roadmap
-> Blog: https://metaspry.com/blog
->
-> Found a bug or have a feature request? https://github.com/metaspry/metaspry/issues
+> Docs and roadmap: https://metaspry.com
+> Bug reports: https://github.com/metaspry/metaspry/issues
 
 ### Justification copy (Permissions)
 
