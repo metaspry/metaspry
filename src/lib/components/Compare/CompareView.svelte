@@ -10,7 +10,11 @@
   export let leftUrl: string;
   export let leftScore: number = 0;
 
-  let url = '';
+  // Pre-fill with the audited page's own URL so first-success is one click
+  // away — user typically wants to compare against a previous version or a
+  // sibling URL, both of which are easier to derive by editing this than
+  // typing from scratch.
+  let url = leftUrl ?? '';
   let loading = false;
   let errorMessage = '';
   let rightMeta: PageMeta | null = null;
