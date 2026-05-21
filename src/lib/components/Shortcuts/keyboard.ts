@@ -34,7 +34,7 @@ export function attachShortcuts(): () => void {
     } else if (event.key === 'r' || event.key === 'R') {
       handlers.rescrape?.();
       event.preventDefault();
-    } else if (event.key >= '1' && event.key <= '4') {
+    } else if (event.key >= '1' && event.key <= '5') {
       const idx = Number(event.key) - 1;
       handlers.selectTab?.(idx);
       event.preventDefault();

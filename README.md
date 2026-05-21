@@ -17,7 +17,7 @@ Open any web page, click the toolbar icon, and the side panel shows four tabs:
 - **Audit** - weighted 0-100 score across 12+ rules covering required, recommended, and best-practice meta-tag hygiene. Live image dimension checking included.
 - **Site** - `robots.txt`, `sitemap.xml` (recursive sitemap-index expansion, 7 fallback paths), and `llms.txt` fetched and parsed from the page's host.
 
-Local-first by design. Three HTTPS fetches per scan (`robots.txt`, `sitemap.xml`, `llms.txt`) issued from your browser to the page's own host. No telemetry, no analytics, no third-party calls.
+Local-first by design. Outbound fetches per scan: `robots.txt`, `llms.txt`, plus up to 7 sitemap fallback paths and recursive sitemap-index expansion (capped at 20 children, depth 2) — all to the page's own host. The optional **Compare** tab fetches a URL you type, and the og:image rule loads the page's declared share image to measure dimensions. No telemetry, no analytics, no first-party servers.
 
 Full docs: **[metaspry.com/docs](https://metaspry.com/docs/)**
 
@@ -150,7 +150,7 @@ Reference copy + asset checklist for the [Developer Dashboard](https://chrome.go
 > WHY METASPRY
 >
 > - Free forever. No account, no signup, no card.
-> - Local-first. Three HTTPS fetches per scan (the three site files above) issued from your browser to the page's own host. No third-party calls.
+> - Local-first. The audit, parsing, and previews all run inside your browser. The only network calls are reading the site files of the page you audit (robots, sitemap, llms.txt). No first-party servers.
 > - Privacy-respecting. No telemetry, no analytics, no tracking.
 > - Works offline once a page is cached.
 > - Open roadmap on metaspry.com.
@@ -172,7 +172,7 @@ The Chrome Web Store review form asks "why does the extension need this?" for ea
 | `sidePanel` | Render the audit UI as a side panel (the default surface). Users can switch to a popup in settings. |
 | `storage` | Save scan history, settings (length thresholds, rule weights), pinned tags, and side-panel-vs-popup preference locally via `chrome.storage.local`. Nothing is synced or transmitted. |
 | `contextMenus` | Required to add a single "Spy this page with Metaspry" entry to the browser's right-click menu. Clicking that entry opens the extension's side panel (or popup, per the user's preferred mode) on the current page. Only one top-level item is added; the extension does not modify, replace, or read any other context menu entries. |
-| `host_permissions: *://*/*` | Fetch `robots.txt`, `sitemap.xml`, and `llms.txt` from the same host as the page the user is auditing. Required because these files live at the host root, not necessarily the page URL. No cross-host fetches are made. |
+| `host_permissions: *://*/*` | Fetch `robots.txt`, `sitemap.xml`, and `llms.txt` from the same host as the page the user is auditing. Required because these files live at the host root, not necessarily the page URL. Same-host by default. Cross-host fetches only happen when the user explicitly uses the **Compare** tab or when the audited page declares an off-host `og:image` (loaded as `<img>` to measure dimensions). |
 
 ### Single purpose
 

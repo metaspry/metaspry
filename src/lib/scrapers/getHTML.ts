@@ -12,9 +12,12 @@ export async function getHTML(): Promise<PageHtml> {
       }
       const url = typeof response.url === 'string' ? response.url : '';
       if (response.html) {
-        const tempElement = document.createElement('html');
-        tempElement.innerHTML = response.html;
-        resolve({ html: tempElement, url });
+        // DOMParser is guaranteed inert: subresources don't load, scripts
+        // don't execute, even when the resulting document is later
+        // appended. Safer than innerHTML on a disconnected <html> node
+        // even though both are effectively safe with our current usage.
+        const doc = new DOMParser().parseFromString(response.html, 'text/html');
+        resolve({ html: doc.documentElement, url });
       } else {
         resolve({ html: null, url });
       }
