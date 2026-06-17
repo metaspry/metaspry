@@ -46,17 +46,39 @@ export function toScanPayload(
   const tagValue = (key: string): string | undefined =>
     meta.tags.find((t) => t.key.toLowerCase() === key)?.value;
 
-  // Trim site files to a summary (no raw text; cap samples) for the app's Site tab.
+  // Trim site files to a summary (no raw text; cap lists) for the app's Site tab — 1:1 detail.
   const siteFilesSummary = siteFiles
     ? {
-        robots: { present: siteFiles.robots.present, sitemaps: siteFiles.robots.sitemaps.slice(0, 10) },
+        robots: {
+          present: siteFiles.robots.present,
+          groups: siteFiles.robots.groups.slice(0, 8).map((g) => ({
+            userAgents: g.userAgents,
+            disallow: g.disallow.length,
+            allow: g.allow.length,
+          })),
+          sitemaps: siteFiles.robots.sitemaps.slice(0, 10),
+        },
         sitemap: {
           present: siteFiles.sitemap.present,
-          urlCount: siteFiles.sitemap.urlCount,
           isIndex: siteFiles.sitemap.isIndex,
-          sample: siteFiles.sitemap.sample.slice(0, 5),
+          urlCount: siteFiles.sitemap.urlCount,
+          childCount: siteFiles.sitemap.childCount,
+          children: siteFiles.sitemap.children.slice(0, 20).map((c) => ({
+            url: c.url,
+            urlCount: c.urlCount,
+            isIndex: c.isIndex,
+            error: c.error,
+          })),
+          sample: siteFiles.sitemap.sample.slice(0, 10),
+          truncated: siteFiles.sitemap.truncated,
         },
-        llms: { present: siteFiles.llms.present, sections: siteFiles.llms.sections.length },
+        llms: {
+          present: siteFiles.llms.present,
+          sections: siteFiles.llms.sections.slice(0, 15).map((s) => ({
+            heading: s.heading,
+            links: s.links.slice(0, 15),
+          })),
+        },
       }
     : undefined;
 
