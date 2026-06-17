@@ -78,6 +78,7 @@ export function toScanPayload(
       description: tagValue('description'),
       canonical: meta.canonical ?? undefined,
       ogImage: tagValue('og:image') ?? tagValue('twitter:image'),
+      favicon: meta.icon ?? undefined,
       tagCount: meta.tags.length,
       tags: meta.tags.map((t) => ({ key: t.key, value: t.value, category: t.category })),
     },
@@ -90,6 +91,7 @@ export function toScanPayload(
         status: mapStatus(r.status),
         severity: r.severity,
         message: r.detail || undefined,
+        meta: r.meta,
       })),
     },
   };
