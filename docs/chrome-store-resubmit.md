@@ -1,40 +1,30 @@
-# Chrome Web Store — resubmit after Yellow Argon rejection
+# Chrome Web Store — resubmit after Yellow Argon rejection (round 2)
 
-## The rejection
+## The rejection (round 2 — 2026-05-22)
 
 Item: Metaspry (`kibedpkbadcofhbcpfigjmjanmdkmaji`)
 Violation reference: **Yellow Argon — Keyword Spam**
 Cited content:
 
-> "Facebook, Twitter (summary + large image), LinkedIn, Discord, Slack, Google SERP, and iMessage. Facebook, Twitter (summary + large image), LinkedIn, Discord, Slack, Google SERP, and iMessage"
+> "Facebook, X (formerly Twitter), LinkedIn, Discord, Slack, Google search results, and iMessage."
 
-The reviewer joined two near-identical platform enumerations from different paragraphs of the description and flagged the combined text as keyword stuffing. Specifically:
+Round 1 fix (single-enumeration PREVIEWS bullet) was **also rejected**. Reviewer is treating any 7-platform enumeration as keyword stuffing, regardless of repetition count. The fallback plan from the prior round (line 107 below) is now the required path: **drop platform names from the description entirely**.
 
-- Intro paragraph: "See exactly what Google, Twitter, LinkedIn, Discord, Slack, and iMessage see..."
-- PREVIEWS bullet: "exact mockups for Facebook, Twitter (summary + large image), LinkedIn, Discord, Slack, Google SERP, and iMessage..."
+## Round-1 history (context)
 
-Each platform name appeared 2x in the listing, totaling ~12 brand-name repetitions. That's the trigger.
+First rejection cited the description listing each platform twice (intro + PREVIEWS bullet). Round-1 fix collapsed to a single enumeration. That was still over the threshold.
 
-## Appeal vs resubmit — pick resubmit
+## Round-2 fix — platform-free description (copy-paste ready)
 
-| Option | Pros | Cons |
-|---|---|---|
-| Appeal | Faster if reviewer mis-flagged. Free. | They didn't mis-flag — the description literally enumerated platforms twice. Likely-denied appeal. |
-| **Resubmit** | Fixes the actual issue, low review cycle time. | Need to wait the normal review queue. |
+Zero platform brand names. PREVIEWS bullet describes the feature generically and points to metaspry.com for the platform list (no Chrome Store keyword filter on your own site).
 
-Recommendation: **resubmit with the cleaned description below**. Skip the appeal.
-
-## New description (copy-paste ready)
-
-Each platform name appears at most once. Intro uses generic "social platforms and search engines" language. PREVIEWS bullet enumerates each platform exactly once, naturally phrased. WHY METASPRY no longer mentions platforms.
-
-> The one-click meta-tag analyzer for modern websites. See how social platforms and search engines will render your page - locally, with no account, no telemetry.
+> The one-click meta-tag analyzer for modern websites. See how your page renders across major social and search platforms - locally, with no account, no telemetry.
 >
 > Open any page, click the toolbar icon, and the side panel shows:
 >
 > • TAGS - every <meta> element on the page, categorized for quick scanning. Search, copy, and pin tags across pages.
 >
-> • PREVIEWS - exact mockups of how your share card looks on Facebook, X (formerly Twitter), LinkedIn, Discord, Slack, Google search results, and iMessage. Rendered from the page's own tags, with documented fallback chains.
+> • PREVIEWS - exact mockups of how your share card renders on the major social and search platforms. Rendered from the page's own tags, with documented fallback chains. Full platform list at metaspry.com/docs/previews.
 >
 > • AUDIT - weighted 0-100 score across 12+ rules covering required, recommended, and best-practice meta-tag hygiene. Includes live image dimension checking.
 >
@@ -52,6 +42,10 @@ Each platform name appears at most once. Intro uses generic "social platforms an
 >
 > Docs and roadmap: https://metaspry.com
 > Bug reports: https://github.com/metaspry/metaspry/issues
+
+## Prerequisite — publish the platform list page on metaspry.com
+
+The PREVIEWS bullet now points to `metaspry.com/docs/previews`. That page MUST exist before resubmit, otherwise the link is a broken claim. Verify or create it.
 
 ## Other listing fields — verify before resubmit
 
@@ -79,16 +73,30 @@ Note: avoid listing platform names ("Facebook", "X", "LinkedIn", etc.) in captio
 
 ## Resubmit steps
 
-1. Open https://chrome.google.com/webstore/devconsole/
-2. Select **Metaspry** (`kibedpkbadcofhbcpfigjmjanmdkmaji`)
-3. **Store listing** tab:
+1. **Rebuild + repack** — `npm run build` then zip the `build/` directory as `metaspry-v1.0.5.zip`. The manifest `description` field was also a keyword-spam vector (round-2 fix below).
+2. Open https://chrome.google.com/webstore/devconsole/
+3. Select **Metaspry** (`kibedpkbadcofhbcpfigjmjanmdkmaji`)
+4. **Package** tab: upload `metaspry-v1.0.5.zip`.
+5. **Store listing** tab:
    - Replace the **Detailed description** with the block above.
    - Replace the **Short summary (132)** with the 95-char version above.
    - Verify screenshot captions per the table above. Re-upload any that repeat platforms.
-4. Save draft. Verify the description renders the same line breaks you pasted.
-5. **Submit for review.**
+6. Save draft. Verify the description renders the same line breaks you pasted.
+7. **Submit for review.**
 
-Build / package: **upload the new `metaspry-v1.0.4.zip`** generated by the same pipeline. Version bump 1.0.3 → 1.0.4 because the pre-launch defense audit also surfaced fixes that ship with this resubmission:
+## Manifest description fix (round 2)
+
+The `description` field in `static/manifest.json` is also scanned by Chrome's keyword-spam filter. Round-1 manifest had:
+
+> "See exactly what Google, Twitter, LinkedIn, and Slack see when they crawl your page. Audit OG, Twitter, robots, sitemap, JSON-LD."
+
+Replaced with platform-free version (under 132 chars):
+
+> "One-click meta-tag audit and social preview for any page. Local-first, no account, no telemetry. OG, robots, sitemap, JSON-LD."
+
+`package.json` and `static/manifest.json` version bumped 1.0.4 → 1.0.5.
+
+## Prior 1.0.3 → 1.0.4 changes (carried forward in 1.0.5)
 
 - Removed the empty `<all_urls>` content_script declaration from the manifest (granted broad scope for zero functionality).
 - Removed `static/scripts/content.js` (was 0-byte stub).
@@ -102,13 +110,14 @@ Build / package: **upload the new `metaspry-v1.0.4.zip`** generated by the same 
 
 Expected review turnaround: 1-3 business days.
 
-## What to do if the resubmit also gets rejected
+## What to do if round-2 also gets rejected
 
-Possibility: reviewer flags any platform enumeration even at the new count. If that happens:
+If even the platform-free description gets flagged:
 
-- Drop platform names entirely from the description. Replace the PREVIEWS bullet with: "PREVIEWS - exact mockups of how your share card renders on the major social and search platforms. All seven supported platforms documented at metaspry.com/docs/previews."
-- That keeps the feature claim, moves the enumeration to docs (where the keyword filter doesn't run).
-- Re-resubmit.
+- Audit the **Summary** field — confirm it does not mention any platform.
+- Audit **screenshot captions** — re-upload any caption that mentions a platform brand.
+- Audit **promo tile text overlays** for platform brand names.
+- File an appeal at this point — the description is now generic; further rejection would be a reviewer error.
 
 ## Future-proofing
 

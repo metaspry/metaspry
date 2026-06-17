@@ -27,6 +27,10 @@
   import { settings, type Settings } from "../storage/settings";
   import { pushHistory } from "../storage/history";
   import { registerShortcuts, helpOpen } from "../components/Shortcuts/keyboard";
+  import CloudSync from "../components/CloudSync/CloudSync.svelte";
+  import { cloudUser } from "../cloud/auth";
+  import { toScanPayload, uploadScan } from "../cloud/sync";
+  import { get } from "svelte/store";
 
   type View = "landing" | "loading" | "error" | "empty" | "results";
   type ActiveTab = "tags" | "previews" | "audit" | "site" | "compare";
@@ -109,6 +113,15 @@
         score: finalResult.score,
         timestamp: Date.now(),
       });
+      // Cloud sync: if signed in, save this scan to the user's cloud history.
+      const cu = get(cloudUser);
+      if (cu && pageUrl) {
+        try {
+          await uploadScan(cu.uid, toScanPayload(meta, finalResult, pageUrl));
+        } catch (err) {
+          console.warn("cloud sync failed", err);
+        }
+      }
     } catch (error) {
       if (id !== scrapeId) return;
       view = "error";
@@ -276,6 +289,8 @@
             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
           </svg>
         </button>
+
+        <CloudSync />
 
         <button
           type="button"

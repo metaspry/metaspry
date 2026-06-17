@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Metaspry",
-  "description": "See exactly what Google, Twitter, LinkedIn, and Slack see when they crawl your page. Audit OG, Twitter, robots, sitemap, JSON-LD.",
-  "version": "1.0.4",
+  "description": "One-click meta-tag audit and social preview for any page. Local-first, no account, no telemetry. OG, robots, sitemap, JSON-LD.",
+  "version": "1.0.6",
   "icons": {
     "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",

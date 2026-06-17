@@ -1,0 +1,85 @@
+/**
+ * Maps an extension scan (PageMeta + AuditResult) to the cloud ScanPayload the web app
+ * renders, and uploads it to users/{uid}/scans. Re-scanning a URL overwrites its doc
+ * (deterministic id) so history shows the latest state per URL, not duplicates.
+ */
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { fbDb } from './firebase';
+import type { PageMeta } from '../scrapers/PageMeta';
+import type { AuditResult, RuleStatus } from '../audit/AuditResult';
+
+const SCAN_SCHEMA_VERSION = 1;
+
+function bandFor(score: number): 'good' | 'warn' | 'fail' {
+  return score >= 80 ? 'good' : score >= 50 ? 'warn' : 'fail';
+}
+
+/** Stable, Firestore-safe doc id from a URL (djb2 hash). */
+function scanIdFor(url: string): string {
+  let h = 5381;
+  for (let i = 0; i < url.length; i++) h = ((h << 5) + h + url.charCodeAt(i)) >>> 0;
+  return 's' + h.toString(36);
+}
+
+function mapStatus(s: RuleStatus): 'pass' | 'warn' | 'fail' {
+  if (s === 'pass') return 'pass';
+  if (s === 'fail') return 'fail';
+  return 'warn'; // 'warn' | 'pending' both surface as warn in the cloud view
+}
+
+function hostnameOf(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return '';
+  }
+}
+
+/** Build the cloud payload. Undefined fields are dropped on write (ignoreUndefinedProperties). */
+export function toScanPayload(meta: PageMeta, auditResult: AuditResult, url: string) {
+  const tagValue = (key: string): string | undefined =>
+    meta.tags.find((t) => t.key.toLowerCase() === key)?.value;
+
+  return {
+    schemaVersion: SCAN_SCHEMA_VERSION,
+    url,
+    hostname: hostnameOf(url),
+    scannedAt: Date.now(),
+    title: meta.title ?? '',
+    source: 'extension' as const,
+    starred: false,
+    workspaceId: null,
+    // denormalized summary for the history list
+    score: auditResult.score,
+    band: bandFor(auditResult.score),
+    pageMeta: {
+      title: meta.title ?? undefined,
+      description: tagValue('description'),
+      canonical: meta.canonical ?? undefined,
+      ogImage: tagValue('og:image') ?? tagValue('twitter:image'),
+      tagCount: meta.tags.length,
+      tags: meta.tags.map((t) => ({ key: t.key, value: t.value, category: t.category })),
+    },
+    audit: {
+      score: auditResult.score,
+      band: bandFor(auditResult.score),
+      rules: auditResult.rules.map((r) => ({
+        id: r.id,
+        label: r.title,
+        status: mapStatus(r.status),
+        severity: r.severity,
+        message: r.detail || undefined,
+      })),
+    },
+  };
+}
+
+export async function uploadScan(
+  uid: string,
+  payload: ReturnType<typeof toScanPayload>
+): Promise<void> {
+  await setDoc(doc(fbDb(), 'users', uid, 'scans', scanIdFor(payload.url)), {
+    ...payload,
+    createdAt: serverTimestamp(),
+  });
+}

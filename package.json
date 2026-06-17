@@ -1,6 +1,6 @@
 {
 	"name": "metaspry",
-	"version": "1.0.4",
+	"version": "1.0.6",
 	"private": true,
 	"scripts": {
 		"dev": "vite dev",
@@ -24,6 +24,7 @@
 	"type": "module",
 	"dependencies": {
 		"@types/chrome": "^0.0.251",
+		"firebase": "^12.15.0",
 		"nodemon": "^3.0.1"
 	}
 }

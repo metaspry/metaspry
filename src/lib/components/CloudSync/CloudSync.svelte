@@ -1,0 +1,95 @@
+<script lang="ts">
+  import { onMount } from "svelte";
+  import { cloudUser, initCloudAuth, cloudSignIn, cloudSignOut } from "../../cloud/auth";
+
+  let open = false;
+  let email = "";
+  let password = "";
+  let busy = false;
+  let error = "";
+
+  onMount(() => initCloudAuth());
+
+  async function submit() {
+    if (busy || !email.trim() || !password) return;
+    busy = true;
+    error = "";
+    try {
+      await cloudSignIn(email.trim(), password);
+      password = "";
+      open = false;
+    } catch {
+      error = "Sign-in failed. Use the same email and password as the web app.";
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function out() {
+    await cloudSignOut();
+    open = false;
+  }
+</script>
+
+<div class="relative">
+  <button
+    type="button"
+    on:click={() => (open = !open)}
+    class="flex h-8 items-center gap-1.5 rounded-full border border-white/40 bg-white/40 px-2.5 text-xs font-medium text-slate-700 backdrop-blur-md transition hover:bg-white/70 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
+    aria-label="Cloud sync"
+  >
+    <span
+      class="h-2 w-2 rounded-full {$cloudUser ? 'bg-emerald-500' : 'bg-slate-400'}"
+      aria-hidden="true"
+    ></span>
+    {$cloudUser ? "Synced" : "Sync"}
+  </button>
+
+  {#if open}
+    <div
+      class="absolute right-0 z-50 mt-2 flex w-64 flex-col gap-2 rounded-xl border border-white/40 bg-white/90 p-3 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/95"
+    >
+      {#if $cloudUser}
+        <p class="text-sm font-medium text-slate-800 dark:text-slate-100">Synced to cloud</p>
+        <p class="text-xs text-slate-500 dark:text-slate-400">
+          {$cloudUser.email}. New scans save to your cloud history at app.metaspry.com.
+        </p>
+        <button
+          type="button"
+          on:click={out}
+          class="mt-1 rounded-full border border-white/40 bg-white/40 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-white/70 dark:border-white/10 dark:bg-white/5 dark:text-slate-200"
+          >Sign out</button
+        >
+      {:else}
+        <p class="text-sm font-medium text-slate-800 dark:text-slate-100">Sync scans to the cloud</p>
+        <p class="text-xs text-slate-500 dark:text-slate-400">
+          Sign in to save every scan to your history at app.metaspry.com.
+        </p>
+        <input
+          type="email"
+          bind:value={email}
+          placeholder="you@company.com"
+          class="w-full rounded-lg border border-white/40 bg-white/60 px-2.5 py-1.5 text-sm text-slate-900 dark:border-white/10 dark:bg-slate-800/60 dark:text-slate-100"
+        />
+        <input
+          type="password"
+          bind:value={password}
+          placeholder="Password"
+          class="w-full rounded-lg border border-white/40 bg-white/60 px-2.5 py-1.5 text-sm text-slate-900 dark:border-white/10 dark:bg-slate-800/60 dark:text-slate-100"
+          on:keydown={(e) => e.key === "Enter" && submit()}
+        />
+        {#if error}
+          <p class="text-xs text-rose-500">{error}</p>
+        {/if}
+        <button
+          type="button"
+          on:click={submit}
+          disabled={busy || !email.trim() || !password}
+          class="rounded-full bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-500 disabled:opacity-60"
+          >{busy ? "Signing in…" : "Sign in"}</button
+        >
+        <p class="text-[11px] text-slate-400 dark:text-slate-500">Same login as the web app.</p>
+      {/if}
+    </div>
+  {/if}
+</div>
