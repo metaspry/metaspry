@@ -30,6 +30,7 @@
   import CloudSync from "../components/CloudSync/CloudSync.svelte";
   import { cloudUser } from "../cloud/auth";
   import { toScanPayload, uploadScan } from "../cloud/sync";
+  import { fetchSiteFiles } from "../scrapers/getSiteFiles";
   import { get } from "svelte/store";
 
   type View = "landing" | "loading" | "error" | "empty" | "results";
@@ -117,7 +118,14 @@
       const cu = get(cloudUser);
       if (cu && pageUrl) {
         try {
-          await uploadScan(cu.uid, toScanPayload(meta, finalResult, pageUrl));
+          // Best-effort: include site files (robots/sitemap/llms) so the app's Site tab populates.
+          let siteFiles;
+          try {
+            siteFiles = await fetchSiteFiles(new URL(pageUrl).origin);
+          } catch {
+            siteFiles = undefined;
+          }
+          await uploadScan(cu.uid, toScanPayload(meta, finalResult, pageUrl, siteFiles));
         } catch (err) {
           console.warn("cloud sync failed", err);
         }

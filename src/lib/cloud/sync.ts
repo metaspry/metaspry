@@ -7,6 +7,7 @@ import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { fbDb } from './firebase';
 import type { PageMeta } from '../scrapers/PageMeta';
 import type { AuditResult, RuleStatus } from '../audit/AuditResult';
+import type { SiteFiles } from '../scrapers/SiteFiles';
 
 const SCAN_SCHEMA_VERSION = 1;
 
@@ -36,11 +37,31 @@ function hostnameOf(url: string): string {
 }
 
 /** Build the cloud payload. Undefined fields are dropped on write (ignoreUndefinedProperties). */
-export function toScanPayload(meta: PageMeta, auditResult: AuditResult, url: string) {
+export function toScanPayload(
+  meta: PageMeta,
+  auditResult: AuditResult,
+  url: string,
+  siteFiles?: SiteFiles
+) {
   const tagValue = (key: string): string | undefined =>
     meta.tags.find((t) => t.key.toLowerCase() === key)?.value;
 
+  // Trim site files to a summary (no raw text; cap samples) for the app's Site tab.
+  const siteFilesSummary = siteFiles
+    ? {
+        robots: { present: siteFiles.robots.present, sitemaps: siteFiles.robots.sitemaps.slice(0, 10) },
+        sitemap: {
+          present: siteFiles.sitemap.present,
+          urlCount: siteFiles.sitemap.urlCount,
+          isIndex: siteFiles.sitemap.isIndex,
+          sample: siteFiles.sitemap.sample.slice(0, 5),
+        },
+        llms: { present: siteFiles.llms.present, sections: siteFiles.llms.sections.length },
+      }
+    : undefined;
+
   return {
+    siteFiles: siteFilesSummary,
     schemaVersion: SCAN_SCHEMA_VERSION,
     url,
     hostname: hostnameOf(url),
