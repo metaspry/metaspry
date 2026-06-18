@@ -48,7 +48,7 @@ function openExtensionFromGesture(tab) {
   // open() call.
   if (currentMode === 'popup') {
     chrome.action.openPopup().catch((err) => {
-      // Older Chrome (<127) or non-popup-allowed context — fall back to
+      // Older Chrome (<127) or non-popup-allowed context - fall back to
       // side panel so the right-click never feels broken.
       console.warn('action.openPopup unavailable, falling back to side panel:', err);
       if (tab?.windowId != null) {

@@ -9,7 +9,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Popup mode — Chrome caps action popups at ~800px wide. We claim 720px to
+/* Popup mode - Chrome caps action popups at ~800px wide. We claim 720px to
  * stay close to that ceiling without bumping right-side overflow on smaller
  * displays. Height grows to fit content (Chrome auto-sizes up to ~600px). */
 html[data-mode="popup"],
@@ -18,7 +18,7 @@ html[data-mode="popup"] body {
   min-height: 600px;
 }
 
-/* Hide the decorative blurred orbs in popup mode — at popup dimensions they
+/* Hide the decorative blurred orbs in popup mode - at popup dimensions they
  * crop into hard corner blobs and the popup ends up looking like a tinted
  * square floating on top of the page. */
 html[data-mode="popup"] [data-bg-orb] {

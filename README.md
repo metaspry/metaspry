@@ -17,7 +17,7 @@ Open any web page, click the toolbar icon, and the side panel shows four tabs:
 - **Audit** - weighted 0-100 score across 12+ rules covering required, recommended, and best-practice meta-tag hygiene. Live image dimension checking included.
 - **Site** - `robots.txt`, `sitemap.xml` (recursive sitemap-index expansion, 7 fallback paths), and `llms.txt` fetched and parsed from the page's host.
 
-Local-first by design. Outbound fetches per scan: `robots.txt`, `llms.txt`, plus up to 7 sitemap fallback paths and recursive sitemap-index expansion (capped at 20 children, depth 2) — all to the page's own host. The optional **Compare** tab fetches a URL you type, and the og:image rule loads the page's declared share image to measure dimensions. No telemetry, no analytics, no first-party servers.
+Local-first by design. Outbound fetches per scan: `robots.txt`, `llms.txt`, plus up to 7 sitemap fallback paths and recursive sitemap-index expansion (capped at 20 children, depth 2) - all to the page's own host. The optional **Compare** tab fetches a URL you type, and the og:image rule loads the page's declared share image to measure dimensions. No telemetry, no analytics, no first-party servers.
 
 Full docs: **[metaspry.com/docs](https://metaspry.com/docs/)**
 

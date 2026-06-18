@@ -25,7 +25,7 @@ const ACCENT = '#7c69ef';
 const ACCENT_STRONG = '#5b4ed8';
 const BG_LIGHT = '#fbfbff';
 
-// Brand-mark M path — same as src/components/Logo.astro on the website.
+// Brand-mark M path - same as src/components/Logo.astro on the website.
 // Path bounding box: x=4..20 (width 16), y=5..19 (height 14) in 24x24 viewBox.
 // Visually centered within the viewBox; nested <svg> with matching viewBox
 // guarantees centered placement inside the tile at any tile size.
