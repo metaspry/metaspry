@@ -13,11 +13,6 @@ import {
 } from 'firebase/auth';
 import { fbAuth } from './firebase';
 
-// OAuth 2.0 Web client (Google Cloud project "metaspry"). The chrome.identity redirect
-// (https://<extension-id>.chromiumapp.org/) must be registered on this client.
-const GOOGLE_CLIENT_ID =
-  '196897437970-tnbbicn749egap9q2mm2isda1up7e3ue.apps.googleusercontent.com';
-
 export const cloudUser = writable<User | null>(null);
 export const cloudReady = writable(false);
 
@@ -36,29 +31,17 @@ export function cloudSignIn(email: string, password: string) {
 }
 
 /**
- * Google sign-in for the extension. Uses chrome.identity to get a Google ID token (OIDC
- * implicit flow), then exchanges it for a Firebase credential. No popup/redirect needed.
+ * Google sign-in for the extension. Uses chrome.identity.getAuthToken (Chrome Extension
+ * OAuth client - client id + scopes declared in manifest "oauth2") to get a Google access
+ * token, then exchanges it for a Firebase credential. No redirect URI needed; the client is
+ * bound to the published extension id.
  */
 export async function cloudSignInWithGoogle(): Promise<void> {
-  const redirectUri = chrome.identity.getRedirectURL(); // https://<ext-id>.chromiumapp.org/
-  const nonce = crypto.randomUUID();
-  const authUrl =
-    'https://accounts.google.com/o/oauth2/v2/auth?' +
-    new URLSearchParams({
-      client_id: GOOGLE_CLIENT_ID,
-      response_type: 'id_token',
-      redirect_uri: redirectUri,
-      scope: 'openid email profile',
-      nonce,
-      prompt: 'select_account',
-    }).toString();
-
-  const redirected = await chrome.identity.launchWebAuthFlow({ url: authUrl, interactive: true });
-  if (!redirected) throw new Error('Sign-in was cancelled.');
-  const frag = redirected.split('#')[1] ?? '';
-  const idToken = new URLSearchParams(frag).get('id_token');
-  if (!idToken) throw new Error('No id_token returned from Google.');
-  await signInWithCredential(fbAuth(), GoogleAuthProvider.credential(idToken));
+  const result = await chrome.identity.getAuthToken({ interactive: true });
+  // Older typings return a string; newer return { token, grantedScopes }.
+  const accessToken = typeof result === 'string' ? result : result?.token;
+  if (!accessToken) throw new Error('No Google token returned.');
+  await signInWithCredential(fbAuth(), GoogleAuthProvider.credential(null, accessToken));
 }
 
 export function cloudSignOut() {
