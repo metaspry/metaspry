@@ -38,7 +38,8 @@
   }
 
   $: scopeValue = $syncScope.kind === "workspace" ? $syncScope.wsId : "personal";
-  $: scopeLabel = $syncScope.kind === "workspace" ? $syncScope.name : "your personal history";
+  $: scopeLabel = $syncScope.kind === "workspace" ? $syncScope.name : "Personal history";
+  $: isTeamTarget = $syncScope.kind === "workspace";
 
   async function submit() {
     if (busy || !email.trim() || !password) return;
@@ -95,13 +96,42 @@
       class="absolute right-0 z-50 mt-2 flex w-64 flex-col gap-2 rounded-xl border border-white/40 bg-white/90 p-3 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/95"
     >
       {#if $cloudUser}
-        <p class="text-sm font-medium text-slate-800 dark:text-slate-100">Synced to cloud</p>
-        <p class="text-xs text-slate-500 dark:text-slate-400">
-          {$cloudUser.email}. New scans save to <span class="font-medium">{scopeLabel}</span>.
-        </p>
+        <div class="flex items-center gap-2">
+          <span class="h-2 w-2 shrink-0 rounded-full bg-emerald-500" aria-hidden="true"></span>
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-slate-800 dark:text-slate-100">Synced</p>
+            <p class="truncate text-xs text-slate-500 dark:text-slate-400">{$cloudUser.email}</p>
+          </div>
+        </div>
+
+        <!-- Prominent: where scans are being saved -->
+        <div
+          class="flex items-center gap-2.5 rounded-xl border border-indigo-200/60 bg-indigo-50/70 p-2.5 dark:border-indigo-400/20 dark:bg-indigo-500/10"
+        >
+          <span
+            class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-500/15 text-indigo-600 dark:text-indigo-300"
+          >
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              {#if isTeamTarget}
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+              {:else}
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
+              {/if}
+            </svg>
+          </span>
+          <div class="min-w-0">
+            <p class="text-[10px] font-semibold tracking-wider text-slate-400 uppercase dark:text-slate-500">
+              Saving scans to
+            </p>
+            <p class="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
+              {scopeLabel}{isTeamTarget ? "" : ""}
+            </p>
+          </div>
+        </div>
+
         {#if $workspaces.length > 0}
-          <label class="mt-1 flex flex-col gap-1 text-xs text-slate-500 dark:text-slate-400">
-            Sync new scans to
+          <label class="flex flex-col gap-1 text-xs text-slate-500 dark:text-slate-400">
+            Change destination
             <span class="relative block">
               <select
                 value={scopeValue}
