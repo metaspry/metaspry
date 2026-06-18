@@ -14,6 +14,7 @@
   import HistoryDropdown from "../components/History/HistoryDropdown.svelte";
   import CompareView from "../components/Compare/CompareView.svelte";
   import SiteView from "../components/Site/SiteView.svelte";
+  import AeoView from "../components/Aeo/AeoView.svelte";
 
   import { getHTML } from "../scrapers/getHTML";
   import { getMetaTags } from "../scrapers/getMetaTags";
@@ -34,10 +35,11 @@
   import { get } from "svelte/store";
 
   type View = "landing" | "loading" | "error" | "empty" | "results";
-  type ActiveTab = "tags" | "previews" | "audit" | "site" | "compare";
+  type ActiveTab = "tags" | "previews" | "audit" | "site" | "aeo" | "compare";
 
   let view: View = "landing";
   let pageMeta: PageMeta | null = null;
+  let pageHtml: HTMLElement | null = null;
   let auditResult: AuditResult | null = null;
   let errorMessage = "";
   let activeTab: ActiveTab = "tags";
@@ -49,6 +51,7 @@
     { id: "previews", label: "Previews" },
     { id: "audit", label: "Audit" },
     { id: "site", label: "Site" },
+    { id: "aeo", label: "AI" },
     { id: "compare", label: "Compare" },
   ];
 
@@ -93,6 +96,7 @@
       const meta = getMetaTags(html, tabUrl);
       if (id !== scrapeId) return;
       pageMeta = meta;
+      pageHtml = html;
       pageUrl =
         meta.tags.find((t) => t.key.toLowerCase() === "og:url")?.value ??
         meta.canonical ??
@@ -160,7 +164,14 @@
   ];
 
   function isActiveTab(v: string): v is ActiveTab {
-    return v === "tags" || v === "previews" || v === "audit" || v === "site" || v === "compare";
+    return (
+      v === "tags" ||
+      v === "previews" ||
+      v === "audit" ||
+      v === "site" ||
+      v === "aeo" ||
+      v === "compare"
+    );
   }
 
   function onTabChange(event: CustomEvent<string>) {
@@ -383,6 +394,10 @@
         {:else if activeTab === "site"}
           {#key pageUrl}
             <SiteView baseUrl={pageUrl} />
+          {/key}
+        {:else if activeTab === "aeo"}
+          {#key pageUrl}
+            <AeoView html={pageHtml} baseUrl={pageUrl} />
           {/key}
         {:else if activeTab === "compare"}
           <CompareView leftMeta={pageMeta} leftUrl={pageUrl} leftScore={auditResult.score} />
