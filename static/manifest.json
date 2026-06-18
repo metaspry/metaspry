@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Metaspry",
   "description": "One-click meta-tag audit and social preview for any page. Local-first, no account, no telemetry. OG, robots, sitemap, JSON-LD.",
-  "version": "1.0.14",
+  "version": "1.0.15",
   "icons": {
     "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",
@@ -25,10 +25,6 @@
   "offline_enabled": true,
   "minimum_chrome_version": "114",
   "permissions": ["tabs", "activeTab", "contextMenus", "storage", "sidePanel", "scripting", "identity"],
-  "oauth2": {
-    "client_id": "196897437970-tnbbicn749egap9q2mm2isda1up7e3ue.apps.googleusercontent.com",
-    "scopes": ["openid", "email", "profile"]
-  },
   "host_permissions": [
     "*://*/*"
   ]
