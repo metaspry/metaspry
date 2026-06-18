@@ -30,6 +30,7 @@
   import { registerShortcuts, helpOpen } from "../components/Shortcuts/keyboard";
   import CloudSync from "../components/CloudSync/CloudSync.svelte";
   import { cloudUser } from "../cloud/auth";
+  import { syncScope } from "../cloud/workspaces";
   import { toScanPayload, uploadScan } from "../cloud/sync";
   import { fetchSiteFiles } from "../scrapers/getSiteFiles";
   import { get } from "svelte/store";
@@ -129,7 +130,7 @@
           } catch {
             siteFiles = undefined;
           }
-          await uploadScan(cu.uid, toScanPayload(meta, finalResult, pageUrl, siteFiles));
+          await uploadScan(cu.uid, toScanPayload(meta, finalResult, pageUrl, siteFiles), get(syncScope));
         } catch (err) {
           console.warn("cloud sync failed", err);
         }

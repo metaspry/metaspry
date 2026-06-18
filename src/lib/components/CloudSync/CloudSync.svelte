@@ -1,6 +1,13 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { cloudUser, initCloudAuth, cloudSignIn, cloudSignOut } from "../../cloud/auth";
+  import { initCloudSettingsSync } from "../../cloud/settings";
+  import {
+    initCloudWorkspaces,
+    workspaces,
+    syncScope,
+    setSyncScope,
+  } from "../../cloud/workspaces";
 
   let open = false;
   let email = "";
@@ -8,7 +15,24 @@
   let busy = false;
   let error = "";
 
-  onMount(() => initCloudAuth());
+  onMount(() => {
+    initCloudAuth();
+    initCloudSettingsSync();
+    initCloudWorkspaces();
+  });
+
+  function onScopeChange(e: Event) {
+    const v = (e.currentTarget as HTMLSelectElement).value;
+    if (v === "personal") {
+      setSyncScope({ kind: "personal" });
+    } else {
+      const ws = $workspaces.find((w) => w.id === v);
+      if (ws) setSyncScope({ kind: "workspace", wsId: ws.id, name: ws.name });
+    }
+  }
+
+  $: scopeValue = $syncScope.kind === "workspace" ? $syncScope.wsId : "personal";
+  $: scopeLabel = $syncScope.kind === "workspace" ? $syncScope.name : "your personal history";
 
   async function submit() {
     if (busy || !email.trim() || !password) return;
@@ -52,8 +76,23 @@
       {#if $cloudUser}
         <p class="text-sm font-medium text-slate-800 dark:text-slate-100">Synced to cloud</p>
         <p class="text-xs text-slate-500 dark:text-slate-400">
-          {$cloudUser.email}. New scans save to your cloud history at app.metaspry.com.
+          {$cloudUser.email}. New scans save to <span class="font-medium">{scopeLabel}</span>.
         </p>
+        {#if $workspaces.length > 0}
+          <label class="mt-1 flex flex-col gap-1 text-xs text-slate-500 dark:text-slate-400">
+            Sync new scans to
+            <select
+              value={scopeValue}
+              on:change={onScopeChange}
+              class="w-full rounded-lg border border-white/40 bg-white/60 px-2.5 py-1.5 text-sm text-slate-900 dark:border-white/10 dark:bg-slate-800/60 dark:text-slate-100"
+            >
+              <option value="personal">Personal history</option>
+              {#each $workspaces as w (w.id)}
+                <option value={w.id}>{w.name}</option>
+              {/each}
+            </select>
+          </label>
+        {/if}
         <button
           type="button"
           on:click={out}

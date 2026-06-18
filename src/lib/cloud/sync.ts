@@ -8,6 +8,7 @@ import { fbDb } from './firebase';
 import type { PageMeta } from '../scrapers/PageMeta';
 import type { AuditResult, RuleStatus } from '../audit/AuditResult';
 import type { SiteFiles } from '../scrapers/SiteFiles';
+import type { SyncScope } from './workspaces';
 
 const SCAN_SCHEMA_VERSION = 1;
 
@@ -121,10 +122,17 @@ export function toScanPayload(
 
 export async function uploadScan(
   uid: string,
-  payload: ReturnType<typeof toScanPayload>
+  payload: ReturnType<typeof toScanPayload>,
+  scope: SyncScope = { kind: 'personal' }
 ): Promise<void> {
-  await setDoc(doc(fbDb(), 'users', uid, 'scans', scanIdFor(payload.url)), {
+  const id = scanIdFor(payload.url);
+  const ref =
+    scope.kind === 'workspace'
+      ? doc(fbDb(), 'workspaces', scope.wsId, 'scans', id)
+      : doc(fbDb(), 'users', uid, 'scans', id);
+  await setDoc(ref, {
     ...payload,
+    workspaceId: scope.kind === 'workspace' ? scope.wsId : null,
     createdAt: serverTimestamp(),
   });
 }
