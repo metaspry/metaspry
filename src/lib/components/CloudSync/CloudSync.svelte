@@ -102,16 +102,30 @@
         {#if $workspaces.length > 0}
           <label class="mt-1 flex flex-col gap-1 text-xs text-slate-500 dark:text-slate-400">
             Sync new scans to
-            <select
-              value={scopeValue}
-              on:change={onScopeChange}
-              class="w-full rounded-lg border border-white/40 bg-white/60 px-2.5 py-1.5 text-sm text-slate-900 dark:border-white/10 dark:bg-slate-800/60 dark:text-slate-100"
-            >
-              <option value="personal">Personal history</option>
-              {#each $workspaces as w (w.id)}
-                <option value={w.id}>{w.name}</option>
-              {/each}
-            </select>
+            <span class="relative block">
+              <select
+                value={scopeValue}
+                on:change={onScopeChange}
+                class="w-full cursor-pointer appearance-none rounded-lg border border-white/40 bg-white/60 py-1.5 pr-8 pl-2.5 text-sm text-slate-900 shadow-sm transition hover:bg-white/80 focus:border-indigo-400 focus:outline-none dark:border-white/10 dark:bg-slate-800/60 dark:text-slate-100"
+              >
+                <option value="personal">Personal history</option>
+                {#each $workspaces as w (w.id)}
+                  <option value={w.id}>{w.name}</option>
+                {/each}
+              </select>
+              <svg
+                class="pointer-events-none absolute top-1/2 right-2.5 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </span>
           </label>
         {/if}
         <button

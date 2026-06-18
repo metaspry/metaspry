@@ -50,7 +50,7 @@
   role="tablist"
   aria-label="Analysis views"
   on:keydown={onKey}
-  class="flex w-full items-center gap-1 rounded-2xl border border-white/40 bg-white/40 p-1 text-xs font-medium backdrop-blur-md dark:border-white/10 dark:bg-white/5"
+  class="flex w-full flex-wrap items-center gap-1 rounded-2xl border border-white/40 bg-white/40 p-1 text-xs font-medium backdrop-blur-md dark:border-white/10 dark:bg-white/5"
 >
   {#each tabs as tab}
     <button
@@ -60,15 +60,14 @@
       tabindex={tab.id === active ? 0 : -1}
       bind:this={refs[tab.id]}
       on:click={() => select(tab.id)}
-      class="flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 transition {tab.id === active
+      class="flex flex-1 basis-16 items-center justify-center gap-1.5 rounded-xl px-2 py-1.5 transition {tab.id === active
         ? 'bg-white text-indigo-600 shadow-sm dark:bg-slate-900 dark:text-indigo-300'
         : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100'}"
     >
       {#if tab.icon}
         {@html tab.icon}
       {/if}
-      <span class="hidden min-[340px]:inline">{tab.label}</span>
-      <span class="sr-only min-[340px]:hidden">{tab.label}</span>
+      <span>{tab.label}</span>
     </button>
   {/each}
 </div>
