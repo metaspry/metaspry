@@ -256,13 +256,13 @@
 
 <div class="flex h-full w-full flex-col p-3">
   <Screen>
-    <header class="flex items-center justify-between gap-3">
-      <div class="flex items-center gap-2">
+    <header class="flex flex-wrap items-center justify-between gap-2">
+      <div class="flex shrink-0 items-center gap-2">
         <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500 text-xs font-bold text-white shadow-md shadow-indigo-500/30">M</span>
         <span class="text-base font-semibold tracking-tight text-slate-900 dark:text-slate-50">Metaspry</span>
       </div>
 
-      <div class="flex items-center gap-1.5">
+      <div class="flex flex-wrap items-center justify-end gap-1.5">
         <div
           role="radiogroup"
           aria-label="Surface mode"

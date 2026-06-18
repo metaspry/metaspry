@@ -22,14 +22,32 @@
   let rows: DiffRow[] = [];
   let rightScore = 0;
 
+  // Add a scheme when missing + validate http(s). Lets users paste "example.com".
+  function normalizeUrl(raw: string): string | null {
+    const t = raw.trim();
+    if (!t) return null;
+    const withScheme = /^https?:\/\//i.test(t) ? t : `https://${t}`;
+    try {
+      const u = new URL(withScheme);
+      if ((u.protocol !== 'http:' && u.protocol !== 'https:') || !u.hostname.includes('.')) return null;
+      return u.toString();
+    } catch {
+      return null;
+    }
+  }
+
   async function compare() {
-    if (!url.trim()) return;
+    const target = normalizeUrl(url);
+    if (!target) {
+      errorMessage = 'Enter a valid URL (e.g. example.com).';
+      return;
+    }
+    url = target;
     loading = true;
     errorMessage = '';
     rightMeta = null;
     rows = [];
     try {
-      const target = url.trim();
       const res = await fetch(target, { credentials: 'omit', redirect: 'follow' });
       if (!res.ok) {
         throw new Error(`HTTP ${res.status} ${res.statusText}`);
@@ -74,9 +92,9 @@
 <div class="flex flex-col gap-3">
   <form on:submit|preventDefault={compare} class="flex gap-2">
     <input
-      type="url"
+      type="text"
       required
-      placeholder="https://example.com"
+      placeholder="example.com"
       bind:value={url}
       class="flex-1 rounded-full border border-white/40 bg-white/40 px-4 py-2 text-sm text-slate-900 placeholder:text-slate-500 backdrop-blur-md focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/40 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:placeholder:text-slate-500"
     />
