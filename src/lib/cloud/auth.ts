@@ -1,15 +1,22 @@
 /**
- * Cloud auth state for the extension (email/password). Same account as the web app.
- * Google sign-in needs an OAuth client id via chrome.identity, added later.
+ * Cloud auth state for the extension. Same account as the web app. Email/password +
+ * Google sign-in (chrome.identity launchWebAuthFlow -> Firebase credential).
  */
 import { writable } from 'svelte/store';
 import {
+  GoogleAuthProvider,
   onAuthStateChanged,
+  signInWithCredential,
   signInWithEmailAndPassword,
   signOut as fbSignOut,
   type User,
 } from 'firebase/auth';
 import { fbAuth } from './firebase';
+
+// OAuth 2.0 Web client (Google Cloud project "metaspry"). The chrome.identity redirect
+// (https://<extension-id>.chromiumapp.org/) must be registered on this client.
+const GOOGLE_CLIENT_ID =
+  '196897437970-tnbbicn749egap9q2mm2isda1up7e3ue.apps.googleusercontent.com';
 
 export const cloudUser = writable<User | null>(null);
 export const cloudReady = writable(false);
@@ -26,6 +33,32 @@ export function initCloudAuth(): void {
 
 export function cloudSignIn(email: string, password: string) {
   return signInWithEmailAndPassword(fbAuth(), email, password);
+}
+
+/**
+ * Google sign-in for the extension. Uses chrome.identity to get a Google ID token (OIDC
+ * implicit flow), then exchanges it for a Firebase credential. No popup/redirect needed.
+ */
+export async function cloudSignInWithGoogle(): Promise<void> {
+  const redirectUri = chrome.identity.getRedirectURL(); // https://<ext-id>.chromiumapp.org/
+  const nonce = crypto.randomUUID();
+  const authUrl =
+    'https://accounts.google.com/o/oauth2/v2/auth?' +
+    new URLSearchParams({
+      client_id: GOOGLE_CLIENT_ID,
+      response_type: 'id_token',
+      redirect_uri: redirectUri,
+      scope: 'openid email profile',
+      nonce,
+      prompt: 'select_account',
+    }).toString();
+
+  const redirected = await chrome.identity.launchWebAuthFlow({ url: authUrl, interactive: true });
+  if (!redirected) throw new Error('Sign-in was cancelled.');
+  const frag = redirected.split('#')[1] ?? '';
+  const idToken = new URLSearchParams(frag).get('id_token');
+  if (!idToken) throw new Error('No id_token returned from Google.');
+  await signInWithCredential(fbAuth(), GoogleAuthProvider.credential(idToken));
 }
 
 export function cloudSignOut() {

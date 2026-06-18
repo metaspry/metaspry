@@ -1,6 +1,12 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { cloudUser, initCloudAuth, cloudSignIn, cloudSignOut } from "../../cloud/auth";
+  import {
+    cloudUser,
+    initCloudAuth,
+    cloudSignIn,
+    cloudSignInWithGoogle,
+    cloudSignOut,
+  } from "../../cloud/auth";
   import { initCloudSettingsSync } from "../../cloud/settings";
   import {
     initCloudWorkspaces,
@@ -44,6 +50,20 @@
       open = false;
     } catch {
       error = "Sign-in failed. Use the same email and password as the web app.";
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function google() {
+    if (busy) return;
+    busy = true;
+    error = "";
+    try {
+      await cloudSignInWithGoogle();
+      open = false;
+    } catch {
+      error = "Google sign-in failed or was cancelled.";
     } finally {
       busy = false;
     }
@@ -126,6 +146,13 @@
           disabled={busy || !email.trim() || !password}
           class="rounded-full bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-500 disabled:opacity-60"
           >{busy ? "Signing in…" : "Sign in"}</button
+        >
+        <button
+          type="button"
+          on:click={google}
+          disabled={busy}
+          class="rounded-full border border-white/40 bg-white/60 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-white/80 disabled:opacity-60 dark:border-white/10 dark:bg-white/5 dark:text-slate-200"
+          >Continue with Google</button
         >
         <p class="text-[11px] text-slate-400 dark:text-slate-500">Same login as the web app.</p>
       {/if}
