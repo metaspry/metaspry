@@ -62,8 +62,9 @@
     try {
       await cloudSignInWithGoogle();
       open = false;
-    } catch {
-      error = "Google sign-in failed or was cancelled.";
+    } catch (e) {
+      error = e instanceof Error ? e.message : "Google sign-in failed or was cancelled.";
+      console.error("[metaspry] google sign-in", e);
     } finally {
       busy = false;
     }

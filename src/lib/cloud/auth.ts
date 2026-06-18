@@ -18,7 +18,7 @@ import { fbAuth } from './firebase';
 // Authorized redirect URIs. (A "Chrome Extension" client type does NOT work here - it forces a
 // custom URI scheme, which Google rejects.)
 const GOOGLE_CLIENT_ID =
-  '196897437970-mh34lnm9rnbtptkt05ugk6g6l34gv2uq.apps.googleusercontent.com';
+  '540366408211-dgqe276vt9j1b9oin5i27orh30q0js4d.apps.googleusercontent.com';
 
 export const cloudUser = writable<User | null>(null);
 export const cloudReady = writable(false);
