@@ -1,10 +1,10 @@
 # Metaspry
 
-The free Chrome extension that audits **Open Graph**, **Twitter**, **robots.txt**, **sitemap.xml**, **llms.txt**, and **JSON-LD** on any page - in one click, locally, with no account.
+The free Chrome extension that audits **Open Graph**, **Twitter**, **robots.txt**, **sitemap.xml**, **llms.txt**, and **JSON-LD** on any page - in one click. Sign in (optional) to sync your scans to the Metaspry cloud.
 
 > See exactly what Google, Twitter, LinkedIn, Discord, Slack, and iMessage see when they crawl your page.
 
-[**Add to Chrome ->**](https://chromewebstore.google.com/detail/metagify/kibedpkbadcofhbcpfigjmjanmdkmaji)
+[**Add to Chrome ->**](https://metaspry.com)
 
 Marketing site, docs, blog, roadmap: **[metaspry.com](https://metaspry.com)**
 

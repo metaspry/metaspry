@@ -168,7 +168,10 @@ const RULES: RuleDefinition[] = [
     description: 'When hreflang links exist, one should reference this page.',
     check: (m) => {
       if (m.hreflang.length === 0) return { status: 'pass', detail: 'No hreflang links; skipped.' };
-      const here = m.canonical ?? document.location.href;
+      // "Self" is the scanned page (canonical preferred, else the page URL). Never the popup's
+      // own document — getMetaTags parses a detached DOM, so document.location is the extension.
+      const here = m.canonical ?? m.pageUrl;
+      if (!here) return { status: 'pass', detail: `${m.hreflang.length} alternates; no page URL to match.` };
       const hasSelf = m.hreflang.some((h) => {
         try {
           return new URL(h.href).toString() === new URL(here).toString();

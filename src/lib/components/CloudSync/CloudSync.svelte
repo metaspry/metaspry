@@ -8,6 +8,7 @@
     cloudSignOut,
   } from "../../cloud/auth";
   import { initCloudSettingsSync } from "../../cloud/settings";
+  import { initCloudPlan } from "../../cloud/plan";
   import {
     initCloudWorkspaces,
     workspaces,
@@ -25,6 +26,7 @@
   onMount(() => {
     initCloudAuth();
     initCloudSettingsSync();
+    initCloudPlan();
     initCloudWorkspaces();
   });
 
@@ -50,7 +52,7 @@
       await cloudSignInWithGoogle();
     } catch (e) {
       error = e instanceof Error ? e.message : "Google sign-in failed or was cancelled.";
-      console.error("[metaspry] google sign-in", e);
+      if (import.meta.env.DEV) console.error("[metaspry] google sign-in", e);
     } finally {
       busy = false;
     }

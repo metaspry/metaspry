@@ -60,6 +60,7 @@ export function getMetaTags(html: HTMLElement, baseUrl: string = ''): PageMeta {
   });
 
   return {
+    pageUrl: baseUrl || null,
     title,
     canonical,
     icon,

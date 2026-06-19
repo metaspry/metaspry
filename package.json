@@ -1,6 +1,6 @@
 {
 	"name": "metaspry",
-	"version": "1.0.23",
+	"version": "1.0.24",
 	"private": true,
 	"scripts": {
 		"dev": "vite dev",
@@ -19,6 +19,7 @@
 		"sharp": "^0.34.5",
 		"svelte": "^4.0.5",
 		"tailwindcss": "^3.3.5",
+		"tiny-glob": "^0.2.9",
 		"vite": "^4.4.2"
 	},
 	"type": "module",

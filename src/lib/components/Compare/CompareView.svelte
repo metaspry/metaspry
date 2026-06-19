@@ -3,7 +3,7 @@
   import { getMetaTags } from '../../scrapers/getMetaTags';
   import { audit } from '../../audit/rules';
   import { resolveAsyncRules } from '../../audit/asyncRules';
-  import { settings } from '../../storage/settings';
+  import { effectiveSettings } from '../../cloud/plan';
   import { diffMeta, type DiffRow } from './diff';
 
   export let leftMeta: PageMeta;
@@ -63,10 +63,10 @@
       rightMeta = meta;
       rightUrl = finalUrl;
       rows = diffMeta(leftMeta, meta);
-      const initial = audit(meta, $settings);
+      const initial = audit(meta, $effectiveSettings);
       rightScore = initial.score;
       if (initial.hasPending) {
-        const resolved = await resolveAsyncRules(initial, meta, $settings);
+        const resolved = await resolveAsyncRules(initial, meta, $effectiveSettings);
         rightScore = resolved.score;
       }
     } catch (err) {

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { fly, fade } from 'svelte/transition';
   import { settings, updateSettings, resetSettings, DEFAULT_SETTINGS } from '../../storage/settings';
+  import { cloudIsPro, APP_URL } from '../../cloud/plan';
   import { createEventDispatcher } from 'svelte';
 
   export let open = false;
@@ -45,6 +46,7 @@
       </button>
     </header>
 
+    {#if $cloudIsPro}
     <section class="flex flex-col gap-2">
       <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Length thresholds</h4>
       <div class="grid grid-cols-2 gap-2">
@@ -98,6 +100,22 @@
       on:click={resetSettings}
       class="self-start rounded-full border border-white/40 bg-white/40 px-3 py-1 text-xs font-medium text-slate-700 backdrop-blur-md hover:bg-white/70 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
     >Restore defaults</button>
+    {:else}
+    <section class="flex flex-col items-start gap-2 rounded-xl border border-indigo-400/30 bg-indigo-500/5 p-3">
+      <span class="rounded-full bg-indigo-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">Pro</span>
+      <h4 class="text-sm font-semibold text-slate-900 dark:text-slate-50">Custom scoring is a Pro feature</h4>
+      <p class="text-xs text-slate-600 dark:text-slate-300">
+        Free scans use Metaspry's default thresholds and rule weights. Upgrade to tune how the SEO/meta
+        score is calculated — and keep it in sync with the web app.
+      </p>
+      <a
+        href={`${APP_URL}/upgrade`}
+        target="_blank"
+        rel="noopener noreferrer"
+        class="rounded-full bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-500"
+      >Go Pro</a>
+    </section>
+    {/if}
 
     <section class="mt-2 flex flex-col gap-2 border-t border-white/40 pt-4 dark:border-white/10">
       <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">About</h4>

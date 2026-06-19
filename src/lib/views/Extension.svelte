@@ -25,7 +25,8 @@
 
   import { theme, toggleTheme } from "../theme";
   import { mode, setMode, type Mode } from "../mode";
-  import { settings, type Settings } from "../storage/settings";
+  import type { Settings } from "../storage/settings";
+  import { effectiveSettings } from "../cloud/plan";
   import { pushHistory } from "../storage/history";
   import { registerShortcuts, helpOpen } from "../components/Shortcuts/keyboard";
   import CloudSync from "../components/CloudSync/CloudSync.svelte";
@@ -109,8 +110,8 @@
       }
       activeTab = "tags";
       view = "results";
-      prevSettings = $settings;
-      const finalResult = await runAudit(meta, $settings, id);
+      prevSettings = $effectiveSettings;
+      const finalResult = await runAudit(meta, $effectiveSettings, id);
       if (id !== scrapeId) return;
       pushHistory({
         url: pageUrl || "(unknown)",
@@ -132,7 +133,7 @@
           }
           await uploadScan(cu.uid, toScanPayload(meta, finalResult, pageUrl, siteFiles), get(syncScope));
         } catch (err) {
-          console.warn("cloud sync failed", err);
+          if (import.meta.env.DEV) console.warn("cloud sync failed", err);
         }
       }
     } catch (error) {
@@ -147,9 +148,10 @@
   }
 
   let prevSettings: Settings | null = null;
-  $: if (pageMeta && view === "results" && $settings !== prevSettings) {
-    prevSettings = $settings;
-    void runAudit(pageMeta, $settings, scrapeId);
+  // Re-score when the effective settings change (Pro edits custom thresholds, or plan flips Pro/free).
+  $: if (pageMeta && view === "results" && $effectiveSettings !== prevSettings) {
+    prevSettings = $effectiveSettings;
+    void runAudit(pageMeta, $effectiveSettings, scrapeId);
   }
 
   const items: GridProps[] = [
