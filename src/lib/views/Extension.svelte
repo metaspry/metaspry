@@ -231,16 +231,20 @@
     // with "must be called in response to a user gesture".
     try {
       if (next === 'popup') {
-        chrome.action.openPopup().catch((err) => console.warn('openPopup:', err));
+        chrome.action.openPopup().catch((err) => {
+          if (import.meta.env.DEV) console.warn('openPopup:', err);
+        });
       } else {
         chrome.windows.getCurrent().then((win) => {
           if (win?.id != null) {
-            chrome.sidePanel.open({ windowId: win.id }).catch((err) => console.warn('sidePanel.open:', err));
+            chrome.sidePanel.open({ windowId: win.id }).catch((err) => {
+              if (import.meta.env.DEV) console.warn('sidePanel.open:', err);
+            });
           }
         });
       }
     } catch (err) {
-      console.warn('switchMode open failed:', err);
+      if (import.meta.env.DEV) console.warn('switchMode open failed:', err);
     }
 
     // Persist the new mode so background script updates action behavior.

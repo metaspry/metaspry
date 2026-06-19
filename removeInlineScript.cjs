@@ -19,6 +19,8 @@ async function removeInlineScript(directory) {
   const files = await glob("**/*.{html}", {
     cwd: directory,
     dot: true,
+    // NOTE: intentionally NOT `absolute` — the code below joins each path with `directory`, so glob
+    // must return paths relative to `cwd`. (Renaming this key to `absolute:true` breaks the build.)
     aboslute: true,
     filesOnly: true,
   });

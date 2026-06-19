@@ -37,10 +37,10 @@ export function initCloudPlan(): void {
   cloudUser.subscribe((u) => {
     unsub?.();
     unsub = null;
-    if (!u) {
-      cloudIsPro.set(false);
-      return;
-    }
+    // Reset on ANY auth change (incl. switching directly from one account to another) so a previous
+    // user's Pro status never lingers; re-set to true only when the new user's snapshot resolves.
+    cloudIsPro.set(false);
+    if (!u) return;
     unsub = onSnapshot(
       doc(fbDb(), "users", u.uid),
       (snap) => cloudIsPro.set(snap.data()?.plan === "pro"),
