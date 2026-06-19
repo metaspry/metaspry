@@ -278,7 +278,7 @@
         <div
           role="radiogroup"
           aria-label="Surface mode"
-          class="inline-flex items-center rounded-full border border-white/40 bg-white/40 p-0.5 text-xs font-medium backdrop-blur-md dark:border-white/10 dark:bg-white/5"
+          class="inline-flex h-8 items-center rounded-full border border-white/40 bg-white/40 p-0.5 text-xs font-medium backdrop-blur-md dark:border-white/10 dark:bg-white/5"
         >
           {#each modeOptions as opt}
             <button
@@ -286,7 +286,7 @@
               role="radio"
               aria-checked={$mode === opt.value}
               on:click={() => switchMode(opt.value)}
-              class="rounded-full px-2.5 py-1 transition {$mode === opt.value
+              class="flex h-full items-center rounded-full px-2.5 transition {$mode === opt.value
                 ? 'bg-white text-indigo-600 shadow-sm dark:bg-slate-900 dark:text-indigo-300'
                 : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100'}"
             >
