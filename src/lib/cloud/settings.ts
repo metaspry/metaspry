@@ -26,22 +26,31 @@ export async function saveCloudSettings(uid: string, s: Settings): Promise<void>
 
 let started = false;
 let suppress = false;
+// Only push local edits AFTER the cloud settings for the current user have been pulled, so a
+// local/default `settings.set` during startup can't clobber the user's saved cloud rules.
+let pulledUid: string | null = null;
+
 export function initCloudSettingsSync(): void {
   if (started) return;
   started = true;
 
   cloudUser.subscribe(async (u) => {
-    if (!u) return;
+    if (!u) {
+      pulledUid = null;
+      return;
+    }
+    pulledUid = null; // block pushes until this user's pull resolves
     const cloud = await loadCloudSettings(u.uid);
     if (cloud) {
       suppress = true;
       settings.set(cloud);
       suppress = false;
     }
+    pulledUid = u.uid;
   });
 
   settings.subscribe((s) => {
     const u = get(cloudUser);
-    if (u && !suppress) void saveCloudSettings(u.uid, s).catch(() => {});
+    if (u && !suppress && pulledUid === u.uid) void saveCloudSettings(u.uid, s).catch(() => {});
   });
 }
