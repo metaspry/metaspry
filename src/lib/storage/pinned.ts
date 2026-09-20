@@ -1,4 +1,5 @@
 import { writable } from 'svelte/store';
+import { makeWriteGuard, watchKey } from './watch';
 
 const STORAGE_KEY = 'pinnedKeys';
 
@@ -21,7 +22,10 @@ function readStorage(): Promise<Set<string>> {
   });
 }
 
+const guard = makeWriteGuard();
+
 function writeStorage(next: Set<string>): void {
+  if (guard.suppressed) return;
   if (typeof chrome === 'undefined' || !chrome.storage?.local) return;
   chrome.storage.local.set({ [STORAGE_KEY]: Array.from(next) });
 }
@@ -30,6 +34,10 @@ export async function initPinned(): Promise<void> {
   const initial = await readStorage();
   pinned.set(initial);
   pinned.subscribe(writeStorage);
+  watchKey(STORAGE_KEY, (raw) => {
+    const next = Array.isArray(raw) ? new Set(raw.map((s) => String(s).toLowerCase())) : new Set<string>();
+    guard.applyExternal(() => pinned.set(next));
+  });
 }
 
 export function togglePinned(key: string): void {

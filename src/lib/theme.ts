@@ -1,4 +1,5 @@
 import { writable } from 'svelte/store';
+import { watchKey } from './storage/watch';
 
 export type Theme = 'light' | 'dark';
 
@@ -44,6 +45,11 @@ export async function initTheme(): Promise<void> {
   applyClass(initial);
   theme.set(initial);
   theme.subscribe(applyClass);
+  // Theme is written by toggleTheme only, so there is no write to suppress here.
+  watchKey(STORAGE_KEY, (raw) => {
+    if (raw !== 'dark' && raw !== 'light') return;
+    theme.set(raw);
+  });
 }
 
 export function toggleTheme(): void {

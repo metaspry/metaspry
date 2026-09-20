@@ -98,15 +98,20 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             return document.documentElement.outerHTML;
           }
         }, (result) => {
-          const htmlContent = result[0]?.result;
+          // On chrome:// pages, the New Tab page, the Web Store, PDFs and policy-blocked pages the
+          // injection fails: `result` itself is undefined and lastError is set. Reading lastError
+          // and always answering keeps the popup from hanging on a promise that never settles.
+          // Reading lastError also stops Chrome logging it as unchecked.
+          void chrome.runtime.lastError;
+          const htmlContent = Array.isArray(result) ? result[0]?.result : undefined;
           if (htmlContent) {
             sendResponse({ html: htmlContent, url: tabUrl });
           } else {
-            sendResponse({ html: null, url: tabUrl });
+            sendResponse({ html: null, url: tabUrl, reason: 'unscriptable' });
           }
         });
       } else {
-        sendResponse({ html: null, url: '' });
+        sendResponse({ html: null, url: '', reason: 'no-tab' });
       }
     });
     return true;

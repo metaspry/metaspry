@@ -1,11 +1,15 @@
-<script lang="ts">
-  import { createEventDispatcher, tick } from 'svelte';
-
+<script context="module" lang="ts">
+  // Type exports must live in the module script: an instance script cannot export a type, which
+  // is why `import { type TabDef }` failed to resolve for svelte-check.
   export interface TabDef {
     id: string;
     label: string;
     icon?: string;
   }
+</script>
+
+<script lang="ts">
+  import { createEventDispatcher, tick } from 'svelte';
 
   export let tabs: TabDef[] = [];
   export let active: string;

@@ -1,4 +1,5 @@
 import { writable } from 'svelte/store';
+import { makeWriteGuard, watchKey } from './watch';
 
 export interface RuleWeights {
   required: number;
@@ -51,7 +52,10 @@ function readStorage(): Promise<Settings> {
   });
 }
 
+const guard = makeWriteGuard();
+
 function writeStorage(next: Settings): void {
+  if (guard.suppressed) return;
   if (typeof chrome === 'undefined' || !chrome.storage?.local) return;
   chrome.storage.local.set({ [STORAGE_KEY]: next });
 }
@@ -60,6 +64,17 @@ export async function initSettings(): Promise<void> {
   const initial = await readStorage();
   settings.set(initial);
   settings.subscribe(writeStorage);
+  watchKey(STORAGE_KEY, (raw) => {
+    const stored = (raw ?? undefined) as Partial<Settings> | undefined;
+    const next: Settings = stored
+      ? {
+          ...DEFAULT_SETTINGS,
+          ...stored,
+          weights: { ...DEFAULT_SETTINGS.weights, ...(stored.weights ?? {}) },
+        }
+      : DEFAULT_SETTINGS;
+    guard.applyExternal(() => settings.set(next));
+  });
 }
 
 export function updateSettings(patch: Partial<Settings>): void {

@@ -3,6 +3,8 @@ import type { AuditResult, RuleResult } from './AuditResult';
 import { rescoreAfterAsync } from './rules';
 import type { Settings } from '../storage/settings';
 import { DEFAULT_SETTINGS } from '../storage/settings';
+import { applyHeaderRobots } from '../scrapers/getRobots';
+import { fetchHeaderRobots } from '../scrapers/getHeaderRobots';
 
 interface Dim {
   width: number;
@@ -68,5 +70,34 @@ export async function resolveAsyncRules(
       };
     }
   }
+  await applyHeaderRobotsRule(rules, meta);
+
   return rescoreAfterAsync(rules, settings);
+}
+
+/**
+ * `X-Robots-Tag` is the standard header-only way to de-index a page, and the scraped DOM cannot see
+ * it. Fetch it here and, when it de-indexes the page, fail the `noindex` rule the DOM passed.
+ * Best-effort: a failed or blocked request leaves the DOM's verdict exactly as it was.
+ */
+async function applyHeaderRobotsRule(rules: RuleResult[], meta: PageMeta): Promise<void> {
+  const idx = rules.findIndex((r) => r.id === 'noindex');
+  const existing = idx >= 0 ? rules[idx] : undefined;
+  // Already failing on a meta tag, or no URL to ask about: nothing a header could add.
+  if (!existing || existing.status === 'fail' || !meta.pageUrl || meta.robots.noindex) return;
+
+  const header = await fetchHeaderRobots(meta.pageUrl);
+  if (!header) return;
+  const merged = applyHeaderRobots(meta.robots, header);
+  if (!merged.noindex) return;
+
+  rules[idx] = {
+    id: existing.id,
+    severity: existing.severity,
+    title: existing.title,
+    description: existing.description,
+    status: 'fail',
+    detail: `X-Robots-Tag: ${header} blocks indexing (HTTP header, not in the HTML).`,
+    ...(existing.meta ? { meta: existing.meta } : {}),
+  };
 }

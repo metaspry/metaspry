@@ -30,23 +30,48 @@ let suppress = false;
 // local/default `settings.set` during startup can't clobber the user's saved cloud rules.
 let pulledUid: string | null = null;
 
+export interface SettingsSyncDeps {
+  /** Read the user's cloud settings doc; null when they have none yet. */
+  load: (uid: string) => Promise<Settings | null>;
+  /** Write the store without triggering a push back to the cloud. */
+  apply: (s: Settings) => void;
+}
+
+/**
+ * Resolve the settings store for an auth change, and report the uid that pushes are now allowed
+ * for (null = push nothing).
+ *
+ * Reset FIRST, on every auth change including sign-out, exactly as `cloud/plan.ts` does for
+ * `cloudIsPro`: without it, user A's scoring rules stay in the store when user B signs in, B's
+ * pages are scored with A's rules, and B's first settings edit writes A's whole object into B's
+ * cloud doc. Custom scoring is Pro-only and Pro requires sign-in, so a signed-out user loses
+ * nothing that was in effect.
+ */
+export async function syncSettingsForUser(
+  u: { uid: string } | null,
+  deps: SettingsSyncDeps
+): Promise<string | null> {
+  deps.apply(DEFAULT_SETTINGS);
+  if (!u) return null;
+  const cloud = await deps.load(u.uid);
+  if (cloud) deps.apply(cloud);
+  // No cloud doc: the defaults applied above stand. Never the previous user's values.
+  return u.uid;
+}
+
 export function initCloudSettingsSync(): void {
   if (started) return;
   started = true;
 
+  const apply = (s: Settings): void => {
+    suppress = true;
+    settings.set(s);
+    suppress = false;
+  };
+
   cloudUser.subscribe(async (u) => {
-    if (!u) {
-      pulledUid = null;
-      return;
-    }
     pulledUid = null; // block pushes until this user's pull resolves
-    const cloud = await loadCloudSettings(u.uid);
-    if (cloud) {
-      suppress = true;
-      settings.set(cloud);
-      suppress = false;
-    }
-    pulledUid = u.uid;
+    pulledUid = await syncSettingsForUser(u, { load: loadCloudSettings, apply });
   });
 
   settings.subscribe((s) => {
