@@ -21,6 +21,8 @@
   let rightUrl = '';
   let rows: DiffRow[] = [];
   let rightScore = 0;
+  /** True when the left side is the rendered DOM and the right side is served HTML. */
+  let mixedSources = false;
 
   // Add a scheme when missing + validate http(s). Lets users paste "example.com".
   function normalizeUrl(raw: string): string | null {
@@ -31,6 +33,21 @@
       const u = new URL(withScheme);
       if ((u.protocol !== 'http:' && u.protocol !== 'https:') || !u.hostname.includes('.')) return null;
       return u.toString();
+    } catch {
+      return null;
+    }
+  }
+
+  /** Parse the served HTML of a URL, or null when it cannot be fetched. */
+  async function fetchSourceMeta(target: string): Promise<PageMeta | null> {
+    if (!target) return null;
+    try {
+      const res = await fetch(target, { credentials: 'omit', redirect: 'follow' });
+      if (!res.ok) return null;
+      const ct = res.headers.get('content-type') ?? '';
+      if (!ct.toLowerCase().includes('text/html')) return null;
+      const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+      return getMetaTags(doc.documentElement, res.url || target);
     } catch {
       return null;
     }
@@ -62,7 +79,12 @@
       const meta = getMetaTags(doc.documentElement, finalUrl);
       rightMeta = meta;
       rightUrl = finalUrl;
-      rows = diffMeta(leftMeta, meta);
+      // Left is the RENDERED DOM of the open tab, right is served HTML. On any SPA that alone
+      // produces a wall of false differences, because the framework injects tags after load. Fetch
+      // the left page's source too so both sides are the same kind of thing.
+      const leftSource = await fetchSourceMeta(leftUrl);
+      mixedSources = leftSource === null;
+      rows = diffMeta(leftSource ?? leftMeta, meta);
       const initial = audit(meta, $effectiveSettings);
       rightScore = initial.score;
       if (initial.hasPending) {
@@ -110,6 +132,20 @@
   {/if}
 
   {#if rightMeta}
+    {#if mixedSources}
+      <p
+        class="rounded-xl border border-amber-400/40 bg-amber-50/70 px-3 py-2 text-[11px] text-amber-800 dark:border-amber-300/20 dark:bg-amber-500/10 dark:text-amber-200"
+        role="status"
+      >
+        Could not fetch this page's served HTML, so the left side is the rendered page and the right
+        side is served HTML. On a JavaScript-rendered site some differences below may not be real.
+      </p>
+    {:else}
+      <p class="px-1 text-[11px] text-slate-500 dark:text-slate-400">
+        Comparing the served HTML of both pages, so tags added by JavaScript after load are not
+        included on either side.
+      </p>
+    {/if}
     <div class="grid grid-cols-2 gap-2">
       <div class="rounded-xl border border-white/40 bg-white/40 px-3 py-2 backdrop-blur-md dark:border-white/10 dark:bg-white/5">
         <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Current</p>

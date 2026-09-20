@@ -34,6 +34,17 @@ function loadImage(src: string, timeoutMs: number): Promise<Dim | null> {
   });
 }
 
+/** Resolve an og:image against the scanned page, not the extension's own origin. */
+export function absoluteImageUrl(raw: string, pageUrl: string | null): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return trimmed;
+  try {
+    return new URL(trimmed, pageUrl ?? undefined).toString();
+  } catch {
+    return trimmed;
+  }
+}
+
 function evalDim(dim: Dim | null): { status: 'pass' | 'warn' | 'fail'; detail: string } {
   if (!dim) return { status: 'warn', detail: 'Could not load image to measure.' };
   const { width, height } = dim;
@@ -55,7 +66,9 @@ export async function resolveAsyncRules(
   const ogImage = meta.tags.find((t) => t.key.toLowerCase() === 'og:image');
   const idx = rules.findIndex((r) => r.id === 'og:image-dimensions');
   if (idx >= 0 && ogImage) {
-    const dim = await loadImage(ogImage.value, 5000);
+    // A relative og:image was loaded against the EXTENSION origin, where it does not exist, so the
+    // rule always reported "Could not load image" for a perfectly good relative URL.
+    const dim = await loadImage(absoluteImageUrl(ogImage.value, meta.pageUrl), 5000);
     const { status, detail } = evalDim(dim);
     const existing = rules[idx];
     if (existing) {

@@ -19,21 +19,29 @@ export type SyncScope = { kind: 'personal' } | { kind: 'workspace'; wsId: string
 export const workspaces = writable<CloudWorkspace[]>([]);
 export const syncScope = writable<SyncScope>({ kind: 'personal' });
 
+/**
+ * The stored scope is namespaced per user. One shared key meant a direct account switch briefly
+ * showed, and could upload to, the previous user's workspace.
+ */
 const SCOPE_KEY = 'syncScope';
-
-function persistScope(s: SyncScope): void {
-  if (typeof chrome === 'undefined' || !chrome.storage?.local) return;
-  chrome.storage.local.set({ [SCOPE_KEY]: s });
+export function scopeKeyFor(uid: string | null | undefined): string {
+  return uid ? `${SCOPE_KEY}__${uid}` : SCOPE_KEY;
 }
 
-function loadScope(): Promise<SyncScope> {
+function persistScope(s: SyncScope, uid: string | null): void {
+  if (typeof chrome === 'undefined' || !chrome.storage?.local) return;
+  chrome.storage.local.set({ [scopeKeyFor(uid)]: s });
+}
+
+function loadScope(uid: string | null): Promise<SyncScope> {
   return new Promise((resolve) => {
     if (typeof chrome === 'undefined' || !chrome.storage?.local) {
       resolve({ kind: 'personal' });
       return;
     }
-    chrome.storage.local.get(SCOPE_KEY, (r) => {
-      const s = r[SCOPE_KEY] as SyncScope | undefined;
+    const key = scopeKeyFor(uid);
+    chrome.storage.local.get(key, (r) => {
+      const s = r[key] as SyncScope | undefined;
       resolve(s && s.kind === 'workspace' ? s : { kind: 'personal' });
     });
   });
@@ -41,7 +49,7 @@ function loadScope(): Promise<SyncScope> {
 
 export function setSyncScope(s: SyncScope): void {
   syncScope.set(s);
-  persistScope(s);
+  persistScope(s, get(cloudUser)?.uid ?? null);
 }
 
 export async function fetchWorkspaces(uid: string): Promise<void> {
@@ -70,12 +78,15 @@ let started = false;
 export function initCloudWorkspaces(): void {
   if (started) return;
   started = true;
-  void loadScope().then((s) => syncScope.set(s));
   cloudUser.subscribe((u) => {
-    if (u) void fetchWorkspaces(u.uid);
-    else {
+    // Reset first on every auth change, then load THIS user's stored scope. Loading a shared key
+    // once at startup meant user B briefly saw user A's workspace selected.
+    syncScope.set({ kind: 'personal' });
+    if (u) {
+      void fetchWorkspaces(u.uid);
+      void loadScope(u.uid).then((s) => syncScope.set(s));
+    } else {
       workspaces.set([]);
-      setSyncScope({ kind: 'personal' });
     }
   });
 }

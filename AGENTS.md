@@ -55,6 +55,11 @@ Rules with behaviour worth knowing:
   restrictive wins, not the first), directives split on whitespace as well as commas, and the
   `X-Robots-Tag` response header, fetched in `resolveAsyncRules` via
   `src/lib/scrapers/getHeaderRobots.ts`. A failed header fetch leaves the DOM verdict untouched.
+- **Title** comes from `<head>` only: an inline SVG `<title>` in the body is not a page title.
+- **`<base href>`** is honoured when resolving canonical, icon and hreflang; `rel` is matched on the
+  parsed token list, so `rel="canonical alternate"` and any casing work.
+- **Duplicate `<title>` / `<link rel=canonical>`** counts ride on `PageMeta.duplicates`, because the
+  dup-tags rule can only see `<meta>` elements.
 - **`canonical`** — compares the canonical to the page URL (`src/lib/audit/url-match.ts`: fragment,
   trailing slash, scheme and host case ignored). A canonical pointing elsewhere warns rather than
   fails, because pagination and syndication use that legitimately.
@@ -72,9 +77,9 @@ never the raw `settings` store.
 | `history` | `src/lib/storage/history.ts` | Last 10 scans (url, hostname, title, score, timestamp). |
 | `settings` | `src/lib/storage/settings.ts` | Thresholds + rule weights. |
 | `pinnedKeys` | `src/lib/storage/pinned.ts` | Pinned meta-tag keys, lowercased. |
+| `syncScope__<uid>` | `src/lib/cloud/workspaces.ts` | Chosen upload target, namespaced per user. |
 | `theme` | `src/lib/theme.ts` | `light` \| `dark`; falls back to the system preference. |
 | `mode` | `src/lib/mode.ts` | `sidepanel` \| `popup`. |
-| scope key | `src/lib/cloud/workspaces.ts` | Which workspace cloud scans are filed under. |
 
 Every one of these re-hydrates on `chrome.storage.onChanged` (§1).
 
@@ -93,7 +98,7 @@ Every one of these re-hydrates on `chrome.storage.onChanged` (§1).
 
 ## 6. Permissions
 
-`tabs`, `activeTab`, `contextMenus`, `storage`, `sidePanel`, `scripting`, `identity`, plus host
+`tabs`, `contextMenus`, `storage`, `sidePanel`, `scripting`, `identity`, plus host
 permissions for all sites. Host access is what lets the extension read `robots.txt`, sitemaps,
 `llms.txt` and the `X-Robots-Tag` header for the scanned origin. Adding a permission means
 justifying it to a store reviewer — do not add one without an explicit decision recorded here.
@@ -113,6 +118,17 @@ justifying it to a store reviewer — do not add one without an explicit decisio
 | `npm test` | Vitest, `src/**/*.spec.ts`. |
 | `npm run check` | `svelte-check` against `tsconfig.json`. |
 | `npm run gen-icons` | Regenerates `static/icons/` from the source icon. |
+
+## 9. Site files
+
+`getSiteFiles.ts` reads robots.txt, sitemaps and llms.txt for the scanned origin. It judges
+robots.txt on its **content** (a `text/html` content type alone does not mean missing), reports a
+body cut at the 2 MB cap as "too large to read here" rather than invalid, and bounds sitemap index
+recursion with a fetch budget (`MAX_SITEMAP_FETCHES`) and a concurrency cap — an unbounded nested
+index used to fire hundreds of requests and a popup-mode scan never finished syncing.
+
+`uploadScan` merges and writes `starred`/`createdAt` only on first write, so re-scanning never
+clears a star or re-dates a scan.
 
 Release: bump `package.json` **and** `static/manifest.json` together, build, zip `build/` as
 `metaspry-v<version>.zip`. Never delete previous zips without asking.

@@ -23,6 +23,8 @@ export interface PageMeta {
   canonical: string | null;
   icon: string | null;
   tags: MetaTag[];
+  /** How many <title> (in head) and <link rel=canonical> elements the page has. */
+  duplicates: { title: number; canonical: number };
   jsonLd: JsonLdResult;
   hreflang: HreflangEntry[];
   robots: RobotsInfo;

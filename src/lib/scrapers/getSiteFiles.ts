@@ -12,6 +12,33 @@ const TIMEOUT_MS = 4000;
 const MAX_BODY = 2_000_000;
 const MAX_CHILDREN = 20;
 const MAX_RECURSION_DEPTH = 2;
+/**
+ * Total sitemap fetches one scan may make. A nested index of 20 children, each an index of 20,
+ * fired ~420 requests inline before the scan could upload - in popup mode the popup closes first
+ * and the scan never syncs at all.
+ */
+const MAX_SITEMAP_FETCHES = 40;
+/** How many of those run at once. Promise.all over every child opened them all simultaneously. */
+const SITEMAP_CONCURRENCY = 6;
+
+/** Fetch budget for one `fetchSiteFiles` call. */
+interface Budget {
+  left: number;
+}
+
+/** Run tasks with a concurrency cap, preserving order. */
+async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let next = 0;
+  const worker = async (): Promise<void> => {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await fn(items[i] as T);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, () => worker()));
+  return out;
+}
 
 async function fetchWithTimeout(url: string): Promise<Response | null> {
   const controller = new AbortController();
@@ -34,6 +61,8 @@ interface FetchedDoc {
   text: string;
   contentType: string;
   status: number;
+  /** The body hit MAX_BODY and was cut, so any XML in it is incomplete. */
+  cut?: boolean;
   error?: string;
 }
 
@@ -42,20 +71,30 @@ async function fetchText(url: string): Promise<FetchedDoc> {
   if (!res) return { ok: false, text: '', contentType: '', status: 0, error: 'Request failed or timed out.' };
   if (!res.ok) return { ok: false, text: '', contentType: res.headers.get('content-type') ?? '', status: res.status, error: `HTTP ${res.status}` };
   const text = await res.text();
+  const cut = text.length > MAX_BODY;
   return {
     ok: true,
-    text: text.length > MAX_BODY ? text.slice(0, MAX_BODY) : text,
+    text: cut ? text.slice(0, MAX_BODY) : text,
     contentType: res.headers.get('content-type') ?? '',
     status: res.status,
+    ...(cut ? { cut: true } : {}),
   };
 }
 
 function looksLikeHtml(text: string, contentType: string): boolean {
-  const ct = contentType.toLowerCase();
-  if (ct.includes('text/html') || ct.includes('application/xhtml')) return true;
   const head = text.slice(0, 200).trimStart().toLowerCase();
   if (head.startsWith('<!doctype html') || head.startsWith('<html')) return true;
-  return false;
+  const ct = contentType.toLowerCase();
+  return ct.includes('text/html') || ct.includes('application/xhtml');
+}
+
+/**
+ * Plenty of servers send a perfectly good robots.txt as `text/html`. Declaring it missing on the
+ * content type alone reported "no robots.txt" for a site that has one - and silently dropped both
+ * AI-crawler checks with it. Content wins over the header.
+ */
+function looksLikeRobots(text: string): boolean {
+  return /^\s*(user-agent|sitemap|allow|disallow)\s*:/im.test(text);
 }
 
 function resolvePath(baseUrl: string, path: string): string | null {
@@ -141,12 +180,24 @@ async function tryParseSitemap(url: string): Promise<{ ok: true; parsed: ParsedS
   }
   const parsed = parseSitemapXml(fetched.text);
   if (!parsed) {
+    // A sitemap over MAX_BODY was cut mid-XML and then reported as invalid, so large sites were
+    // told their perfectly good sitemap was broken. Say what actually happened.
+    if (fetched.cut) {
+      return {
+        ok: false,
+        error: `Sitemap is larger than ${Math.round(MAX_BODY / 1_000_000)} MB - too big to read here. It is probably fine; check it in the web app.`,
+      };
+    }
     return { ok: false, error: 'Response was not a valid sitemap XML.' };
   }
   return { ok: true, parsed };
 }
 
-async function resolveSitemap(url: string, depth: number): Promise<SitemapChild> {
+async function resolveSitemap(url: string, depth: number, budget: Budget): Promise<SitemapChild> {
+  if (budget.left <= 0) {
+    return { url, urlCount: 0, isIndex: false, error: 'Not read - sitemap fetch budget reached.' };
+  }
+  budget.left -= 1;
   const res = await tryParseSitemap(url);
   if (!res.ok) {
     return { url, urlCount: 0, isIndex: false, error: res.error };
@@ -156,7 +207,9 @@ async function resolveSitemap(url: string, depth: number): Promise<SitemapChild>
     return { url, urlCount: parsed.locs.length, isIndex: parsed.isIndex };
   }
   const childLocs = parsed.locs.slice(0, MAX_CHILDREN);
-  const children = await Promise.all(childLocs.map((loc) => resolveSitemap(loc, depth + 1)));
+  const children = await mapLimit(childLocs, SITEMAP_CONCURRENCY, (loc) =>
+    resolveSitemap(loc, depth + 1, budget)
+  );
   const total = children.reduce((sum, c) => sum + c.urlCount, 0);
   return { url, urlCount: total, isIndex: true };
 }
@@ -189,7 +242,10 @@ async function buildSitemapFromParsed(_sourceUrl: string, parsed: ParsedSitemap)
   const allChildLocs = parsed.locs;
   const truncated = allChildLocs.length > MAX_CHILDREN;
   const childLocs = allChildLocs.slice(0, MAX_CHILDREN);
-  const children = await Promise.all(childLocs.map((loc) => resolveSitemap(loc, 1)));
+  const budget: Budget = { left: MAX_SITEMAP_FETCHES };
+  const children = await mapLimit(childLocs, SITEMAP_CONCURRENCY, (loc) =>
+    resolveSitemap(loc, 1, budget)
+  );
   const total = children.reduce((sum, c) => sum + c.urlCount, 0);
   return {
     present: true,
@@ -272,7 +328,7 @@ async function buildRobots(baseUrl: string): Promise<RobotsInfo> {
   if (!fetched.ok) {
     return { present: false, raw: null, groups: [], sitemaps: [], ...(fetched.error ? { error: fetched.error } : {}) };
   }
-  if (looksLikeHtml(fetched.text, fetched.contentType)) {
+  if (looksLikeHtml(fetched.text, fetched.contentType) && !looksLikeRobots(fetched.text)) {
     return { present: false, raw: null, groups: [], sitemaps: [], error: 'Server returned HTML (likely SPA fallback or missing route).' };
   }
   const parsed = parseRobots(fetched.text);

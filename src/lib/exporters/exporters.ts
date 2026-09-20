@@ -16,11 +16,21 @@ export function toJson(meta: PageMeta): string {
   );
 }
 
+/** Leading characters a spreadsheet treats as the start of a formula. */
+const FORMULA_START = /^[=+\-@\t\r]/;
+const NEEDS_QUOTES = /[",\n\r\t]/;
+
+/**
+ * Every value in this CSV comes from the audited site. A cell starting with `=`, `+`, `-`, `@` or
+ * a control character is executed as a formula when the file is opened in Excel, Sheets or
+ * Numbers, so it is prefixed with a tab, the standard neutralisation.
+ */
 function csvEscape(value: string): string {
-  if (/[",\n\r]/.test(value)) {
-    return `"${value.replace(/"/g, '""')}"`;
+  const neutralised = FORMULA_START.test(value) ? `\t${value}` : value;
+  if (NEEDS_QUOTES.test(neutralised)) {
+    return `"${neutralised.replace(/"/g, '""')}"`;
   }
-  return value;
+  return neutralised;
 }
 
 export function toCsv(meta: PageMeta): string {
