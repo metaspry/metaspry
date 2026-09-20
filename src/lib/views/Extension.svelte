@@ -260,6 +260,11 @@
   }
 
   function openApp() {
+    // Guarded like every other chrome.* entry point in this file: `npm run dev` renders this
+    // component in a plain browser, where `chrome` is undefined and the click would throw.
+    if (typeof chrome === 'undefined' || !chrome.tabs) return;
+    // `active: true` on purpose, unlike HistoryDropdown's background tab: the user is deliberately
+    // leaving for the web app, so letting the popup close is the wanted behaviour.
     chrome.tabs.create({ url: `${APP_URL}/dashboard`, active: true });
   }
 
