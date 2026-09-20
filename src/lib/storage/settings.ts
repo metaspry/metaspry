@@ -54,6 +54,19 @@ function readStorage(): Promise<Settings> {
 
 const guard = makeWriteGuard();
 
+/**
+ * Apply a value to the settings store WITHOUT persisting it to chrome.storage.
+ *
+ * The cloud sync resets the store to the defaults on every auth change so one account's scoring
+ * rules can never score another's. That reset must not reach storage: a free user who customised
+ * locally and then signed in for the first time had their local copy overwritten with the defaults
+ * before the (absent) cloud document could restore anything, losing the customisation from both
+ * sides.
+ */
+export function applySettingsWithoutPersisting(next: Settings): void {
+  guard.applyExternal(() => settings.set(next));
+}
+
 function writeStorage(next: Settings): void {
   if (guard.suppressed) return;
   if (typeof chrome === 'undefined' || !chrome.storage?.local) return;

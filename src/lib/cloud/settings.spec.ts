@@ -10,11 +10,16 @@ const custom = (tag: string): Settings => ({
 
 function harness(clouds: Record<string, Settings | null>) {
   const applied: Settings[] = [];
+  const persisted: Array<boolean | undefined> = [];
   return {
     applied,
+    persisted,
     deps: {
       load: vi.fn(async (uid: string) => clouds[uid] ?? null),
-      apply: (s: Settings) => void applied.push(s),
+      apply: (s: Settings, opts?: { persist?: boolean }) => {
+        applied.push(s);
+        persisted.push(opts?.persist);
+      },
     },
   };
 }
@@ -51,5 +56,23 @@ describe('syncSettingsForUser', () => {
     expect(pulled).toBeNull();
     expect(h.applied).toEqual([DEFAULT_SETTINGS]);
     expect(h.deps.load).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('the isolation reset never reaches local storage', () => {
+  it('applies the defaults with persist: false', async () => {
+    // A free user who customised locally and then signed in for the first time had their local
+    // copy overwritten with the defaults, and the (absent) cloud doc had nothing to restore.
+    const h = harness({});
+    await syncSettingsForUser({ uid: 'b' }, h.deps);
+    expect(h.applied[0]).toBe(DEFAULT_SETTINGS);
+    expect(h.persisted[0]).toBe(false);
+  });
+
+  it('persists the pulled cloud settings normally', async () => {
+    const h = harness({ a: custom('A') });
+    await syncSettingsForUser({ uid: 'a' }, h.deps);
+    expect(h.persisted[0]).toBe(false);
+    expect(h.persisted[1]).toBeUndefined();
   });
 });

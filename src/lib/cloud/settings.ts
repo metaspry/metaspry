@@ -7,7 +7,12 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { get } from 'svelte/store';
 import { fbDb } from './firebase';
 import { cloudUser } from './auth';
-import { settings, DEFAULT_SETTINGS, type Settings } from '../storage/settings';
+import {
+  settings,
+  applySettingsWithoutPersisting,
+  DEFAULT_SETTINGS,
+  type Settings,
+} from '../storage/settings';
 
 export async function loadCloudSettings(uid: string): Promise<Settings | null> {
   const snap = await getDoc(doc(fbDb(), 'users', uid, 'settings', 'audit'));
@@ -33,8 +38,11 @@ let pulledUid: string | null = null;
 export interface SettingsSyncDeps {
   /** Read the user's cloud settings doc; null when they have none yet. */
   load: (uid: string) => Promise<Settings | null>;
-  /** Write the store without triggering a push back to the cloud. */
-  apply: (s: Settings) => void;
+  /**
+   * Write the store without triggering a push back to the cloud. `persist: false` additionally
+   * keeps the value out of chrome.storage, for the isolation reset.
+   */
+  apply: (s: Settings, opts?: { persist?: boolean }) => void;
 }
 
 /**
@@ -51,7 +59,9 @@ export async function syncSettingsForUser(
   u: { uid: string } | null,
   deps: SettingsSyncDeps
 ): Promise<string | null> {
-  deps.apply(DEFAULT_SETTINGS);
+  // `persist: false` — the reset is an in-memory isolation step, not a user edit. Persisting it
+  // destroyed a free user's locally customised rules the first time they signed in.
+  deps.apply(DEFAULT_SETTINGS, { persist: false });
   if (!u) return null;
   const cloud = await deps.load(u.uid);
   if (cloud) deps.apply(cloud);
@@ -63,10 +73,16 @@ export function initCloudSettingsSync(): void {
   if (started) return;
   started = true;
 
-  const apply = (s: Settings): void => {
+  const apply = (s: Settings, opts: { persist?: boolean } = {}): void => {
     suppress = true;
-    settings.set(s);
-    suppress = false;
+    try {
+      if (opts.persist === false) applySettingsWithoutPersisting(s);
+      else settings.set(s);
+    } finally {
+      // try/finally, not bare assignment: a throwing subscriber used to latch pushes off for the
+      // rest of the session.
+      suppress = false;
+    }
   };
 
   cloudUser.subscribe(async (u) => {

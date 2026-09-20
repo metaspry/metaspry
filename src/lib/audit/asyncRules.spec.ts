@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { resolveAsyncRules } from './asyncRules';
+import { needsAsyncResolution, resolveAsyncRules } from './asyncRules';
 import { audit } from './rules';
 import type { PageMeta } from '../scrapers/PageMeta';
 import type { RobotsInfo } from '../scrapers/getRobots';
@@ -7,7 +7,9 @@ import type { RobotsInfo } from '../scrapers/getRobots';
 const realFetch = globalThis.fetch;
 
 function mockHeader(value: string | null) {
-  globalThis.fetch = vi.fn(async () => ({
+  globalThis.fetch = vi.fn(async (input: unknown) => ({
+    ok: true,
+    url: String(input),
     headers: { get: () => value },
     body: null,
   })) as unknown as typeof fetch;
@@ -72,7 +74,7 @@ describe('X-Robots-Tag resolution', () => {
   });
 
   it('does not fetch when the meta tag already failed the rule', async () => {
-    const spy = vi.fn(async () => ({ headers: { get: () => 'noindex' }, body: null }));
+    const spy = vi.fn(async () => ({ ok: true, url: '', headers: { get: () => 'noindex' }, body: null }));
     globalThis.fetch = spy as unknown as typeof fetch;
     const m = meta({ robots: { ...NO_ROBOTS, robots: 'noindex', noindex: true, source: 'meta' } });
     const resolved = await resolveAsyncRules(audit(m), m);
@@ -81,7 +83,7 @@ describe('X-Robots-Tag resolution', () => {
   });
 
   it('does not fetch when the page URL is unknown', async () => {
-    const spy = vi.fn(async () => ({ headers: { get: () => 'noindex' }, body: null }));
+    const spy = vi.fn(async () => ({ ok: true, url: '', headers: { get: () => 'noindex' }, body: null }));
     globalThis.fetch = spy as unknown as typeof fetch;
     const m = meta({ pageUrl: null });
     await resolveAsyncRules(audit(m), m);
@@ -93,5 +95,35 @@ describe('X-Robots-Tag resolution', () => {
     const m = meta();
     const resolved = await resolveAsyncRules(audit(m), m);
     expect(noindexRule(resolved)?.status).toBe('pass');
+  });
+});
+
+describe('the production gate (E1 path 3)', () => {
+  // Extension.svelte and CompareView both skip resolveAsyncRules when this returns false. It used
+  // to be `hasPending`, and only og:image-dimensions ever produces `pending` - so a page with no
+  // og:image never had its X-Robots-Tag checked, which is precisely the shape of a bare staging
+  // site. The unit tests passed because they called resolveAsyncRules directly.
+  it('still resolves a page with no og:image at all', async () => {
+    const m = meta({ tags: [] });
+    expect(needsAsyncResolution(audit(m), m)).toBe(true);
+
+    mockHeader('noindex');
+    const resolved = await resolveAsyncRules(audit(m), m);
+    expect(noindexRule(resolved)?.status).toBe('fail');
+  });
+
+  it('resolves when an og:image needs measuring', () => {
+    const m = meta({ tags: [{ key: 'og:image', value: 'https://acme.com/c.png' }] as never });
+    expect(needsAsyncResolution(audit(m), m)).toBe(true);
+  });
+
+  it('skips the network when the DOM already failed the rule', () => {
+    const m = meta({ robots: { ...NO_ROBOTS, robots: 'noindex', noindex: true, source: 'meta' } });
+    expect(needsAsyncResolution(audit(m), m)).toBe(false);
+  });
+
+  it('skips the network when there is no URL to ask about', () => {
+    const m = meta({ pageUrl: null });
+    expect(needsAsyncResolution(audit(m), m)).toBe(false);
   });
 });
