@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { safeHref } from '../../util/safe-href';
   import type { SitemapInfo } from '../../scrapers/SiteFiles';
 
   export let sitemap: SitemapInfo;
@@ -32,7 +33,11 @@
               <ul class="space-y-1">
                 {#each sitemap.children as child, i (i)}
                   <li class="rounded-lg border border-white/40 bg-white/40 px-2 py-1 dark:border-white/10 dark:bg-white/5">
-                    <a href={child.url} target="_blank" rel="noopener noreferrer" class="block break-all text-[11px] text-indigo-600 hover:underline dark:text-indigo-300">{child.url}</a>
+                    {#if safeHref(child.url)}
+                      <a href={safeHref(child.url)} target="_blank" rel="noopener noreferrer" class="block break-all text-[11px] text-indigo-600 hover:underline dark:text-indigo-300">{child.url}</a>
+                    {:else}
+                      <span class="block break-all text-[11px] text-slate-600 dark:text-slate-400" title="Not an http(s) URL">{child.url}</span>
+                    {/if}
                     <p class="text-[10px] text-slate-600 dark:text-slate-400">
                       {#if child.error}
                         <span class="text-rose-600 dark:text-rose-400">{child.error}</span>
@@ -55,7 +60,13 @@
             <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Sample (first 10)</p>
             <ul class="space-y-0.5">
               {#each sitemap.sample as s, i (i)}
-                <li><a href={s} target="_blank" rel="noopener noreferrer" class="break-all text-indigo-600 hover:underline dark:text-indigo-300">{s}</a></li>
+                <li>
+                  {#if safeHref(s)}
+                    <a href={safeHref(s)} target="_blank" rel="noopener noreferrer" class="break-all text-indigo-600 hover:underline dark:text-indigo-300">{s}</a>
+                  {:else}
+                    <span class="break-all text-slate-600 dark:text-slate-400" title="Not an http(s) URL">{s}</span>
+                  {/if}
+                </li>
               {/each}
             </ul>
           </div>

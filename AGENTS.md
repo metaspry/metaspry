@@ -103,13 +103,20 @@ permissions for all sites. Host access is what lets the extension read `robots.t
 `llms.txt` and the `X-Robots-Tag` header for the scanned origin. Adding a permission means
 justifying it to a store reviewer — do not add one without an explicit decision recorded here.
 
-## 7. Message types
+## 7. Untrusted input from the audited site
+
+Everything scraped belongs to someone else. URLs from robots.txt, sitemaps and llms.txt are rendered
+through `safeHref` (`src/lib/util/safe-href.ts`) — non-http(s) schemes render as text, never as a
+link inside the extension's own page. The scraped DOM is capped at 3 MB in the injected function
+before it crosses the message channel, and CSV exports neutralise spreadsheet formula prefixes.
+
+## 8. Message types
 
 | Message | From → To | Response |
 | --- | --- | --- |
 | `getHTML` | popup/side panel → service worker | `{ html, url }`, or `{ html: null, url, reason: 'unscriptable' \| 'no-tab' }`. Always answers. |
 
-## 8. Build and gates
+## 9. Build and gates
 
 | Command | What it does |
 | --- | --- |

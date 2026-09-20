@@ -30,6 +30,15 @@ function readAndApplyMode() {
   });
 }
 
+// The service worker is killed and restarted constantly, and `currentMode` resets to its default
+// each time. Re-reading on every lifecycle event, and following storage changes, keeps the
+// right-click action from opening the surface the user did not choose.
+chrome.runtime.onStartup?.addListener(readAndApplyMode);
+chrome.runtime.onInstalled?.addListener(readAndApplyMode);
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes.mode) applyMode(changes.mode.newValue);
+});
+
 // --- Context menu: page right-click ----------------------------------------
 
 function ensureContextMenu() {
@@ -95,7 +104,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         chrome.scripting.executeScript({
           target: { tabId: tab.id },
           function: () => {
-            return document.documentElement.outerHTML;
+            // Cap what crosses the message channel. A page with a huge inline payload could
+            // otherwise push tens of megabytes through it; the audit only needs <head> and the
+            // start of <body>, and DOMParser copes with a truncated document.
+            const MAX_HTML = 3_000_000;
+            const html = document.documentElement.outerHTML;
+            return html.length > MAX_HTML ? html.slice(0, MAX_HTML) : html;
           }
         }, (result) => {
           // On chrome:// pages, the New Tab page, the Web Store, PDFs and policy-blocked pages the

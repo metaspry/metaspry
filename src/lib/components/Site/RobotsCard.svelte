@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { safeHref } from '../../util/safe-href';
   import type { RobotsInfo } from '../../scrapers/SiteFiles';
 
   export let robots: RobotsInfo;
@@ -25,7 +26,13 @@
           <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Sitemaps</p>
           <ul class="space-y-0.5">
             {#each robots.sitemaps as s, i (i)}
-              <li><a href={s} target="_blank" rel="noopener noreferrer" class="break-all text-indigo-600 hover:underline dark:text-indigo-300">{s}</a></li>
+              <li>
+                {#if safeHref(s)}
+                  <a href={safeHref(s)} target="_blank" rel="noopener noreferrer" class="break-all text-indigo-600 hover:underline dark:text-indigo-300">{s}</a>
+                {:else}
+                  <span class="break-all text-slate-600 dark:text-slate-400" title="Not an http(s) URL">{s}</span>
+                {/if}
+              </li>
             {/each}
           </ul>
         </div>
