@@ -22,7 +22,9 @@
         <p class="text-slate-700 dark:text-slate-300">
           Sitemap index · {sitemap.childCount} child sitemap{sitemap.childCount === 1 ? '' : 's'}
           {#if sitemap.truncated}<span class="text-amber-600 dark:text-amber-400"> (showing first 20)</span>{/if}
-          · ~{sitemap.urlCount} total URL{sitemap.urlCount === 1 ? '' : 's'}
+          · {sitemap.budgetExhausted ? 'at least' : '~'}{sitemap.urlCount} total URL{sitemap.urlCount === 1
+            ? ''
+            : 's'}{sitemap.budgetExhausted ? ' (some child sitemaps not read)' : ''}
         </p>
         {#if sitemap.children.length > 0}
           <div class="space-y-1">

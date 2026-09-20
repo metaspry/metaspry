@@ -129,17 +129,19 @@ export async function uploadScan(
     scope.kind === 'workspace'
       ? doc(fbDb(), 'workspaces', scope.wsId, 'scans', id)
       : doc(fbDb(), 'users', uid, 'scans', id);
-  // merge + a first-write-only createdAt: a plain setDoc wiped the user's `starred` flag and
-  // reset createdAt on every re-scan, so re-auditing a page you had starred silently unstarred it
-  // and moved it to the top of history as if it were new.
+  // A plain setDoc wiped the user's `starred` flag and reset createdAt on every re-scan, so
+  // re-auditing a page you had starred silently unstarred it and moved it to the top of history as
+  // if it were new. Carry those two forward from the snapshot instead of merging: the Firestore
+  // instance runs with ignoreUndefinedProperties, and toScanPayload emits undefined for siteFiles,
+  // description, canonical, ogImage and favicon — with merge those are DROPPED from the write and
+  // the document keeps the previous scan's values, so the web app would show a stale robots/sitemap
+  // summary or a description the site has since removed, beside a fresh score and timestamp.
   const existing = await getDoc(ref);
-  await setDoc(
-    ref,
-    {
-      ...payload,
-      workspaceId: scope.kind === 'workspace' ? scope.wsId : null,
-      ...(existing.exists() ? {} : { starred: false, createdAt: serverTimestamp() }),
-    },
-    { merge: true }
-  );
+  const prev = existing.data();
+  await setDoc(ref, {
+    ...payload,
+    workspaceId: scope.kind === 'workspace' ? scope.wsId : null,
+    starred: prev?.starred ?? false,
+    createdAt: prev?.createdAt ?? serverTimestamp(),
+  });
 }

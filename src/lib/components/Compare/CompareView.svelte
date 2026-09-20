@@ -5,6 +5,7 @@
   import { needsAsyncResolution, resolveAsyncRules } from '../../audit/asyncRules';
   import { effectiveSettings } from '../../cloud/plan';
   import { diffMeta, type DiffRow } from './diff';
+  import { sameUrl } from '../../audit/url-match';
 
   export let leftMeta: PageMeta;
   export let leftUrl: string;
@@ -38,18 +39,31 @@
     }
   }
 
-  /** Parse the served HTML of a URL, or null when it cannot be fetched. */
+  /** Parse the served HTML of a URL, or null when it cannot be fetched like-for-like. */
   async function fetchSourceMeta(target: string): Promise<PageMeta | null> {
     if (!target) return null;
+    const controller = new AbortController();
+    // Every other fetch in the extension is bounded; this one was not, so a slow host hung Compare
+    // indefinitely — and this change added a second such request per comparison.
+    const timer = setTimeout(() => controller.abort(), 6000);
     try {
-      const res = await fetch(target, { credentials: 'omit', redirect: 'follow' });
+      const res = await fetch(target, {
+        credentials: 'omit',
+        redirect: 'follow',
+        signal: controller.signal,
+      });
       if (!res.ok) return null;
+      // No cookies are sent, so an auth-gated page answers with its logged-out or login document.
+      // Diffing that against what the user is looking at would be a confident lie.
+      if (res.url && !sameUrl(res.url, target)) return null;
       const ct = res.headers.get('content-type') ?? '';
       if (!ct.toLowerCase().includes('text/html')) return null;
       const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
       return getMetaTags(doc.documentElement, res.url || target);
     } catch {
       return null;
+    } finally {
+      clearTimeout(timer);
     }
   }
 
@@ -142,8 +156,9 @@
       </p>
     {:else}
       <p class="px-1 text-[11px] text-slate-500 dark:text-slate-400">
-        Comparing the served HTML of both pages, so tags added by JavaScript after load are not
-        included on either side.
+        Comparing the served HTML of both pages, fetched without your cookies — so tags added by
+        JavaScript after load are not included on either side, and a page that varies by login or
+        region may differ from what you see.
       </p>
     {/if}
     <div class="grid grid-cols-2 gap-2">

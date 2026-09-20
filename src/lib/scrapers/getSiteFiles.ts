@@ -21,6 +21,9 @@ const MAX_SITEMAP_FETCHES = 40;
 /** How many of those run at once. Promise.all over every child opened them all simultaneously. */
 const SITEMAP_CONCURRENCY = 6;
 
+/** Marker for a child the budget stopped us reading, so the caller can flag the total. */
+export const BUDGET_ERROR = 'Not read - sitemap fetch budget reached.';
+
 /** Fetch budget for one `fetchSiteFiles` call. */
 interface Budget {
   left: number;
@@ -170,7 +173,9 @@ function parseSitemapXml(raw: string): ParsedSitemap | null {
   return { isIndex, locs };
 }
 
-async function tryParseSitemap(url: string): Promise<{ ok: true; parsed: ParsedSitemap } | { ok: false; error: string }> {
+async function tryParseSitemap(
+  url: string
+): Promise<{ ok: true; parsed: ParsedSitemap } | { ok: false; error: string; tooLarge?: boolean }> {
   const fetched = await fetchText(url);
   if (!fetched.ok) {
     return { ok: false, error: fetched.error ?? 'Fetch failed.' };
@@ -185,6 +190,7 @@ async function tryParseSitemap(url: string): Promise<{ ok: true; parsed: ParsedS
     if (fetched.cut) {
       return {
         ok: false,
+        tooLarge: true,
         error: `Sitemap is larger than ${Math.round(MAX_BODY / 1_000_000)} MB - too big to read here. It is probably fine; check it in the web app.`,
       };
     }
@@ -195,7 +201,7 @@ async function tryParseSitemap(url: string): Promise<{ ok: true; parsed: ParsedS
 
 async function resolveSitemap(url: string, depth: number, budget: Budget): Promise<SitemapChild> {
   if (budget.left <= 0) {
-    return { url, urlCount: 0, isIndex: false, error: 'Not read - sitemap fetch budget reached.' };
+    return { url, urlCount: 0, isIndex: false, error: BUDGET_ERROR };
   }
   budget.left -= 1;
   const res = await tryParseSitemap(url);
@@ -247,10 +253,14 @@ async function buildSitemapFromParsed(_sourceUrl: string, parsed: ParsedSitemap)
     resolveSitemap(loc, 1, budget)
   );
   const total = children.reduce((sum, c) => sum + c.urlCount, 0);
+  // Children we could not read contribute 0, so the total is a floor, not a count. Say so rather
+  // than presenting a number partly built from unread files.
+  const budgetExhausted = children.some((c) => c.error === BUDGET_ERROR);
   return {
     present: true,
     isIndex: true,
     urlCount: total,
+    ...(budgetExhausted ? { budgetExhausted: true } : {}),
     childCount: allChildLocs.length,
     children,
     sample: allChildLocs.slice(0, 10),
@@ -290,12 +300,18 @@ async function buildSitemap(baseUrl: string, robotsSitemaps: string[]): Promise<
       if (candidate === candidates[0]) return built;
       return { ...built, error: `Found at fallback location: ${candidate}` };
     }
+    // A sitemap that EXISTS but is too big to read is not a missing sitemap. Stop here and say so:
+    // otherwise this error was overwritten by the 404 from the next fallback path, and the card
+    // showed a red "Missing" badge for a site whose sitemap.xml is perfectly valid.
+    if (res.tooLarge) {
+      return { ...emptySitemap(res.error), present: true };
+    }
     lastError = `${candidate}: ${res.error}`;
   }
   return emptySitemap(`Tried ${candidates.length} location(s). Last error — ${lastError}`);
 }
 
-function parseLlms(raw: string): LlmsSection[] {
+function parseLlms(raw: string, baseUrl: string): LlmsSection[] {
   const lines = raw.split(/\r?\n/);
   const sections: LlmsSection[] = [];
   let current: LlmsSection | null = null;
@@ -309,7 +325,9 @@ function parseLlms(raw: string): LlmsSection[] {
     }
     const link = rawLine.match(/^\s*-\s*\[([^\]]+)\]\(([^)]+)\)/);
     if (link && current && link[1] && link[2]) {
-      current.links.push({ label: link[1], url: link[2] });
+      // Resolve against the site: llms.txt routinely uses relative targets, and safeHref only
+      // accepts absolute http(s), so leaving them raw turned every relative link into text.
+      current.links.push({ label: link[1], url: resolvePath(baseUrl, link[2]) ?? link[2] });
     }
   }
 
@@ -355,7 +373,7 @@ async function buildLlms(baseUrl: string): Promise<LlmsInfo> {
   return {
     present: true,
     raw: fetched.text,
-    sections: parseLlms(fetched.text),
+    sections: parseLlms(fetched.text, target),
   };
 }
 

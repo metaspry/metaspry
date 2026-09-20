@@ -116,7 +116,7 @@ before it crosses the message channel, and CSV exports neutralise spreadsheet fo
 | --- | --- | --- |
 | `getHTML` | popup/side panel → service worker | `{ html, url }`, or `{ html: null, url, reason: 'unscriptable' \| 'no-tab' }`. Always answers. |
 
-## 9. Build and gates
+## 10. Build and gates
 
 | Command | What it does |
 | --- | --- |
