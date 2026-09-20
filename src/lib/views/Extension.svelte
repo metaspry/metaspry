@@ -21,7 +21,7 @@
   import { getMetaTags } from "../scrapers/getMetaTags";
   import type { PageMeta } from "../scrapers/PageMeta";
   import { audit } from "../audit/rules";
-  import { resolveAsyncRules } from "../audit/asyncRules";
+  import { needsAsyncResolution, resolveAsyncRules } from "../audit/asyncRules";
   import type { AuditResult } from "../audit/AuditResult";
 
   import { theme, toggleTheme } from "../theme";
@@ -77,7 +77,9 @@
     const id = ++auditId;
     const sync = audit(meta, currentSettings);
     if (id === auditId && sourceScrapeId === scrapeId) auditResult = sync;
-    if (!sync.hasPending) return sync;
+    // Not `hasPending`: that is true only when an og:image exists, which would skip the
+    // X-Robots-Tag check on exactly the bare pages most likely to be header-de-indexed.
+    if (!needsAsyncResolution(sync, meta)) return sync;
     const resolved = await resolveAsyncRules(sync, meta, currentSettings);
     if (id === auditId && sourceScrapeId === scrapeId) auditResult = resolved;
     return resolved;

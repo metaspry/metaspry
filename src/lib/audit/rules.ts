@@ -107,8 +107,17 @@ const RULES: RuleDefinition[] = [
     description: 'Page must not be marked noindex.',
     check: (m) => {
       if (m.robots.noindex) {
-        const found = m.robots.robots ?? m.robots.googlebot ?? 'noindex';
-        return { status: 'fail', detail: `Robots meta tag: ${found} blocks indexing.` };
+        // Name the tag that actually carries the directive. `getRobots` unions both tags, so
+        // quoting `robots` blindly reported "Robots meta tag: index,follow blocks indexing." on a
+        // page whose googlebot tag was the restrictive one.
+        const restrictive = (v: string | null) =>
+          !!v && /(^|[\s,])(noindex|none)([\s,]|$)/i.test(v);
+        const found = restrictive(m.robots.robots)
+          ? `robots: ${m.robots.robots}`
+          : restrictive(m.robots.googlebot)
+            ? `googlebot: ${m.robots.googlebot}`
+            : (m.robots.robots ?? m.robots.googlebot ?? 'noindex');
+        return { status: 'fail', detail: `Robots meta tag — ${found} blocks indexing.` };
       }
       // An X-Robots-Tag header can still de-index this page; resolveAsyncRules checks that and
       // overrides this result. Until then the honest answer is "nothing in the HTML blocks it".

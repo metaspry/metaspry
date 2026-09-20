@@ -2,7 +2,7 @@
   import type { PageMeta } from '../../scrapers/PageMeta';
   import { getMetaTags } from '../../scrapers/getMetaTags';
   import { audit } from '../../audit/rules';
-  import { resolveAsyncRules } from '../../audit/asyncRules';
+  import { needsAsyncResolution, resolveAsyncRules } from '../../audit/asyncRules';
   import { effectiveSettings } from '../../cloud/plan';
   import { diffMeta, type DiffRow } from './diff';
 
@@ -87,7 +87,7 @@
       rows = diffMeta(leftSource ?? leftMeta, meta);
       const initial = audit(meta, $effectiveSettings);
       rightScore = initial.score;
-      if (initial.hasPending) {
+      if (needsAsyncResolution(initial, meta)) {
         const resolved = await resolveAsyncRules(initial, meta, $effectiveSettings);
         rightScore = resolved.score;
       }

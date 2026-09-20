@@ -45,3 +45,18 @@ describe('scanUrlFor', () => {
     expect(scanUrlFor(null, null)).toBe('');
   });
 });
+
+describe('trailing slash (approved Decision 3)', () => {
+  it('files /blog and /blog/ as one scan', () => {
+    expect(normalizeScanUrl('https://acme.com/blog/')).toBe('https://acme.com/blog');
+    expect(scanUrlFor('https://acme.com/blog/', null)).toBe(scanUrlFor('https://acme.com/blog', null));
+  });
+
+  it('keeps the root slash', () => {
+    expect(normalizeScanUrl('https://acme.com/')).toBe('https://acme.com/');
+  });
+
+  it('does not touch a query string', () => {
+    expect(normalizeScanUrl('https://acme.com/a/?p=1')).toBe('https://acme.com/a?p=1');
+  });
+});

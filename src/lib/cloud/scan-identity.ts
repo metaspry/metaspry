@@ -14,6 +14,9 @@ export function normalizeScanUrl(raw: string | null | undefined): string {
   try {
     const u = new URL(raw);
     u.hash = '';
+    // Trailing slash too, as the approved decision says: `/blog` and `/blog/` are one page, and
+    // hashing them separately filed the same page as two cloud documents.
+    if (u.pathname.length > 1 && u.pathname.endsWith('/')) u.pathname = u.pathname.slice(0, -1);
     return u.toString();
   } catch {
     return raw.trim();

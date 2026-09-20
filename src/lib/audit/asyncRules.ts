@@ -57,6 +57,21 @@ function evalDim(dim: Dim | null): { status: 'pass' | 'warn' | 'fail'; detail: s
   return { status: 'fail', detail: `${width}×${height} — well below 1200×630.` };
 }
 
+/**
+ * Does this result still need the network?
+ *
+ * `hasPending` alone was the wrong question: only the og:image-dimensions rule ever produces
+ * `pending`, so a page with no og:image skipped `resolveAsyncRules` entirely — and with it the
+ * X-Robots-Tag check. A bare staging site with no Open Graph tags is exactly the shape of page that
+ * gets de-indexed by header, so the headline fix never ran where it mattered most.
+ */
+export function needsAsyncResolution(result: AuditResult, meta: PageMeta): boolean {
+  if (result.hasPending) return true;
+  if (!meta.pageUrl || meta.robots.noindex) return false;
+  const noindex = result.rules.find((r) => r.id === 'noindex');
+  return !!noindex && noindex.status !== 'fail';
+}
+
 export async function resolveAsyncRules(
   initial: AuditResult,
   meta: PageMeta,
@@ -102,6 +117,10 @@ async function applyHeaderRobotsRule(rules: RuleResult[], meta: PageMeta): Promi
   const header = await fetchHeaderRobots(meta.pageUrl);
   if (!header) return;
   const merged = applyHeaderRobots(meta.robots, header);
+  // Write the merged result back onto the scraped model, deliberately: the exported JSON and the
+  // Site view read `meta.robots`, and leaving them saying `noindex: false, header: null` next to a
+  // failing noindex rule is the product contradicting itself.
+  meta.robots = merged;
   if (!merged.noindex) return;
 
   rules[idx] = {
