@@ -6,9 +6,16 @@
   export let meta: PageMeta;
 
   function copyText(text: string, what: string) {
-    navigator.clipboard.writeText(text).then(() => {
-      toast(`${what} copied to clipboard`, 'success');
-    });
+    // Without the catch a blocked or failed clipboard write showed nothing at all: no toast, no
+    // error, and the user believed they had copied.
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        toast(`${what} copied to clipboard`, 'success');
+      })
+      .catch(() => {
+        toast(`Could not copy ${what.toLowerCase()} — your browser blocked clipboard access`, 'error');
+      });
   }
 
   function safeName(): string {

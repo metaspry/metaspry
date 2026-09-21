@@ -156,7 +156,7 @@ This is the complete inventory. There are no ports (`runtime.connect`), no conte
 | `settings` | `Settings` (6 thresholds + 3 weights) | `DEFAULT_SETTINGS`, merged over the stored value on read | `src/lib/storage/settings.ts` | `src/lib/cloud/settings.ts` (through the store) |
 | `history` | `HistoryEntry[]`, newest first, max 10 | `[]` | `src/lib/storage/history.ts` | - |
 | `pinnedKeys` | `string[]` of lower-cased tag keys | `[]` | `src/lib/storage/pinned.ts` | - |
-| `syncScope` | `{ kind: 'personal' } \| { kind: 'workspace', wsId, name }` | personal | `src/lib/cloud/workspaces.ts` | - |
+| `syncScope__<uid>` | `{ kind: 'personal' } \| { kind: 'workspace', wsId, name }` | personal | `src/lib/cloud/workspaces.ts` (`scopeKeyFor`) | - |
 | `popupHintDismissed` | `true` | unset | `src/lib/views/Extension.svelte` | - |
 
 Other storage:
@@ -165,6 +165,10 @@ Other storage:
 - **Firestore:** see section 5. Firestore runs with the default in-memory cache (no offline persistence).
 
 Each store module persists through `store.subscribe(writeStorage)`, which also fires once at init with the value just read. Every storage module is a no-op when `chrome` is undefined (dev server).
+
+**The sync target is namespaced per user.** The key is `syncScope__<uid>` (`scopeKeyFor`), falling
+back to the bare `syncScope` when signed out. A single shared key meant that after switching
+accounts the extension still showed - and could upload to - the previous user's workspace.
 
 **Cross-surface rehydration (`src/lib/storage/watch.ts`).** The popup and the side panel are separate
 documents with separate store instances. Each hydrates once at mount and then writes its **whole**
@@ -292,6 +296,19 @@ in the payload as metadata.
 - Tag values in `PageMeta.tags` are raw; only title, canonical, icon and hreflang hrefs are resolved. Consumers resolve `og:image` themselves.
 - `getRobots.ts` exports a `RobotsInfo` for meta robots that is unrelated to `SiteFiles.ts`'s `RobotsInfo` for robots.txt. Import the right one.
 - `categorize.ts`: `og:*` -> `og`, `twitter:*` -> `twitter`, a fixed SEO set (`description`, `keywords`, `robots`, `canonical`, `author`, `googlebot`) -> `seo`, a fixed basic set (`viewport`, `theme-color`, `generator`, ...) -> `basic`, everything else -> `other`.
+
+**Everything scraped belongs to someone else.** URLs out of robots.txt, sitemaps and llms.txt render
+through `safeHref` (`src/lib/util/safe-href.ts`): a non-http(s) scheme renders as text, never as a
+live link inside the extension's own page, which is a privileged origin. The injected function caps
+the DOM at 3 MB before it crosses the message channel, and CSV exports neutralise spreadsheet formula
+prefixes.
+
+**Parsing details that were wrong and are now pinned by tests.** `<title>` is read from `<head>`
+only, so an inline SVG `<title>` in the body is not a page title. `<base href>` is honoured when
+resolving canonical, icon and hreflang. `rel` is matched on the parsed token list, so
+`rel="canonical alternate"` and any casing work - a `[rel="canonical" i]` selector did not.
+Duplicate `<title>` and `<link rel=canonical>` counts ride on `PageMeta.duplicates`, because the
+duplicate-tags rule can only see `<meta>` elements.
 
 ### 3.5 Tags tab
 

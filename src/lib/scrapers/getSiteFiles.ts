@@ -12,6 +12,36 @@ const TIMEOUT_MS = 4000;
 const MAX_BODY = 2_000_000;
 const MAX_CHILDREN = 20;
 const MAX_RECURSION_DEPTH = 2;
+/**
+ * Total sitemap fetches one scan may make. A nested index of 20 children, each an index of 20,
+ * fired ~420 requests inline before the scan could upload - in popup mode the popup closes first
+ * and the scan never syncs at all.
+ */
+const MAX_SITEMAP_FETCHES = 40;
+/** How many of those run at once. Promise.all over every child opened them all simultaneously. */
+const SITEMAP_CONCURRENCY = 6;
+
+/** Marker for a child the budget stopped us reading, so the caller can flag the total. */
+export const BUDGET_ERROR = 'Not read - sitemap fetch budget reached.';
+
+/** Fetch budget for one `fetchSiteFiles` call. */
+interface Budget {
+  left: number;
+}
+
+/** Run tasks with a concurrency cap, preserving order. */
+async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let next = 0;
+  const worker = async (): Promise<void> => {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await fn(items[i] as T);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, () => worker()));
+  return out;
+}
 
 async function fetchWithTimeout(url: string): Promise<Response | null> {
   const controller = new AbortController();
@@ -34,6 +64,8 @@ interface FetchedDoc {
   text: string;
   contentType: string;
   status: number;
+  /** The body hit MAX_BODY and was cut, so any XML in it is incomplete. */
+  cut?: boolean;
   error?: string;
 }
 
@@ -42,20 +74,30 @@ async function fetchText(url: string): Promise<FetchedDoc> {
   if (!res) return { ok: false, text: '', contentType: '', status: 0, error: 'Request failed or timed out.' };
   if (!res.ok) return { ok: false, text: '', contentType: res.headers.get('content-type') ?? '', status: res.status, error: `HTTP ${res.status}` };
   const text = await res.text();
+  const cut = text.length > MAX_BODY;
   return {
     ok: true,
-    text: text.length > MAX_BODY ? text.slice(0, MAX_BODY) : text,
+    text: cut ? text.slice(0, MAX_BODY) : text,
     contentType: res.headers.get('content-type') ?? '',
     status: res.status,
+    ...(cut ? { cut: true } : {}),
   };
 }
 
 function looksLikeHtml(text: string, contentType: string): boolean {
-  const ct = contentType.toLowerCase();
-  if (ct.includes('text/html') || ct.includes('application/xhtml')) return true;
   const head = text.slice(0, 200).trimStart().toLowerCase();
   if (head.startsWith('<!doctype html') || head.startsWith('<html')) return true;
-  return false;
+  const ct = contentType.toLowerCase();
+  return ct.includes('text/html') || ct.includes('application/xhtml');
+}
+
+/**
+ * Plenty of servers send a perfectly good robots.txt as `text/html`. Declaring it missing on the
+ * content type alone reported "no robots.txt" for a site that has one - and silently dropped both
+ * AI-crawler checks with it. Content wins over the header.
+ */
+function looksLikeRobots(text: string): boolean {
+  return /^\s*(user-agent|sitemap|allow|disallow)\s*:/im.test(text);
 }
 
 function resolvePath(baseUrl: string, path: string): string | null {
@@ -131,7 +173,9 @@ function parseSitemapXml(raw: string): ParsedSitemap | null {
   return { isIndex, locs };
 }
 
-async function tryParseSitemap(url: string): Promise<{ ok: true; parsed: ParsedSitemap } | { ok: false; error: string }> {
+async function tryParseSitemap(
+  url: string
+): Promise<{ ok: true; parsed: ParsedSitemap } | { ok: false; error: string; tooLarge?: boolean }> {
   const fetched = await fetchText(url);
   if (!fetched.ok) {
     return { ok: false, error: fetched.error ?? 'Fetch failed.' };
@@ -141,12 +185,25 @@ async function tryParseSitemap(url: string): Promise<{ ok: true; parsed: ParsedS
   }
   const parsed = parseSitemapXml(fetched.text);
   if (!parsed) {
+    // A sitemap over MAX_BODY was cut mid-XML and then reported as invalid, so large sites were
+    // told their perfectly good sitemap was broken. Say what actually happened.
+    if (fetched.cut) {
+      return {
+        ok: false,
+        tooLarge: true,
+        error: `Sitemap is larger than ${Math.round(MAX_BODY / 1_000_000)} MB - too big to read here. It is probably fine; check it in the web app.`,
+      };
+    }
     return { ok: false, error: 'Response was not a valid sitemap XML.' };
   }
   return { ok: true, parsed };
 }
 
-async function resolveSitemap(url: string, depth: number): Promise<SitemapChild> {
+async function resolveSitemap(url: string, depth: number, budget: Budget): Promise<SitemapChild> {
+  if (budget.left <= 0) {
+    return { url, urlCount: 0, isIndex: false, error: BUDGET_ERROR };
+  }
+  budget.left -= 1;
   const res = await tryParseSitemap(url);
   if (!res.ok) {
     return { url, urlCount: 0, isIndex: false, error: res.error };
@@ -156,7 +213,9 @@ async function resolveSitemap(url: string, depth: number): Promise<SitemapChild>
     return { url, urlCount: parsed.locs.length, isIndex: parsed.isIndex };
   }
   const childLocs = parsed.locs.slice(0, MAX_CHILDREN);
-  const children = await Promise.all(childLocs.map((loc) => resolveSitemap(loc, depth + 1)));
+  const children = await mapLimit(childLocs, SITEMAP_CONCURRENCY, (loc) =>
+    resolveSitemap(loc, depth + 1, budget)
+  );
   const total = children.reduce((sum, c) => sum + c.urlCount, 0);
   return { url, urlCount: total, isIndex: true };
 }
@@ -189,12 +248,19 @@ async function buildSitemapFromParsed(_sourceUrl: string, parsed: ParsedSitemap)
   const allChildLocs = parsed.locs;
   const truncated = allChildLocs.length > MAX_CHILDREN;
   const childLocs = allChildLocs.slice(0, MAX_CHILDREN);
-  const children = await Promise.all(childLocs.map((loc) => resolveSitemap(loc, 1)));
+  const budget: Budget = { left: MAX_SITEMAP_FETCHES };
+  const children = await mapLimit(childLocs, SITEMAP_CONCURRENCY, (loc) =>
+    resolveSitemap(loc, 1, budget)
+  );
   const total = children.reduce((sum, c) => sum + c.urlCount, 0);
+  // Children we could not read contribute 0, so the total is a floor, not a count. Say so rather
+  // than presenting a number partly built from unread files.
+  const budgetExhausted = children.some((c) => c.error === BUDGET_ERROR);
   return {
     present: true,
     isIndex: true,
     urlCount: total,
+    ...(budgetExhausted ? { budgetExhausted: true } : {}),
     childCount: allChildLocs.length,
     children,
     sample: allChildLocs.slice(0, 10),
@@ -234,12 +300,18 @@ async function buildSitemap(baseUrl: string, robotsSitemaps: string[]): Promise<
       if (candidate === candidates[0]) return built;
       return { ...built, error: `Found at fallback location: ${candidate}` };
     }
+    // A sitemap that EXISTS but is too big to read is not a missing sitemap. Stop here and say so:
+    // otherwise this error was overwritten by the 404 from the next fallback path, and the card
+    // showed a red "Missing" badge for a site whose sitemap.xml is perfectly valid.
+    if (res.tooLarge) {
+      return { ...emptySitemap(res.error), present: true };
+    }
     lastError = `${candidate}: ${res.error}`;
   }
   return emptySitemap(`Tried ${candidates.length} location(s). Last error — ${lastError}`);
 }
 
-function parseLlms(raw: string): LlmsSection[] {
+function parseLlms(raw: string, baseUrl: string): LlmsSection[] {
   const lines = raw.split(/\r?\n/);
   const sections: LlmsSection[] = [];
   let current: LlmsSection | null = null;
@@ -253,7 +325,9 @@ function parseLlms(raw: string): LlmsSection[] {
     }
     const link = rawLine.match(/^\s*-\s*\[([^\]]+)\]\(([^)]+)\)/);
     if (link && current && link[1] && link[2]) {
-      current.links.push({ label: link[1], url: link[2] });
+      // Resolve against the site: llms.txt routinely uses relative targets, and safeHref only
+      // accepts absolute http(s), so leaving them raw turned every relative link into text.
+      current.links.push({ label: link[1], url: resolvePath(baseUrl, link[2]) ?? link[2] });
     }
   }
 
@@ -272,7 +346,7 @@ async function buildRobots(baseUrl: string): Promise<RobotsInfo> {
   if (!fetched.ok) {
     return { present: false, raw: null, groups: [], sitemaps: [], ...(fetched.error ? { error: fetched.error } : {}) };
   }
-  if (looksLikeHtml(fetched.text, fetched.contentType)) {
+  if (looksLikeHtml(fetched.text, fetched.contentType) && !looksLikeRobots(fetched.text)) {
     return { present: false, raw: null, groups: [], sitemaps: [], error: 'Server returned HTML (likely SPA fallback or missing route).' };
   }
   const parsed = parseRobots(fetched.text);
@@ -299,7 +373,7 @@ async function buildLlms(baseUrl: string): Promise<LlmsInfo> {
   return {
     present: true,
     raw: fetched.text,
-    sections: parseLlms(fetched.text),
+    sections: parseLlms(fetched.text, target),
   };
 }
 

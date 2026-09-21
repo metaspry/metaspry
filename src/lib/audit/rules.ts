@@ -196,13 +196,9 @@ const RULES: RuleDefinition[] = [
       // own document — getMetaTags parses a detached DOM, so document.location is the extension.
       const here = m.canonical ?? m.pageUrl;
       if (!here) return { status: 'pass', detail: `${m.hreflang.length} alternates; no page URL to match.` };
-      const hasSelf = m.hreflang.some((h) => {
-        try {
-          return new URL(h.href).toString() === new URL(here).toString();
-        } catch {
-          return false;
-        }
-      });
+      // Exact string equality flagged a correctly configured page over one trailing slash or an
+      // http-to-https migration. Same comparison the canonical rule uses.
+      const hasSelf = m.hreflang.some((h) => sameUrl(h.href, here));
       return hasSelf
         ? { status: 'pass', detail: `${m.hreflang.length} alternates; self-reference present.` }
         : { status: 'warn', detail: `${m.hreflang.length} alternates; no self-reference link.` };
@@ -276,6 +272,10 @@ const RULES: RuleDefinition[] = [
         counts.set(k, (counts.get(k) ?? 0) + 1);
       }
       const dups = Array.from(counts.entries()).filter(([, c]) => c > 1);
+      // <title> and <link rel=canonical> are not <meta> elements, so counting tags alone made a
+      // duplicate of either structurally invisible — and two canonicals is a real defect.
+      if (m.duplicates.title > 1) dups.push(['<title>', m.duplicates.title]);
+      if (m.duplicates.canonical > 1) dups.push(['<link rel=canonical>', m.duplicates.canonical]);
       if (dups.length === 0) return { status: 'pass', detail: 'All keys unique.' };
       return { status: 'warn', detail: dups.map(([k, c]) => `${k}×${c}`).join(', ') };
     },
@@ -327,7 +327,8 @@ export function audit(meta: PageMeta, settings: Settings = DEFAULT_SETTINGS): Au
 
   const earned = results.reduce((sum, r) => sum + scoreFor(r.status, r.severity, settings.weights), 0);
   const possible = RULES.reduce((sum, r) => sum + settings.weights[r.severity], 0);
-  const score = Math.round((earned / possible) * 100);
+  // All three weights at zero produced NaN, which was rendered and uploaded to Firestore.
+  const score = possible > 0 ? Math.round((earned / possible) * 100) : 0;
 
   return {
     score,
@@ -340,7 +341,8 @@ export function audit(meta: PageMeta, settings: Settings = DEFAULT_SETTINGS): Au
 export function rescoreAfterAsync(rules: RuleResult[], settings: Settings = DEFAULT_SETTINGS): AuditResult {
   const earned = rules.reduce((sum, r) => sum + scoreFor(r.status, r.severity, settings.weights), 0);
   const possible = RULES.reduce((sum, r) => sum + settings.weights[r.severity], 0);
-  const score = Math.round((earned / possible) * 100);
+  // Same zero-divisor guard as `audit` above.
+  const score = possible > 0 ? Math.round((earned / possible) * 100) : 0;
   return {
     score,
     band: band(score),

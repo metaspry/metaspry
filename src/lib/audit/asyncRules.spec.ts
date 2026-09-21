@@ -31,6 +31,7 @@ function meta(over: Partial<PageMeta> = {}): PageMeta {
     canonical: 'https://acme.com/post',
     icon: null,
     tags: [],
+    duplicates: { title: 1, canonical: 1 },
     jsonLd: { blocks: [], errors: [] } as unknown as PageMeta['jsonLd'],
     hreflang: [],
     robots: NO_ROBOTS,

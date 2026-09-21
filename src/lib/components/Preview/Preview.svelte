@@ -44,7 +44,10 @@
   $: ogImage = safeImage(val('og:image'));
   $: ogHost = hostnameOf(val('og:url'), meta.canonical, pageUrl);
 
-  $: twitterCard = (val('twitter:card') ?? 'summary_large_image').toLowerCase();
+  // Without twitter:card, X falls back to a plain summary — not summary_large_image. Defaulting
+  // to the big card showed the user a preview they will never actually get.
+  $: declaredTwitterCard = val('twitter:card')?.toLowerCase() ?? null;
+  $: twitterCard = declaredTwitterCard ?? 'summary';
   $: twitterTitle = val('twitter:title') ?? ogTitle;
   $: twitterDescription = val('twitter:description') ?? ogDescription;
   $: twitterImage = safeImage(val('twitter:image') ?? val('og:image') ?? undefined);
@@ -92,7 +95,7 @@
     class="overflow-hidden rounded-2xl border border-white/40 bg-white/60 shadow-md shadow-indigo-500/5 backdrop-blur-md dark:border-white/10 dark:bg-white/5"
   >
     <header class="border-b border-white/40 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:border-white/10 dark:text-slate-400">
-      Twitter · {twitterCard}
+      Twitter · {twitterCard}{declaredTwitterCard ? '' : ' (no twitter:card — fallback)'}
     </header>
     {#if twitterCard === 'summary'}
       <div class="flex">

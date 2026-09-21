@@ -12,7 +12,7 @@
 
   const rows: { key: string; label: string }[] = [
     { key: '/', label: 'Focus search' },
-    { key: '1 / 2 / 3 / 4', label: 'Switch to Tags / Previews / Audit / Compare' },
+    { key: '1 – 6', label: 'Switch to Tags / Previews / Audit / Site / AI / Compare' },
     { key: 'r', label: 'Re-scrape current page' },
     { key: '?', label: 'Toggle this help' },
     { key: 'Esc', label: 'Close drawers and modals' },

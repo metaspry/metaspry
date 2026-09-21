@@ -62,6 +62,9 @@ function openExtensionFromGesture(tab) {
   }
 }
 
+// The service worker is killed and restarted constantly, and `currentMode` resets to its default
+// each time; these three listeners plus the top-level readAndApplyMode() below are what keep the
+// right-click action from opening the surface the user did not choose.
 chrome.runtime.onInstalled.addListener(() => {
   readAndApplyMode();
   ensureContextMenu();
@@ -96,13 +99,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           chrome.scripting.executeScript({
             target: { tabId: tab.id },
             function: () => {
-              return document.documentElement.outerHTML;
+              // Cap what crosses the message channel. A page with a huge inline payload could
+              // otherwise push tens of megabytes through it; the audit only needs <head> and the
+              // start of <body>, and DOMParser copes with a truncated document.
+              const MAX_HTML = 3_000_000;
+              const html = document.documentElement.outerHTML;
+              return html.length > MAX_HTML ? html.slice(0, MAX_HTML) : html;
             }
           }, (result) => {
             // On chrome:// pages, the New Tab page, the Web Store, PDFs and policy-blocked pages the
             // injection fails: `result` itself is undefined and lastError is set. Reading lastError
             // and always answering keeps the popup from hanging on a promise that never settles.
-            // Reading lastError also stops Chrome logging it as unchecked.
             void chrome.runtime.lastError;
             const htmlContent = Array.isArray(result) ? result[0]?.result : undefined;
             if (htmlContent) {

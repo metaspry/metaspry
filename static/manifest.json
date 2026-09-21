@@ -24,7 +24,7 @@
   },
   "offline_enabled": true,
   "minimum_chrome_version": "114",
-  "permissions": ["tabs", "activeTab", "contextMenus", "storage", "sidePanel", "scripting", "identity"],
+  "permissions": ["tabs", "contextMenus", "storage", "sidePanel", "scripting", "identity"],
   "host_permissions": [
     "*://*/*"
   ]

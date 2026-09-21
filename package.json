@@ -17,6 +17,7 @@
 		"@sveltejs/adapter-static": "^2.0.3",
 		"@sveltejs/kit": "^1.27.4",
 		"autoprefixer": "^10.4.16",
+		"happy-dom": "^20.14.5",
 		"onchange": "^7.1.0",
 		"postcss": "^8.4.31",
 		"sharp": "^0.34.5",

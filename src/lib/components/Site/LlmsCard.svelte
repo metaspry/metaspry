@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { safeHref } from '../../util/safe-href';
   import type { LlmsInfo } from '../../scrapers/SiteFiles';
 
   export let llms: LlmsInfo;
@@ -25,7 +26,13 @@
             {#if section.links.length > 0}
               <ul class="ml-3 mt-1 list-disc space-y-0.5 text-[11px] marker:text-slate-400">
                 {#each section.links as link, j (j)}
-                  <li><a href={link.url} target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:underline dark:text-indigo-300">{link.label}</a></li>
+                  <li>
+                    {#if safeHref(link.url)}
+                      <a href={safeHref(link.url)} target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:underline dark:text-indigo-300">{link.label}</a>
+                    {:else}
+                      <span class="text-slate-600 dark:text-slate-400" title="Not an http(s) URL">{link.label}</span>
+                    {/if}
+                  </li>
                 {/each}
               </ul>
             {/if}
