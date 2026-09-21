@@ -26,7 +26,7 @@
   import { theme, toggleTheme } from "../theme";
   import { mode, setMode, type Mode } from "../mode";
   import type { Settings } from "../storage/settings";
-  import { effectiveSettings } from "../cloud/plan";
+  import { effectiveSettings, APP_URL } from "../cloud/plan";
   import { pushHistory } from "../storage/history";
   import { registerShortcuts, helpOpen } from "../components/Shortcuts/keyboard";
   import CloudSync from "../components/CloudSync/CloudSync.svelte";
@@ -259,6 +259,15 @@
     void current;
   }
 
+  function openApp() {
+    // Guarded like every other chrome.* entry point in this file: `npm run dev` renders this
+    // component in a plain browser, where `chrome` is undefined and the click would throw.
+    if (typeof chrome === 'undefined' || !chrome.tabs) return;
+    // `active: true` on purpose, unlike HistoryDropdown's background tab: the user is deliberately
+    // leaving for the web app, so letting the popup close is the wanted behaviour.
+    chrome.tabs.create({ url: `${APP_URL}/dashboard`, active: true });
+  }
+
   onMount(() => {
     if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
       chrome.runtime.onMessage.addListener(onRuntimeMessage);
@@ -317,6 +326,22 @@
         </button>
 
         <CloudSync />
+
+        {#if $cloudUser}
+          <button
+            type="button"
+            aria-label="Open Metaspry web app"
+            title="Open Metaspry web app"
+            on:click={openApp}
+            class="flex h-8 w-8 items-center justify-center rounded-full border border-white/40 bg-white/40 text-slate-700 backdrop-blur-md transition hover:bg-white/70 hover:text-indigo-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 dark:hover:text-indigo-300"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+              <path d="M15 3h6v6" />
+              <path d="M10 14 21 3" />
+            </svg>
+          </button>
+        {/if}
 
         <button
           type="button"
