@@ -368,6 +368,12 @@ header**, which no meta tag can reveal: `scrapers/getHeaderRobots.ts` fetches it
 `resolveAsyncRules` overrides the rule. Until that resolves, the synchronous answer is the honest
 "nothing in the HTML blocks it", not "indexable".
 
+**`dup-tags` counts per (name, media) pair.** Two tags sharing a name but scoped to different
+media queries - the light/dark `theme-color` pattern - are not duplicates. Counting by name
+alone reported the correct markup as a defect, including on metaspry.com itself. `MetaTag`
+carries an optional `media`, whitespace in the query is normalised before comparison, and two
+tags sharing a query are still a warning. Mirrored in `app/functions/src/audit/engine.ts`.
+
 **`canonical` compares, it does not merely exist.** `audit/url-match.ts` `sameUrl` ignores the
 fragment, a trailing slash and http/https, and treats `www.`, query strings and path casing as real
 differences - a canonical pointing somewhere else is the common, silent cause of a page not being

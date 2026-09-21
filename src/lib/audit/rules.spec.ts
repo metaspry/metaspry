@@ -69,3 +69,47 @@ describe('canonical rule', () => {
     expect(r?.status).toBe('pass');
   });
 });
+
+describe('dup-tags and media-scoped duplicates', () => {
+  const tag = (key: string, value: string, media?: string) => ({
+    key,
+    value,
+    source: 'name' as const,
+    category: 'basic' as const,
+    ...(media ? { media } : {}),
+  });
+
+  const run = (tags: ReturnType<typeof tag>[]) => ruleById(meta({ tags }), 'dup-tags');
+
+  it('does not flag light/dark theme-color as a duplicate', () => {
+    // The documented pattern, and what metaspry.com itself ships. Counting by name alone
+    // reported our own correct markup as "theme-color×2".
+    const r = run([
+      tag('theme-color', '#fbfbff', '(prefers-color-scheme: light)'),
+      tag('theme-color', '#0b1020', '(prefers-color-scheme: dark)'),
+    ]);
+    expect(r?.status).toBe('pass');
+  });
+
+  it('still flags a genuine duplicate with no media', () => {
+    const r = run([tag('description', 'one'), tag('description', 'two')]);
+    expect(r?.status).toBe('warn');
+    expect(r?.detail).toContain('description');
+  });
+
+  it('flags two tags that share the same media query', () => {
+    const r = run([
+      tag('theme-color', '#aaa', '(prefers-color-scheme: dark)'),
+      tag('theme-color', '#bbb', '(prefers-color-scheme: dark)'),
+    ]);
+    expect(r?.status).toBe('warn');
+  });
+
+  it('treats whitespace differences in a media query as the same scope', () => {
+    const r = run([
+      tag('theme-color', '#aaa', '(prefers-color-scheme:  dark)'),
+      tag('theme-color', '#bbb', '(prefers-color-scheme: dark)'),
+    ]);
+    expect(r?.status).toBe('warn');
+  });
+});

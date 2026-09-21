@@ -13,6 +13,9 @@ export interface MetaTag {
   value: string;
   source: TagSource;
   category: TagCategory;
+  /** `media` attribute, when present. Two tags sharing a name but scoped to different media
+   *  queries are a documented pattern (light/dark `theme-color`), not a duplicate. */
+  media?: string;
 }
 
 export interface PageMeta {

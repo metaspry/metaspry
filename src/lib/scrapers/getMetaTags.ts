@@ -68,11 +68,13 @@ export function getMetaTags(html: HTMLElement, baseUrl: string = ''): PageMeta {
     }
     if (!key) return;
 
+    const media = el.getAttribute('media');
     tags.push({
       key,
       value,
       source,
       category: categorize(key),
+      ...(media ? { media } : {}),
     });
   });
 
