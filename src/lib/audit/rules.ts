@@ -266,12 +266,22 @@ const RULES: RuleDefinition[] = [
     title: 'No duplicate meta tags',
     description: 'Repeated identical keys can confuse crawlers.',
     check: (m) => {
-      const counts = new Map<string, number>();
+      // Counted per (name, media) pair. `<meta name="theme-color" media="(prefers-color-scheme:
+      // light)">` beside its dark twin is the documented way to do it, and counting by name alone
+      // reported the correct implementation as a defect — including on metaspry.com itself.
+      const seen = new Map<string, Map<string, number>>();
       for (const t of m.tags) {
         const k = t.key.toLowerCase();
-        counts.set(k, (counts.get(k) ?? 0) + 1);
+        const mq = (t.media ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
+        const byMedia = seen.get(k) ?? new Map<string, number>();
+        byMedia.set(mq, (byMedia.get(mq) ?? 0) + 1);
+        seen.set(k, byMedia);
       }
-      const dups = Array.from(counts.entries()).filter(([, c]) => c > 1);
+      const dups: [string, number][] = [];
+      for (const [k, byMedia] of seen) {
+        const worst = Math.max(...Array.from(byMedia.values()));
+        if (worst > 1) dups.push([k, worst]);
+      }
       // <title> and <link rel=canonical> are not <meta> elements, so counting tags alone made a
       // duplicate of either structurally invisible — and two canonicals is a real defect.
       if (m.duplicates.title > 1) dups.push(['<title>', m.duplicates.title]);
