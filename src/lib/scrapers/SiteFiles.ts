@@ -20,6 +20,12 @@ export interface SitemapChild {
 }
 
 export interface SitemapInfo {
+  /**
+   * True when the fetch budget stopped us before every child sitemap was read, so `urlCount` is a
+   * floor rather than a total. Without this the headline summed the unread children as zero and
+   * asserted a number built partly from nothing.
+   */
+  budgetExhausted?: boolean;
   present: boolean;
   isIndex: boolean;
   urlCount: number;

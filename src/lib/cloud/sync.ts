@@ -3,7 +3,7 @@
  * renders, and uploads it to users/{uid}/scans. Re-scanning a URL overwrites its doc
  * (deterministic id) so history shows the latest state per URL, not duplicates.
  */
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { fbDb } from './firebase';
 import type { PageMeta } from '../scrapers/PageMeta';
 import type { AuditResult, RuleStatus } from '../audit/AuditResult';
@@ -91,7 +91,6 @@ export function toScanPayload(
     scannedAt: Date.now(),
     title: meta.title ?? '',
     source: 'extension' as const,
-    starred: false,
     workspaceId: null,
     // denormalized summary for the history list
     score: auditResult.score,
@@ -130,9 +129,19 @@ export async function uploadScan(
     scope.kind === 'workspace'
       ? doc(fbDb(), 'workspaces', scope.wsId, 'scans', id)
       : doc(fbDb(), 'users', uid, 'scans', id);
+  // A plain setDoc wiped the user's `starred` flag and reset createdAt on every re-scan, so
+  // re-auditing a page you had starred silently unstarred it and moved it to the top of history as
+  // if it were new. Carry those two forward from the snapshot instead of merging: the Firestore
+  // instance runs with ignoreUndefinedProperties, and toScanPayload emits undefined for siteFiles,
+  // description, canonical, ogImage and favicon — with merge those are DROPPED from the write and
+  // the document keeps the previous scan's values, so the web app would show a stale robots/sitemap
+  // summary or a description the site has since removed, beside a fresh score and timestamp.
+  const existing = await getDoc(ref);
+  const prev = existing.data();
   await setDoc(ref, {
     ...payload,
     workspaceId: scope.kind === 'workspace' ? scope.wsId : null,
-    createdAt: serverTimestamp(),
+    starred: prev?.starred ?? false,
+    createdAt: prev?.createdAt ?? serverTimestamp(),
   });
 }

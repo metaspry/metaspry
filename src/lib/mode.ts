@@ -1,4 +1,5 @@
 import { writable } from 'svelte/store';
+import { watchKey } from './storage/watch';
 
 export type Mode = 'sidepanel' | 'popup';
 
@@ -35,6 +36,10 @@ export async function initMode(): Promise<void> {
   applyAttr(initial);
   mode.set(initial);
   mode.subscribe(applyAttr);
+  // Mode is written by setMode only, so there is no write to suppress here.
+  watchKey(STORAGE_KEY, (raw) => {
+    mode.set(raw === 'popup' ? 'popup' : 'sidepanel');
+  });
 }
 
 export function setMode(next: Mode): void {

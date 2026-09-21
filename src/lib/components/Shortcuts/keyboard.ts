@@ -25,6 +25,9 @@ function isEditable(el: EventTarget | null): boolean {
 export function attachShortcuts(): () => void {
   function onKey(event: KeyboardEvent) {
     if (isEditable(event.target)) return;
+    // Without this, Ctrl+R re-scraped instead of reloading and Ctrl+1 switched OUR tab instead of
+    // the browser's — every shortcut fired on the modified chord too.
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
     if (event.key === '/') {
       handlers.focusSearch?.();
       event.preventDefault();
@@ -34,7 +37,9 @@ export function attachShortcuts(): () => void {
     } else if (event.key === 'r' || event.key === 'R') {
       handlers.rescrape?.();
       event.preventDefault();
-    } else if (event.key >= '1' && event.key <= '5') {
+    } else if (event.key >= '1' && event.key <= '6') {
+      // Six tabs (Tags, Previews, Audit, Site, AI, Compare): the range stopped at 5, so Compare
+      // was the one view with no shortcut.
       const idx = Number(event.key) - 1;
       handlers.selectTab?.(idx);
       event.preventDefault();

@@ -12,7 +12,15 @@ function resolve(raw: string, baseUrl: string): string {
 }
 
 export function getHreflang(html: HTMLElement, baseUrl: string = ''): HreflangEntry[] {
-  const links = html.querySelectorAll('link[rel="alternate"][hreflang]');
+  // `rel` is case-insensitive and space-separated, so match on the token list — the same rule
+  // getMetaTags uses. The exact-attribute selector made `rel="ALTERNATE"` and
+  // `rel="alternate stylesheet"` invisible, and the hreflang-self fix could never fire on them.
+  const links = Array.from(html.querySelectorAll('link[hreflang]')).filter((el) =>
+    (el.getAttribute('rel') ?? '')
+      .toLowerCase()
+      .split(/\s+/)
+      .includes('alternate')
+  );
   const out: HreflangEntry[] = [];
   links.forEach((el) => {
     const hreflang = el.getAttribute('hreflang')?.trim();
