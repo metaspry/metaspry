@@ -16,11 +16,12 @@
   import SiteView from "../components/Site/SiteView.svelte";
   import AeoView from "../components/Aeo/AeoView.svelte";
 
-  import { getHTML } from "../scrapers/getHTML";
+  import { getHTML, unscriptableMessage } from "../scrapers/getHTML";
+  import { scanUrlFor } from "../cloud/scan-identity";
   import { getMetaTags } from "../scrapers/getMetaTags";
   import type { PageMeta } from "../scrapers/PageMeta";
   import { audit } from "../audit/rules";
-  import { resolveAsyncRules } from "../audit/asyncRules";
+  import { needsAsyncResolution, resolveAsyncRules } from "../audit/asyncRules";
   import type { AuditResult } from "../audit/AuditResult";
 
   import { theme, toggleTheme } from "../theme";
@@ -76,7 +77,9 @@
     const id = ++auditId;
     const sync = audit(meta, currentSettings);
     if (id === auditId && sourceScrapeId === scrapeId) auditResult = sync;
-    if (!sync.hasPending) return sync;
+    // Not `hasPending`: that is true only when an og:image exists, which would skip the
+    // X-Robots-Tag check on exactly the bare pages most likely to be header-de-indexed.
+    if (!needsAsyncResolution(sync, meta)) return sync;
     const resolved = await resolveAsyncRules(sync, meta, currentSettings);
     if (id === auditId && sourceScrapeId === scrapeId) auditResult = resolved;
     return resolved;
@@ -88,22 +91,21 @@
     view = "loading";
     errorMessage = "";
     try {
-      const { html, url: tabUrl } = await getHTML();
+      const { html, url: tabUrl, reason } = await getHTML();
       if (id !== scrapeId) return;
       if (!html) {
         view = "error";
-        errorMessage = "No HTML content returned from the active tab.";
+        errorMessage = unscriptableMessage(tabUrl, reason);
         return;
       }
       const meta = getMetaTags(html, tabUrl);
       if (id !== scrapeId) return;
       pageMeta = meta;
       pageHtml = html;
-      pageUrl =
-        meta.tags.find((t) => t.key.toLowerCase() === "og:url")?.value ??
-        meta.canonical ??
-        tabUrl ??
-        "";
+      // Identity is the URL we actually scanned. og:url stays in the payload as metadata: a site
+      // that hardcodes it (the very defect this product finds) would otherwise collapse every
+      // article into one history row and one overwritten cloud document.
+      pageUrl = scanUrlFor(tabUrl, meta.canonical);
       if (isPageEmpty(meta)) {
         view = "empty";
         return;

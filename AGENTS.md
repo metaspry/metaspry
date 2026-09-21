@@ -166,11 +166,18 @@ Other storage:
 
 Each store module persists through `store.subscribe(writeStorage)`, which also fires once at init with the value just read. Every storage module is a no-op when `chrome` is undefined (dev server).
 
+**Cross-surface rehydration (`src/lib/storage/watch.ts`).** The popup and the side panel are separate
+documents with separate store instances. Each hydrates once at mount and then writes its **whole**
+value on every change, so a scan recorded in one surface was erased the next time the other wrote its
+stale copy back. Every persisted key (`history`, `settings`, `pinnedKeys`, `theme`, `mode`) now
+re-hydrates through `watchKey`, and `makeWriteGuard` suppresses the store's own writer while an
+external change is being applied so the two surfaces cannot echo each other into a loop.
+
 ---
 
 ## 3. Features
 
-Each feature lists: purpose and user flow, key files, data and storage, permissions, tests, gotchas. There is no automated test suite (section 3.18), so "Tests" means manual checks in a loaded `build/`.
+Each feature lists: purpose and user flow, key files, data and storage, permissions, tests, gotchas. Pure modules have Vitest specs (section 3.18); anything needing a real browser is still a manual check in a loaded `build/`.
 
 ### 3.1 Manifest and permissions
 
@@ -256,6 +263,20 @@ Each feature lists: purpose and user flow, key files, data and storage, permissi
 
 A "Re-scrape this page" button sits under the tab content. `scrapeId` and `auditId` counters drop results from superseded runs.
 
+**Unscriptable pages answer honestly.** `chrome://`/`edge://`/`brave://` pages, the New Tab page, the
+Chrome Web Store, PDFs and policy-blocked pages cannot be injected into. The background replies
+`{ html: null, url, reason: 'unscriptable' | 'no-tab' }` and `unscriptableMessage()` names the surface
+("a browser settings page", "the Chrome Web Store"). Before this the injection failure surfaced as a
+generic error, or worse as an empty page that scored.
+
+**Scan identity is the tab URL, never `og:url`** (`src/lib/cloud/scan-identity.ts`). Local history,
+the site-files origin, the uploaded payload and the deterministic cloud document id all derive from
+`scanUrlFor(tabUrl, canonical)`. A site that hardcodes `og:url` to its homepage on every article is
+precisely the defect this product exists to find, and using it as the identity collapsed every one of
+those articles into one history row and one overwritten cloud document. `normalizeScanUrl` drops the
+fragment and a trailing slash so `/blog`, `/blog/` and `/blog#comments` are one scan; `og:url` stays
+in the payload as metadata.
+
 **Key files.** `src/lib/views/Extension.svelte`; `src/lib/scrapers/getHTML.ts`, `getMetaTags.ts`, `getJsonLd.ts`, `getHreflang.ts`, `getRobots.ts`, `PageMeta.ts`; `src/lib/categorize.ts`; `static/scripts/background.js`; components `Grid`, `Skeleton`, `EmptyState`, `ErrorState`, `Screen`.
 
 **Data.** In memory only (`pageMeta`, `pageHtml`, `auditResult`).
@@ -321,6 +342,20 @@ Fallback chains (`Preview.svelte`):
 
 **Engine.** `audit(meta, settings)` runs every rule synchronously. `og:image-dimensions` returns `pending`; `resolveAsyncRules()` loads the image (`new Image()`, 5 s timeout, `referrerPolicy = 'no-referrer'`), replaces that rule's result and rescores with `rescoreAfterAsync()`.
 
+**The `noindex` rule returned a false PASS four ways, and all four are now covered.** It parses the
+directive list case-insensitively and on any whitespace or comma (`/(^|[\s,])(noindex|none)([\s,]|$)/i`),
+reads **every** `robots`/`googlebot` meta tag rather than the first, and names the tag that actually
+carries the directive - quoting `robots` blindly reported "robots: index,follow blocks indexing" on a
+page whose `googlebot` tag was the restrictive one. The fourth path is the `X-Robots-Tag` **response
+header**, which no meta tag can reveal: `scrapers/getHeaderRobots.ts` fetches it and
+`resolveAsyncRules` overrides the rule. Until that resolves, the synchronous answer is the honest
+"nothing in the HTML blocks it", not "indexable".
+
+**`canonical` compares, it does not merely exist.** `audit/url-match.ts` `sameUrl` ignores the
+fragment, a trailing slash and http/https, and treats `www.`, query strings and path casing as real
+differences - a canonical pointing somewhere else is the common, silent cause of a page not being
+indexed, and "a canonical tag is present" passed it.
+
 **Rules** (`src/lib/audit/rules.ts`, 19 rules, in order):
 
 | id | Severity | Passes when | Otherwise |
@@ -330,11 +365,11 @@ Fallback chains (`Preview.svelte`):
 | `og:title` | required | present | fail |
 | `og:description` | required | present | fail |
 | `og:image` | required | present | fail |
-| `noindex` | required | no `noindex` or `none` in meta `robots` or `googlebot` | fail |
+| `noindex` | required | no `noindex` or `none` in meta `robots` or `googlebot`, **and** no `noindex` in the `X-Robots-Tag` response header | fail |
 | `og:url` | recommended | present | warn |
 | `og:type` | recommended | present | warn |
 | `twitter:card` | recommended | present | warn |
-| `canonical` | recommended | canonical link present | warn |
+| `canonical` | recommended | canonical link present **and pointing at this page** (`sameUrl`) | warn |
 | `article-og` | recommended | `og:type` is not `article`, or `article:author`, `article:published_time` and `article:section` are all present | warn, listing the missing ones |
 | `hreflang-self` | recommended | no hreflang links, no page URL to compare, or one alternate equals `canonical ?? PageMeta.pageUrl` | warn |
 | `title-length` | best-practice | length within `titleMin`-`titleMax` | warn outside the range; fail with no title |
@@ -506,6 +541,12 @@ Checks in `src/lib/audit/aeo.ts`:
 - The redirect URI is `https://<extension-id>.chromiumapp.org/`, and it must be listed in that OAuth client's authorised redirect URIs. Unpacked builds have their own extension ID, so each needs its own entry. A "Chrome Extension" OAuth client type does not work here (comment in `auth.ts`; history in commits `77cd51f` to `9703b91`).
 - Email and password errors are replaced with one generic message.
 - The bundle imports the default `firebase/auth` entry (see the store-review note in 4.4).
+- **Settings reset on every auth change, sign-out included** (`src/lib/cloud/settings.ts`
+  `resolveSettingsForAuth`). The reset happens FIRST, before any cloud load, mirroring what
+  `cloud/plan.ts` does for the plan: without it, signing out of account A and into account B left A's
+  custom scoring weights applied to B's scans, and a sign-out left them applied to an anonymous user.
+  The reset is `persist: false` - an in-memory isolation step, not a user edit, so it never writes
+  the other account's values into `chrome.storage`.
 
 ### 3.14 Scan upload and sync target
 
@@ -578,9 +619,18 @@ In the tab strip, Arrow Left/Right, Home and End move between tabs. `Esc` closes
 
 ### 3.18 Tests and quality gates
 
-- There is no test framework, test file, linter, formatter or type-checker. `npm run build` is the only automated gate, and it does not type-check.
-- Manual verification: `npm run build`, load `build/` unpacked, then check all six tabs, both surfaces, the context menu, sign-in (email and Google), a signed-in scan landing in the app, and free versus Pro scoring.
-- `.github/copilot-instructions.md` says a future test framework should be Vitest with co-located `X.test.ts` files; adding it needs an OpenSpec and dependency approval. Pure modules that could be unit-tested first: `audit/rules.ts`, `categorize.ts`, `Compare/diff.ts`, `exporters/exporters.ts`.
+| Command | What |
+| --- | --- |
+| `npm test` | Vitest, co-located `*.spec.ts` (`--run` for one pass, `npm run test:watch` to watch). |
+| `npm run check` | `svelte-check` against `tsconfig.json`. |
+| `npm run build` | `vite build` + `removeInlineScript.cjs`. Does not type-check on its own. |
+
+- Covered by unit tests: `audit/rules.ts`, `audit/asyncRules.ts`, `audit/url-match.ts`,
+  `cloud/scan-identity.ts`, `cloud/settings.ts`, `scrapers/getHTML.ts`, `scrapers/getRobots.ts`,
+  `scrapers/getHeaderRobots.ts`, `storage/watch.ts` and its key helper.
+- Manual verification is still required for anything that needs a real browser: `npm run build`, load
+  `build/` unpacked, then check all six tabs, both surfaces, the context menu, sign-in (email and
+  Google), a signed-in scan landing in the app, and free versus Pro scoring.
 
 ---
 

@@ -8,6 +8,7 @@ import type {
 } from './AuditResult';
 import type { Settings } from '../storage/settings';
 import { DEFAULT_SETTINGS } from '../storage/settings';
+import { sameUrl } from './url-match';
 
 interface RuleDefinition {
   id: string;
@@ -106,9 +107,21 @@ const RULES: RuleDefinition[] = [
     description: 'Page must not be marked noindex.',
     check: (m) => {
       if (m.robots.noindex) {
-        return { status: 'fail', detail: `Robots: ${m.robots.robots ?? m.robots.googlebot ?? 'noindex'} blocks indexing.` };
+        // Name the tag that actually carries the directive. `getRobots` unions both tags, so
+        // quoting `robots` blindly reported "Robots meta tag: index,follow blocks indexing." on a
+        // page whose googlebot tag was the restrictive one.
+        const restrictive = (v: string | null) =>
+          !!v && /(^|[\s,])(noindex|none)([\s,]|$)/i.test(v);
+        const found = restrictive(m.robots.robots)
+          ? `robots: ${m.robots.robots}`
+          : restrictive(m.robots.googlebot)
+            ? `googlebot: ${m.robots.googlebot}`
+            : (m.robots.robots ?? m.robots.googlebot ?? 'noindex');
+        return { status: 'fail', detail: `Robots meta tag — ${found} blocks indexing.` };
       }
-      return { status: 'pass', detail: m.robots.robots ? `robots: ${m.robots.robots}` : 'No noindex directive.' };
+      // An X-Robots-Tag header can still de-index this page; resolveAsyncRules checks that and
+      // overrides this result. Until then the honest answer is "nothing in the HTML blocks it".
+      return { status: 'pass', detail: m.robots.robots ? `robots: ${m.robots.robots}` : 'No noindex directive in the HTML.' };
     },
   },
   {
@@ -146,7 +159,18 @@ const RULES: RuleDefinition[] = [
     severity: 'recommended',
     title: 'Canonical URL',
     description: '<link rel="canonical"> prevents duplicate-content issues.',
-    check: (m) => (m.canonical ? { status: 'pass', detail: m.canonical } : { status: 'warn', detail: 'No canonical link.' }),
+    check: (m) => {
+      if (!m.canonical) return { status: 'warn', detail: 'No canonical link.' };
+      // A canonical that exists but points elsewhere is the common defect (every page canonicalised
+      // to the homepage). Warn, not fail: cross-page canonicals are legitimate for pagination and
+      // syndication, and this check cannot tell those apart.
+      if (!m.pageUrl) return { status: 'pass', detail: m.canonical };
+      if (sameUrl(m.canonical, m.pageUrl)) return { status: 'pass', detail: `Self-referencing: ${m.canonical}` };
+      return {
+        status: 'warn',
+        detail: `Canonical points to ${m.canonical}, not this page (${m.pageUrl}). Search engines will index that URL instead.`,
+      };
+    },
   },
   {
     id: 'article-og',

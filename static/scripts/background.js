@@ -90,23 +90,36 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const queryOptions = { active: true, lastFocusedWindow: true };
     chrome.tabs.query(queryOptions, (tabs) => {
       let [tab] = tabs;
-      if (tab) {
+      if (tab && tab.id != null) {
         const tabUrl = tab.url || '';
-        chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          function: () => {
-            return document.documentElement.outerHTML;
-          }
-        }, (result) => {
-          const htmlContent = result[0]?.result;
-          if (htmlContent) {
-            sendResponse({ html: htmlContent, url: tabUrl });
-          } else {
-            sendResponse({ html: null, url: tabUrl });
-          }
-        });
+        try {
+          chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            function: () => {
+              return document.documentElement.outerHTML;
+            }
+          }, (result) => {
+            // On chrome:// pages, the New Tab page, the Web Store, PDFs and policy-blocked pages the
+            // injection fails: `result` itself is undefined and lastError is set. Reading lastError
+            // and always answering keeps the popup from hanging on a promise that never settles.
+            // Reading lastError also stops Chrome logging it as unchecked.
+            void chrome.runtime.lastError;
+            const htmlContent = Array.isArray(result) ? result[0]?.result : undefined;
+            if (htmlContent) {
+              sendResponse({ html: htmlContent, url: tabUrl });
+            } else {
+              sendResponse({ html: null, url: tabUrl, reason: 'unscriptable' });
+            }
+          });
+        } catch (err) {
+          // executeScript validates its arguments synchronously. Without this the throw escaped,
+          // sendResponse never ran, the port closed, and the popup showed the very message E4
+          // exists to remove: "No response from background script."
+          console.warn('executeScript failed', err);
+          sendResponse({ html: null, url: tabUrl, reason: 'unscriptable' });
+        }
       } else {
-        sendResponse({ html: null, url: '' });
+        sendResponse({ html: null, url: tab?.url || '', reason: 'no-tab' });
       }
     });
     return true;
