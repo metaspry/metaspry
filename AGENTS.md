@@ -424,7 +424,7 @@ indexed, and "a canonical tag is present" passed it.
 
 ### 3.8 Scoring settings, Pro gating and settings sync
 
-**Purpose and flow.** The gear icon opens the Settings drawer, a modal dialog (`aria-modal`, focus moves to the first input on open - or to the close button when there is none - Tab/Shift+Tab cycle inside, Esc / the close button / the backdrop close it and focus returns to the gear). Everyone first sees a **Preferences** fieldset holding the `Surface` radio group (Side panel / Popup, calling `switchMode`, 3.2); the subtitle reads "Preferences and scoring rules". Pro users then see a sync line ("Synced with your account", "Open in web app" -> `https://app.metaspry.com/settings`), the **Length thresholds (characters)** fieldset (Title, Description, og:description, each a min-max pair), the **Severity weights** fieldset (Required / Recommended / Best practice under the explainer "Each rule earns its weight on pass, half on warn, zero on fail. Score = earned / total × 100."), then **Save**, **Reset to defaults** and an "Unsaved changes" chip. Everyone else sees a "Custom scoring is a Pro feature" card whose "Go Pro" link opens `https://app.metaspry.com/upgrade`. The footer shows "Metaspry v<manifest version>" ("dev" outside the extension) and the links metaspry.com, Docs, Roadmap, Blog, "Report a bug".
+**Purpose and flow.** The gear icon opens the Settings drawer, a modal dialog (`aria-modal`, focus moves to the first threshold input on open - or to the close button for non-Pro users; never the Surface radio, where one keypress would switch surface - Tab/Shift+Tab cycle inside, Esc / the close button / the backdrop close it and focus returns to the gear). Everyone first sees a **Preferences** fieldset holding the `Surface` radio group (Side panel / Popup, calling `switchMode`, 3.2); the subtitle reads "Preferences and scoring rules". Pro users then see a sync line ("Synced with your account", "Open in web app" -> `https://app.metaspry.com/settings`), the **Length thresholds (characters)** fieldset (Title, Description, og:description, each a min-max pair), the **Severity weights** fieldset (Required / Recommended / Best practice under the explainer "Each rule earns its weight on pass, half on warn, zero on fail. Score = earned / total × 100."), then **Save**, **Reset to defaults** and an "Unsaved changes" chip. Everyone else sees a "Custom scoring is a Pro feature" card whose "Go Pro" link opens `https://app.metaspry.com/upgrade`. The footer shows "Metaspry v<manifest version>" ("dev" outside the extension) and the links metaspry.com, Docs, Roadmap, Blog, "Report a bug".
 
 - **The form edits a draft; nothing persists until Save.** Save calls `updateSettings(draft)` once (one `chrome.storage` write, one cloud push) and toasts "Scoring rules saved"; it is disabled while the draft equals the stored value or has a validation problem. Closing with unsaved edits discards them. A cloud pull or the other surface refreshes an untouched form only.
 - **Validation** (`src/lib/storage/validate-settings.ts`, modelled on the app's `validateAuditSettings` but requiring whole numbers everywhere): every threshold an integer >= 0 ("Enter a whole number of 0 or more."), each max >= its min ("Title max must be at least the min."), weights integers >= 0 ("Weights must be whole numbers of 0 or more."), not all zero ("At least one weight must be above 0, or nothing can score."). A cleared box is NaN and is reported, not ignored. Invalid inputs get `aria-invalid` and `aria-describedby` pointing at the message under the row.
@@ -558,13 +558,13 @@ Checks in `src/lib/audit/aeo.ts`:
 - `cloudUser` and `cloudReady` stores follow `onAuthStateChanged`.
 - There is no auth handoff between the web app and the extension. The user signs in separately in each, with the same account.
 
-**Key files.** `src/lib/cloud/firebase.ts`, `src/lib/cloud/auth.ts`, `src/lib/components/CloudSync/CloudSync.svelte`.
+**Key files.** `src/lib/cloud/firebase.ts`, `src/lib/cloud/auth.ts`, `src/lib/cloud/initials.ts`, `src/lib/components/CloudSync/CloudSync.svelte`.
 
 **Data.** Firebase Auth session in IndexedDB.
 
 **Permissions.** `identity`.
 
-**Tests.** None.
+**Tests.** `src/lib/cloud/initials.spec.ts` (initials from the email). Sign-in itself: none.
 
 **Gotchas.**
 - The redirect URI is `https://<extension-id>.chromiumapp.org/`, and it must be listed in that OAuth client's authorised redirect URIs. Unpacked builds have their own extension ID, so each needs its own entry. A "Chrome Extension" OAuth client type does not work here (comment in `auth.ts`; history in commits `77cd51f` to `9703b91`).
@@ -637,7 +637,8 @@ In the tab strip, Arrow Left/Right, Home and End move between tabs. `Esc` closes
 ### 3.17 UI shell and shared components
 
 - `+page.svelte`: gradient background and two blurred decorative orbs (`data-bg-orb`, hidden in popup mode).
-- Header, left to right, one line at every width from 320 px: logo (wordmark hidden below 400 px); the account control (3.13); one `role="toolbar"` group styled by `src/lib/components/toolbar.ts` (`toolbarButtonClass(active)`, `TOOLBAR_GROUP`) holding History, Settings, theme toggle (`aria-pressed` in dark mode) and shortcuts `?`. Every button has a `title`. The surface toggle lives in Settings (3.2).
+- Header, left to right, one line at every width from 320 px: logo (wordmark hidden below 400 px); the account control (3.13); one `role="toolbar"` group styled by `src/lib/components/toolbar.ts` (`toolbarButtonClass(active)`, `TOOLBAR_GROUP`) holding History, Settings, theme toggle (`aria-pressed` in dark mode) and shortcuts `?`. Every button has a `title` equal to its `aria-label`; Arrow Left/Right, Home and End move focus inside the toolbar. The surface toggle lives in Settings (3.2).
+- Both header menus anchor to the header's right-hand block (`relative` in `Extension.svelte`). Nothing between that block and a menu may carry `backdrop-blur`, `filter` or `transform`: that element would become the menu's containing block and stacking context, re-anchoring it and painting it under later glass cards (this bit the toolbar group once).
 - Views: `landing` (Grid card "Get Meta Tags"), `loading` (`Skeleton`), `error` (`ErrorState`: "Couldn't scrape this page", Retry, links to docs and GitHub issues), `empty` (`EmptyState`: "No meta tags found", Try again, docs link), `results` (`Tabs` with Tags, Previews, Audit, Site, AI, Compare).
 - `Screen`: glass card wrapper. `Grid`: landing action cards (`GridProps` in `Grid.ts`).
 - Toasts: `toast(message, variant)`; at most 3 visible, 1.5 s each.

@@ -13,6 +13,12 @@ export function toolbarButtonClass(active = false): string {
   return `${BASE} ${active ? ACTIVE : IDLE}`;
 }
 
-/** The container that groups the buttons: one border for the whole row instead of one per button. */
+/**
+ * The container that groups the buttons: one border for the whole row instead of one per button.
+ *
+ * No `backdrop-blur` / `filter` / `transform` here: any of them makes this element the containing
+ * block and a stacking context for the History menu inside it, so the menu anchors to the group
+ * instead of the header block and is painted under later glass cards (the landing tile, Tabs).
+ */
 export const TOOLBAR_GROUP =
-  'inline-flex shrink-0 items-center gap-0.5 rounded-xl border border-slate-200/70 bg-white/70 p-0.5 backdrop-blur-md dark:border-white/10 dark:bg-white/5';
+  'inline-flex shrink-0 items-center gap-0.5 rounded-xl border border-slate-200/70 bg-white/70 p-0.5 dark:border-white/10 dark:bg-white/5';

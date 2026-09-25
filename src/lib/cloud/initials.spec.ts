@@ -15,9 +15,13 @@ describe('initialsFor', () => {
     expect(initialsFor('ann-marie+work@x.io')).toBe('AM');
   });
 
-  it('ignores digits-only or symbol-only parts and upper-cases', () => {
+  it('keeps digit parts, drops symbol-only parts, upper-cases', () => {
     expect(initialsFor('42.abc@x.io')).toBe('4A');
     expect(initialsFor('..@x.io')).toBe('M');
+  });
+
+  it('keeps non-ASCII letters', () => {
+    expect(initialsFor('élodie.martin@x.io')).toBe('ÉM');
   });
 
   it('falls back to M when there is no email', () => {

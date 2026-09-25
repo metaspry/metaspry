@@ -5,9 +5,10 @@
  */
 export function initialsFor(email: string | null | undefined): string {
   const local = (email ?? '').split('@')[0] ?? '';
+  // Keep letters and digits from any script (\p{L}\p{N}), so "élodie" gives "E", not "L".
   const parts = local
     .split(/[._\-+]+/)
-    .map((p) => p.replace(/[^a-z0-9]/gi, ''))
+    .map((p) => p.replace(/[^\p{L}\p{N}]/gu, ''))
     .filter(Boolean);
   const letters = parts
     .slice(0, 2)

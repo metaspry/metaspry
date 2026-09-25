@@ -54,9 +54,10 @@ export function setMode(next: Mode): void {
  * Switch surfaces from a click handler (Settings -> Preferences, and the popup note). Lives here,
  * not in a component, so more than one control can offer it.
  *
- * The click that fired this is a valid user gesture. `chrome.action.openPopup` and
- * `chrome.sidePanel.open` MUST be called synchronously, before any await, or Chrome drops the
- * gesture and rejects with "must be called in response to a user gesture".
+ * The click that fired this is a valid user gesture. `chrome.action.openPopup` is called
+ * synchronously inside it, as it must be ("must be called in response to a user gesture").
+ * The side-panel branch first awaits `chrome.windows.getCurrent()`; Chrome has honoured the
+ * gesture across that one hop in practice, and the mode is saved either way (AGENTS 3.2 gotcha).
  */
 export function switchMode(next: Mode): void {
   if (next === get(mode)) return;

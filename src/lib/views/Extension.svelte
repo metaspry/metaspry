@@ -222,6 +222,21 @@
     }
   }
 
+  // `role="toolbar"` promises arrow-key movement between its buttons (Tab still reaches each one).
+  function onToolbarKey(event: KeyboardEvent) {
+    const keys = ["ArrowLeft", "ArrowRight", "Home", "End"];
+    if (!keys.includes(event.key)) return;
+    const group = event.currentTarget as HTMLElement;
+    const items = Array.from(group.querySelectorAll<HTMLElement>("button:not([disabled])"));
+    const index = items.indexOf(document.activeElement as HTMLElement);
+    if (index === -1 || items.length === 0) return;
+    event.preventDefault();
+    const last = items.length - 1;
+    const next =
+      event.key === "Home" ? 0 : event.key === "End" ? last : event.key === "ArrowRight" ? (index === last ? 0 : index + 1) : index === 0 ? last : index - 1;
+    items[next]?.focus();
+  }
+
   function onRuntimeMessage(_msg: any) {
     // Reserved for future cross-surface coordination. Mode-switch reopening
     // is handled in `switchMode()` (`src/lib/mode.ts`), inside the user-gesture
@@ -251,11 +266,13 @@
 
       <!-- One line at every width from 320 px: the account control, then one grouped toolbar.
            `relative` here, not on the dropdown components: their menus anchor to this block's
-           right edge, so a 256/288 px menu never runs off the left of a narrow side panel. -->
+           right edge, so a 256 px menu never runs off the left of a narrow side panel. Nothing
+           between this block and the menus may add `backdrop-blur` / `filter` / `transform`
+           (see toolbar.ts), or the menu re-anchors to that element and paints under later cards. -->
       <div class="relative flex shrink-0 items-center gap-2">
         <CloudSync />
 
-        <div role="toolbar" aria-label="Extension controls" class={TOOLBAR_GROUP}>
+        <div role="toolbar" aria-label="Extension controls" tabindex="-1" class={TOOLBAR_GROUP} on:keydown={onToolbarKey}>
           <HistoryDropdown />
 
           <button
@@ -274,7 +291,7 @@
 
           <button
             type="button"
-            aria-label="Toggle theme"
+            aria-label={$theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
             title={$theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
             aria-pressed={$theme === "dark"}
             on:click={toggleTheme}
@@ -295,7 +312,7 @@
           <button
             type="button"
             aria-label="Keyboard shortcuts"
-            title="Keyboard shortcuts (?)"
+            title="Keyboard shortcuts"
             aria-expanded={$helpOpen}
             on:click={() => helpOpen.set(true)}
             class={toolbarButtonClass($helpOpen)}

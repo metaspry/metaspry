@@ -102,10 +102,12 @@
     }
   }
 
-  // The first input (Pro) or, when there is none, the first control (the close button).
+  // The first threshold input (Pro) or, when there is none, the first control (the close
+  // button). Never the Surface radio: in popup mode one Space or arrow key on it switches surface
+  // and closes the window.
   async function focusIn() {
     await tick();
-    (drawerEl?.querySelector<HTMLElement>('input') ?? focusables()[0])?.focus();
+    (drawerEl?.querySelector<HTMLElement>('input[type="number"]') ?? focusables()[0])?.focus();
   }
 
   function onClose() {
