@@ -40,13 +40,17 @@
   <button
     type="button"
     on:click={() => dispatch('retry')}
-    class="mt-2 rounded-full bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white shadow-md shadow-indigo-500/30 transition hover:bg-indigo-500 active:scale-[0.98] dark:bg-indigo-500 dark:hover:bg-indigo-400 {FOCUS_RING}"
+    class="mt-2 rounded-full bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white shadow-md shadow-indigo-500/30 transition hover:bg-indigo-500 active:scale-[0.98] dark:bg-indigo-600 dark:hover:bg-indigo-500 {FOCUS_RING}"
   >
     Retry
   </button>
   {#if detail}
-    <details class="w-full max-w-xs text-left text-xs">
-      <summary class="ms-muted mx-auto flex h-6 w-fit cursor-pointer items-center rounded px-1 font-medium hover:text-slate-900 dark:hover:text-slate-100 {FOCUS_RING}">Details</summary>
+    <details class="group w-full max-w-xs text-left text-xs">
+      <!-- `flex` drops the native marker, so the chevron shows it expands (and turns when open). -->
+      <summary class="ms-muted mx-auto flex h-6 w-fit cursor-pointer list-none items-center gap-1 rounded px-1 font-medium hover:text-slate-900 dark:hover:text-slate-100 {FOCUS_RING}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="h-3 w-3 transition-transform group-open:rotate-90" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+        Details
+      </summary>
       <pre class="mt-2 whitespace-pre-wrap break-words rounded-lg border border-slate-300 bg-white/60 p-2 font-mono text-[11px] text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">{detail}</pre>
     </details>
   {/if}
