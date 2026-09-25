@@ -187,7 +187,7 @@ Each feature lists: purpose and user flow, key files, data and storage, permissi
 
 ### 3.1 Manifest and permissions
 
-**Purpose.** `static/manifest.json` declares the extension: MV3, name `Metaspry`, version `1.0.25`, `minimum_chrome_version: "114"`, `offline_enabled: true`.
+**Purpose.** `static/manifest.json` declares the extension: MV3, name `Metaspry`, version `1.0.26`, `minimum_chrome_version: "114"`, `offline_enabled: true`.
 
 - `background.service_worker`: `scripts/background.js` (classic script; no `"type": "module"`).
 - `side_panel.default_path`: `index.html`.
@@ -704,7 +704,7 @@ The help modal (`ShortcutsHelp.svelte`) is `role="dialog" aria-modal="true"`, la
 
 ### 4.2 Versioning
 
-- The version lives in two files that must match: `version` in `static/manifest.json` and in `package.json` (both `1.0.25` on `main`, which is what the store serves; `main` carries unreleased fixes for v1.0.26). No script syncs them.
+- The version lives in two files that must match: `version` in `static/manifest.json` and in `package.json` (both `1.0.26` on `main`; the store serves `1.0.25` until the v1.0.26 zip is submitted). No script syncs them.
 - Convention from the git history: each shipped change bumps the patch version and gets a new zip (commit messages like "v1.0.22 + zip").
 - The repo has no git tags, although the README checklist ends with "tag the commit `vX.Y.Z`".
 
