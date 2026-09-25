@@ -48,6 +48,8 @@
   let errorMessage = "";
   let activeTab: ActiveTab = "tags";
   let pageUrl = "";
+  /** What the browser shows as this page's favicon (declared link -> tab icon -> /favicon.ico). */
+  let pageIcon: string | null = null;
   let settingsOpen = false;
 
   const tabs: TabDef[] = [
@@ -99,19 +101,19 @@
         errorMessage = unscriptableMessage(tabUrl, reason);
         return;
       }
-      const scraped = getMetaTags(html, tabUrl);
+      const meta = getMetaTags(html, tabUrl);
       if (id !== scrapeId) return;
-      // The declared icon is what the page says; the resolved one is what the browser shows
-      // (declared -> Chrome's tab icon -> /favicon.ico). Emptiness is judged on the declared
-      // value: the fallback would otherwise make every http page "have" an icon.
-      const meta: PageMeta = { ...scraped, icon: resolveIcon(scraped.icon, favIconUrl, tabUrl) };
+      // Kept beside `meta`, not inside it: `PageMeta.icon` stays the declared <link>, so the Tags
+      // tab, the exports and the empty-page check report only markup that exists. The resolved
+      // icon feeds the SERP preview, History and the cloud payload.
+      pageIcon = resolveIcon(meta.icon, favIconUrl, tabUrl);
       pageMeta = meta;
       pageHtml = html;
       // Identity is the URL we actually scanned. og:url stays in the payload as metadata: a site
       // that hardcodes it (the very defect this product finds) would otherwise collapse every
       // article into one history row and one overwritten cloud document.
       pageUrl = scanUrlFor(tabUrl, meta.canonical);
-      if (isPageEmpty(scraped)) {
+      if (isPageEmpty(meta)) {
         view = "empty";
         return;
       }
@@ -126,7 +128,7 @@
         title: meta.title ?? "",
         score: finalResult.score,
         timestamp: Date.now(),
-        ...(meta.icon ? { icon: meta.icon } : {}),
+        ...(pageIcon ? { icon: pageIcon } : {}),
       });
       // Cloud sync: if signed in, save this scan to the user's cloud history.
       const cu = get(cloudUser);
@@ -139,7 +141,8 @@
           } catch {
             siteFiles = undefined;
           }
-          await uploadScan(cu.uid, toScanPayload(meta, finalResult, pageUrl, siteFiles), get(syncScope));
+          const payloadMeta: PageMeta = { ...meta, icon: pageIcon ?? meta.icon };
+          await uploadScan(cu.uid, toScanPayload(payloadMeta, finalResult, pageUrl, siteFiles), get(syncScope));
         } catch (err) {
           if (import.meta.env.DEV) console.warn("cloud sync failed", err);
         }
@@ -428,7 +431,7 @@
         {#if activeTab === "tags"}
           <TagsView meta={pageMeta} />
         {:else if activeTab === "previews"}
-          <Preview meta={pageMeta} {pageUrl} />
+          <Preview meta={pageMeta} {pageUrl} icon={pageIcon} />
         {:else if activeTab === "audit"}
           <Audit result={auditResult} meta={pageMeta} />
         {:else if activeTab === "site"}

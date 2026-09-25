@@ -260,9 +260,9 @@ Each feature lists: purpose and user flow, key files, data and storage, permissi
 1. Sets the view to `loading` (skeleton). A second call while loading is ignored.
 2. `getHTML()` sends `getHTML`. The background queries `{ active: true, lastFocusedWindow: true }`, injects a function that returns `document.documentElement.outerHTML`, and replies with the HTML, the tab URL and `tab.favIconUrl` (Chrome's resolved favicon, null until loaded). The page parses the string with `DOMParser` into an inert document.
 3. `getMetaTags(html, tabUrl)` builds `PageMeta`: `<title>`; canonical and icon (`rel=icon`, then `shortcut icon`, then `apple-touch-icon`), both resolved to absolute URLs; every `<meta>` with non-empty `content`, keyed by `property` (preferred) or `name` and categorised; plus `jsonLd`, `hreflang` (resolved) and meta `robots`.
-   Then `resolveIcon(declared, favIconUrl, tabUrl)` (`src/lib/scrapers/icon.ts`) replaces `icon` with the first http(s) URL of: the declared link, Chrome's tab icon, `/favicon.ico` at the page origin. `data:`/`chrome:`/`blob:` tab icons are skipped so no icon bytes ever enter a scan document. Every http(s) page therefore has an icon for the SERP preview, History and the cloud payload.
+   Then `resolveIcon(meta.icon, favIconUrl, tabUrl)` (`src/lib/scrapers/icon.ts`) computes the **page icon** (`pageIcon` in `Extension.svelte`): the first http(s) URL of the declared link, Chrome's tab icon, `/favicon.ico` at the page origin. `data:`/`chrome:`/`blob:` tab icons are skipped so no icon bytes ever enter a scan document. `PageMeta.icon` itself stays the declared link, so the Tags tab (3.5), the exports and the empty-page check only report markup that exists; the page icon feeds the SERP preview (3.6), History (3.10) and the cloud payload (3.14).
 4. `pageUrl` = the first `og:url` value, else the canonical, else the tab URL.
-5. No tags, title, canonical or **declared** icon -> `empty` view ("No meta tags found"); the resolved fallback icon does not count. Any error -> `error` view with the message and Retry.
+5. No tags, title, canonical or declared icon -> `empty` view ("No meta tags found"); the page icon fallback does not count. Any error -> `error` view with the message and Retry.
 6. Otherwise the `results` view opens on the Tags tab. `runAudit()` shows the synchronous result at once and the async result when ready.
 7. After the final score: `pushHistory()` (3.10), then the cloud upload if signed in (3.14).
 
@@ -313,7 +313,7 @@ duplicate-tags rule can only see `<meta>` elements.
 
 ### 3.5 Tags tab
 
-**Purpose and flow.** A search box (focus with `/`), category chips (All, Open Graph, Twitter, SEO, Basic, Other; counts follow the search), an export bar, then one card per tag. Synthetic `title`, `canonical` and `icon` cards come first. Pinned tags sort to the top. Each card shows the key and value (URL values become links; values over 240 characters collapse behind "Show more"), a pin toggle, and a copy button with a toast.
+**Purpose and flow.** A search box (focus with `/`), category chips (All, Open Graph, Twitter, SEO, Basic, Other; counts follow the search), an export bar, then one card per tag. Synthetic `title`, `canonical` and `icon` cards come first (the `icon` card, like the exports' `icon` field, is the declared `<link>` only; the resolved page icon from 3.4 never appears here). Pinned tags sort to the top. Each card shows the key and value (URL values become links; values over 240 characters collapse behind "Show more"), a pin toggle, and a copy button with a toast.
 
 Export bar: Copy JSON, Copy CSV, Download .json, Download .csv. JSON is `{ title, canonical, icon, tags, hreflang, robots, jsonLd }`. CSV columns are `key,value,source,category`, synthetic rows first. The file name is the canonical's hostname, else `meta`.
 
@@ -344,7 +344,7 @@ Fallback chains (`Preview.svelte`):
 | Twitter image | `twitter:image` -> `og:image` |
 | Host label | hostname of `og:url` -> canonical -> `pageUrl`, upper-cased |
 | Google title, description | `<title>` -> social title; `description` -> social description |
-| Google URL line | canonical -> `pageUrl`, shown as `host › path › segments`, with the page icon (`SiteIcon`: the resolved favicon, or a hostname-letter tile when there is none or it fails to load - never a broken image) |
+| Google URL line | canonical -> `pageUrl`, shown as `host › path › segments`, with the page icon from 3.4 (`Preview`'s `icon` prop, rendered by `SiteIcon`: the resolved favicon, or a hostname-letter tile when there is none or it fails to load - never a broken image) |
 
 **Key files.** `src/lib/components/Preview/Preview.svelte`; `src/lib/components/Previews/DiscordPreview.svelte`, `SlackPreview.svelte`, `SerpPreview.svelte`, `MessagingPreview.svelte`; `src/lib/components/SiteIcon/SiteIcon.svelte`.
 
@@ -576,7 +576,7 @@ Checks in `src/lib/audit/aeo.ts`:
 
 **Purpose and flow.** When signed in, every successful scan uploads after its final audit. The dropdown sets where new scans go: "Personal history" or any workspace where the user's role is `owner` or `member`.
 
-- `toScanPayload(meta, auditResult, pageUrl, siteFiles)` builds the web app's scan document: `schemaVersion: 1`, `url`, `hostname`, `scannedAt`, `title`, `source: 'extension'`, `starred: false`, `workspaceId`, `score`, `band`, `pageMeta` (`title`, `description`, `canonical`, `ogImage` from `og:image` then `twitter:image`, `favicon` = the resolved icon from 3.4 so it is set for every http(s) page, `tagCount`, `tags`), `audit` (`score`, `band`, and `rules` of `{ id, label, status, severity, message, meta }`), and an optional `siteFiles` summary.
+- `toScanPayload(meta, auditResult, pageUrl, siteFiles)` builds the web app's scan document: `schemaVersion: 1`, `url`, `hostname`, `scannedAt`, `title`, `source: 'extension'`, `starred: false`, `workspaceId`, `score`, `band`, `pageMeta` (`title`, `description`, `canonical`, `ogImage` from `og:image` then `twitter:image`, `favicon` = the page icon from 3.4 (`Extension.svelte` passes `{ ...meta, icon: pageIcon }`), so it is set for every http(s) page, `tagCount`, `tags`), `audit` (`score`, `band`, and `rules` of `{ id, label, status, severity, message, meta }`), and an optional `siteFiles` summary.
 - Site-files summary caps: 8 robots groups (counts only), 10 sitemap directives, 20 sitemap children, 10 sample URLs, 15 llms sections with 15 links each. No raw file text.
 - Document ID: `'s'` + a djb2 hash of the URL in base 36, so scanning the same URL again overwrites its document.
 - Target: `users/{uid}/scans/{id}` or `workspaces/{wsId}/scans/{id}`, with `workspaceId` set to match and `createdAt: serverTimestamp()`.
