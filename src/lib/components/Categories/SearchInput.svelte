@@ -23,7 +23,7 @@
     stroke-width="1.8"
     stroke-linecap="round"
     stroke-linejoin="round"
-    class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 dark:text-slate-400"
+ class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 ms-muted"
   >
     <circle cx="11" cy="11" r="7" />
     <path d="m21 21-4.3-4.3" />

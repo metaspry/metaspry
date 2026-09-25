@@ -32,23 +32,27 @@ export interface BandClasses {
   stroke: string;
 }
 
+// Light mode uses -600 / -700 hues, matching the web app: on the light Screen (#ecf1ff) the old -500
+// strokes measured emerald 2.25, amber 1.90, rose 3.25 (WCAG 1.4.11 needs 3:1); emerald-600 3.34,
+// amber-700 4.45, rose-600 4.16. Dark keeps -400 / -300. `text` is only used for the 18 px bold
+// Compare numbers (large text, 3:1).
 // `/20`, not `/15`: this repo is on Tailwind 3, whose default opacity scale has no 15, so a
 // `bg-*/15` class silently compiles to nothing (the chips rendered with no pill in light mode).
 const CLASSES: Record<Band, BandClasses> = {
   good: {
     text: 'text-emerald-600 dark:text-emerald-400',
     chip: 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300',
-    stroke: 'text-emerald-500 dark:text-emerald-400',
+    stroke: 'text-emerald-600 dark:text-emerald-400',
   },
   warn: {
-    text: 'text-amber-600 dark:text-amber-400',
+    text: 'text-amber-700 dark:text-amber-400',
     chip: 'bg-amber-500/20 text-amber-700 dark:text-amber-300',
-    stroke: 'text-amber-500 dark:text-amber-400',
+    stroke: 'text-amber-700 dark:text-amber-400',
   },
   fail: {
     text: 'text-rose-600 dark:text-rose-400',
     chip: 'bg-rose-500/20 text-rose-700 dark:text-rose-300',
-    stroke: 'text-rose-500 dark:text-rose-400',
+    stroke: 'text-rose-600 dark:text-rose-400',
   },
 };
 

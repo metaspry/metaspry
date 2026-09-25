@@ -24,14 +24,14 @@
       </p>
       {#if robots.sitemaps.length > 0}
         <div class="space-y-1">
-          <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Sitemaps</p>
+ <p class="text-[10px] font-semibold uppercase tracking-wider ms-muted">Sitemaps</p>
           <ul class="space-y-0.5">
             {#each robots.sitemaps as s, i (i)}
               <li>
                 {#if safeHref(s)}
                   <a href={safeHref(s)} target="_blank" rel="noopener noreferrer" class="break-all text-indigo-600 hover:underline dark:text-indigo-300">{s}</a>
                 {:else}
-                  <span class="break-all text-slate-600 dark:text-slate-400" use:tooltip={'Not an http(s) URL'}>{s}<span class="sr-only"> (not an http(s) URL)</span></span>
+ <span class="break-all ms-muted" use:tooltip={'Not an http(s) URL'}>{s}<span class="sr-only"> (not an http(s) URL)</span></span>
                 {/if}
               </li>
             {/each}
@@ -40,16 +40,16 @@
       {/if}
       {#if robots.groups.length > 0}
         <div class="space-y-1">
-          <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">User-agent groups</p>
+ <p class="text-[10px] font-semibold uppercase tracking-wider ms-muted">User-agent groups</p>
           <ul class="space-y-1">
             {#each robots.groups.slice(0, 5) as g, i (i)}
               <li class="rounded-lg border border-white/40 bg-white/40 px-2 py-1 dark:border-white/10 dark:bg-white/5">
                 <p class="font-medium text-slate-900 dark:text-slate-100">{g.userAgents.join(', ')}</p>
-                <p class="text-[10px] text-slate-600 dark:text-slate-400">disallow: {g.disallow.length} · allow: {g.allow.length}</p>
+ <p class="text-[10px] ms-muted">disallow: {g.disallow.length} · allow: {g.allow.length}</p>
               </li>
             {/each}
             {#if robots.groups.length > 5}
-              <li class="text-[10px] text-slate-500 dark:text-slate-400">…{robots.groups.length - 5} more</li>
+ <li class="text-[10px] ms-muted">…{robots.groups.length - 5} more</li>
             {/if}
           </ul>
         </div>
@@ -63,7 +63,7 @@
         {/if}
       {/if}
     {:else}
-      <p class="text-slate-500 dark:text-slate-400">{robots.error ?? 'No /robots.txt at this host.'}</p>
+ <p class="ms-muted">{robots.error ?? 'No /robots.txt at this host.'}</p>
     {/if}
   </div>
 </section>

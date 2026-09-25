@@ -218,21 +218,21 @@
     <header class="flex items-center justify-between">
       <div class="flex flex-col">
         <h3 id={TITLE_ID} class="text-base font-semibold text-slate-900 dark:text-slate-50">Settings</h3>
-        <p class="text-xs text-slate-500 dark:text-slate-400">Preferences and scoring rules</p>
+ <p class="text-xs ms-muted">Preferences and scoring rules</p>
       </div>
       <button
         type="button"
         aria-label="Close settings"
         use:tooltip={'Close settings (Esc)'}
         on:click={close}
-        class="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-50 {FOCUS_RING}"
+ class="flex h-8 w-8 items-center justify-center rounded-lg ms-muted transition hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-50 {FOCUS_RING}"
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
       </button>
     </header>
 
     <fieldset class="flex flex-col gap-2">
-      <legend class="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Preferences</legend>
+ <legend class="mb-2 text-xs font-semibold uppercase tracking-wider ms-muted">Preferences</legend>
       <div role="radiogroup" aria-label="Surface" class="grid grid-cols-2 gap-2">
         {#each SURFACES as s (s.value)}
           <label
@@ -249,7 +249,7 @@
               class="sr-only"
             />
             <span class="text-xs font-semibold text-slate-800 dark:text-slate-100">{s.label}</span>
-            <span class="text-[11px] leading-snug text-slate-500 dark:text-slate-400">{s.hint}</span>
+ <span class="text-[11px] leading-snug ms-muted">{s.hint}</span>
           </label>
         {/each}
       </div>
@@ -289,14 +289,14 @@
       </p>
 
       <fieldset class="flex flex-col gap-3">
-        <legend class="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Length thresholds (characters)</legend>
+ <legend class="mb-2 text-xs font-semibold uppercase tracking-wider ms-muted">Length thresholds (characters)</legend>
         {#each LENGTH_ROWS as row (row.min)}
           {@const minProblem = problemFor(row.min)}
           {@const maxProblem = problemFor(row.max)}
           <div class="flex flex-col gap-1">
             <span class="text-xs font-medium text-slate-700 dark:text-slate-200">{row.label}</span>
             <div class="flex items-center gap-2">
-              <label class="flex flex-1 items-center gap-1.5 text-[10px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
+ <label class="flex flex-1 items-center gap-1.5 text-[10px] uppercase tracking-wide ms-muted">
                 min
                 <input
                   type="number"
@@ -311,8 +311,8 @@
                   class="{inputClass} {minProblem ? inputBad : inputOk}"
                 />
               </label>
-              <span class="text-slate-400" aria-hidden="true">–</span>
-              <label class="flex flex-1 items-center gap-1.5 text-[10px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
+ <span class="ms-muted" aria-hidden="true">–</span>
+ <label class="flex flex-1 items-center gap-1.5 text-[10px] uppercase tracking-wide ms-muted">
                 max
                 <input
                   type="number"
@@ -339,7 +339,7 @@
       </fieldset>
 
       <fieldset class="flex flex-col gap-2">
-        <legend class="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Severity weights</legend>
+ <legend class="mb-2 text-xs font-semibold uppercase tracking-wider ms-muted">Severity weights</legend>
         <p class="text-xs text-slate-600 dark:text-slate-300">
           Each rule earns its weight on pass, half on warn, zero on fail. Score = earned / total × 100.
         </p>
@@ -420,7 +420,7 @@
       </section>
     {/if}
 
-    <footer class="mt-auto flex flex-col gap-1.5 border-t border-slate-200 pt-3 text-[11px] text-slate-500 dark:border-slate-800 dark:text-slate-400">
+ <footer class="mt-auto flex flex-col gap-1.5 border-t border-slate-200 pt-3 text-[11px] ms-muted dark:border-slate-800">
       <span>Metaspry v{version}</span>
       <nav aria-label="About Metaspry" class="flex flex-wrap items-center gap-x-2 gap-y-2">
         {#each ABOUT_LINKS as link, i (link.href)}

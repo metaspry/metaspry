@@ -97,7 +97,7 @@
       tabindex="-1"
       class="absolute right-0 top-10 z-30 w-64 max-w-[calc(100vw-2.5rem)] overflow-hidden rounded-2xl border border-white/40 bg-white shadow-xl focus:outline-none dark:border-white/10 dark:bg-popover"
     >
-      <header class="flex items-center justify-between border-b border-white/40 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:border-white/10 dark:text-slate-400">
+ <header class="flex items-center justify-between border-b border-white/40 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider ms-muted dark:border-white/10">
         <span id={TITLE_ID}>Recent scrapes</span>
         {#if $history.length > 0}
           {#if clearArmed}
@@ -113,7 +113,7 @@
         {/if}
       </header>
       {#if $history.length > 0}
-        <p class="flex items-center gap-1 border-b border-white/40 px-3 py-1.5 text-[10px] text-slate-500 dark:border-white/10 dark:text-slate-400">
+ <p class="flex items-center gap-1 border-b border-white/40 px-3 py-1.5 text-[10px] ms-muted dark:border-white/10">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-3 w-3" aria-hidden="true">
             <path d="M7 17 17 7M8 7h9v9" />
           </svg>
@@ -121,7 +121,7 @@
         </p>
       {/if}
       {#if $history.length === 0}
-        <p class="px-3 py-4 text-center text-xs text-slate-500 dark:text-slate-400">No history yet.</p>
+ <p class="px-3 py-4 text-center text-xs ms-muted">No history yet.</p>
       {:else}
         <ul class="max-h-72 overflow-y-auto">
           {#each $history as entry (entry.timestamp)}
@@ -147,14 +147,14 @@
                       stroke-linecap="round"
                       stroke-linejoin="round"
                       aria-hidden="true"
-                      class="h-3 w-3 flex-shrink-0 text-slate-400 opacity-0 transition group-hover/row:opacity-100 dark:text-slate-500"
+ class="h-3 w-3 flex-shrink-0 ms-muted opacity-0 transition group-hover/row:opacity-100"
                     >
                       <path d="M7 17 17 7M8 7h9v9" />
                     </svg>
                   </span>
-                  <span class="block truncate text-[10px] text-slate-500 dark:text-slate-400">{entry.hostname}</span>
+ <span class="block truncate text-[10px] ms-muted">{entry.hostname}</span>
                 </span>
-                <span class="shrink-0 text-[10px] text-slate-400 dark:text-slate-500">{timeAgo(entry.timestamp)}</span>
+ <span class="shrink-0 text-[10px] ms-muted">{timeAgo(entry.timestamp)}</span>
                 <!-- Verdict last, on the right: the same rule as every list in the web app. -->
                 <span
                   role="img"

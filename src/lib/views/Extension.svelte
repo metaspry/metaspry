@@ -395,7 +395,7 @@
     {#if view === "landing"}
       <div class="flex flex-col gap-1">
         <h2 class="text-base font-semibold text-slate-900 dark:text-slate-50">What would you like to do?</h2>
-        <p class="text-xs text-slate-600 dark:text-slate-400">Select an option below to get started.</p>
+ <p class="text-xs ms-muted">Select an option below to get started.</p>
       </div>
       <Grid {items} />
     {:else if view === "loading"}

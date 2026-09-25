@@ -72,22 +72,22 @@
       >
         {result.chip === 'ready' ? 'AI-ready' : 'Needs work'}
       </span>
-      <span class="text-[11px] text-slate-500 dark:text-slate-400">Readiness for AI answer engines - not a guarantee of citations.</span>
+ <span class="text-[11px] ms-muted">Readiness for AI answer engines - not a guarantee of citations.</span>
     </div>
 
     {#each [{ title: 'Page', items: pageChecks }, { title: 'Site', items: siteChecks }] as group (group.title)}
       {#if group.items.length}
         <div class="flex flex-col gap-2">
-          <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">{group.title}</p>
+ <p class="text-[10px] font-semibold uppercase tracking-wider ms-muted">{group.title}</p>
           {#each group.items as c (c.id)}
             <div class="flex items-start gap-2.5 rounded-2xl border border-white/40 bg-white/40 px-3 py-2 backdrop-blur-md dark:border-white/10 dark:bg-white/5">
               <span class="mt-1 h-2 w-2 shrink-0 rounded-full {dot[c.state]}" aria-hidden="true"></span>
               <div class="min-w-0">
                 <div class="flex items-center gap-2">
                   <span class="text-xs font-medium text-slate-800 dark:text-slate-100">{c.label}</span>
-                  <span class="text-[9px] uppercase tracking-wide text-slate-400">{stateLabel[c.state]}</span>
+ <span class="text-[9px] uppercase tracking-wide ms-muted">{stateLabel[c.state]}</span>
                 </div>
-                <p class="text-[11px] text-slate-500 dark:text-slate-400">{c.detail}</p>
+ <p class="text-[11px] ms-muted">{c.detail}</p>
               </div>
             </div>
           {/each}

@@ -74,7 +74,7 @@
     aria-label="Facebook preview"
     class="overflow-hidden rounded-2xl border border-white/40 bg-white/60 shadow-md shadow-indigo-500/5 backdrop-blur-md dark:border-white/10 dark:bg-white/5"
   >
-    <header class="border-b border-white/40 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:border-white/10 dark:text-slate-400">
+ <header class="border-b border-white/40 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider ms-muted dark:border-white/10">
       Facebook
     </header>
     <div class="aspect-[1.91/1] w-full bg-gradient-to-br from-indigo-200 to-violet-200 dark:from-indigo-900/40 dark:to-violet-900/40">
@@ -85,9 +85,9 @@
       {/if}
     </div>
     <div class="space-y-1 bg-slate-50/80 px-4 py-3 dark:bg-slate-900/40">
-      <p class="text-[10px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">{ogHost}</p>
+ <p class="text-[10px] font-medium uppercase tracking-wider ms-muted">{ogHost}</p>
       <p class="line-clamp-1 text-sm font-semibold text-slate-900 dark:text-slate-50">{ogTitle}</p>
-      <p class="line-clamp-2 text-xs text-slate-600 dark:text-slate-400">{ogDescription}</p>
+ <p class="line-clamp-2 text-xs ms-muted">{ogDescription}</p>
     </div>
   </section>
 
@@ -96,7 +96,7 @@
     aria-label="Twitter preview"
     class="overflow-hidden rounded-2xl border border-white/40 bg-white/60 shadow-md shadow-indigo-500/5 backdrop-blur-md dark:border-white/10 dark:bg-white/5"
   >
-    <header class="border-b border-white/40 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:border-white/10 dark:text-slate-400">
+ <header class="border-b border-white/40 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider ms-muted dark:border-white/10">
       Twitter · {twitterCard}{declaredTwitterCard ? '' : ' (no twitter:card — fallback)'}
     </header>
     {#if twitterCard === 'summary'}
@@ -110,8 +110,8 @@
         </div>
         <div class="min-w-0 flex-1 space-y-1 px-3 py-2">
           <p class="line-clamp-1 text-sm font-semibold text-slate-900 dark:text-slate-50">{twitterTitle}</p>
-          <p class="line-clamp-2 text-xs text-slate-600 dark:text-slate-400">{twitterDescription}</p>
-          <p class="text-[10px] text-slate-500 dark:text-slate-400">{ogHost}</p>
+ <p class="line-clamp-2 text-xs ms-muted">{twitterDescription}</p>
+ <p class="text-[10px] ms-muted">{ogHost}</p>
         </div>
       </div>
     {:else}
@@ -124,8 +124,8 @@
       </div>
       <div class="space-y-1 px-4 py-3">
         <p class="line-clamp-1 text-sm font-semibold text-slate-900 dark:text-slate-50">{twitterTitle}</p>
-        <p class="line-clamp-2 text-xs text-slate-600 dark:text-slate-400">{twitterDescription}</p>
-        <p class="text-[10px] text-slate-500 dark:text-slate-400">{ogHost}</p>
+ <p class="line-clamp-2 text-xs ms-muted">{twitterDescription}</p>
+ <p class="text-[10px] ms-muted">{ogHost}</p>
       </div>
     {/if}
   </section>
@@ -135,7 +135,7 @@
     aria-label="LinkedIn preview"
     class="overflow-hidden rounded-2xl border border-white/40 bg-white/60 shadow-md shadow-indigo-500/5 backdrop-blur-md dark:border-white/10 dark:bg-white/5"
   >
-    <header class="border-b border-white/40 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:border-white/10 dark:text-slate-400">
+ <header class="border-b border-white/40 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider ms-muted dark:border-white/10">
       LinkedIn
     </header>
     <div class="aspect-[1.91/1] w-full bg-gradient-to-br from-sky-200 to-indigo-200 dark:from-sky-900/40 dark:to-indigo-900/40">
@@ -147,8 +147,8 @@
     </div>
     <div class="space-y-1 bg-slate-50/80 px-4 py-3 dark:bg-slate-900/40">
       <p class="line-clamp-1 text-sm font-semibold text-slate-900 dark:text-slate-50">{ogTitle}</p>
-      <p class="line-clamp-2 text-xs text-slate-600 dark:text-slate-400">{ogDescription}</p>
-      <p class="text-[10px] text-slate-500 dark:text-slate-400">{ogHost}</p>
+ <p class="line-clamp-2 text-xs ms-muted">{ogDescription}</p>
+ <p class="text-[10px] ms-muted">{ogHost}</p>
     </div>
   </section>
 

@@ -21,7 +21,7 @@
   aria-label="Google search preview"
   class="overflow-hidden rounded-2xl border border-white/40 bg-white/80 shadow-md shadow-indigo-500/5 backdrop-blur-md dark:border-white/10 dark:bg-white/5"
 >
-  <header class="border-b border-white/40 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:border-white/10 dark:text-slate-400">
+ <header class="border-b border-white/40 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider ms-muted dark:border-white/10">
     Google · Search
   </header>
   <div class="space-y-1 bg-white p-3 dark:bg-slate-900">
@@ -29,7 +29,7 @@
       <SiteIcon src={icon} hostname={host} size={20} />
       <div class="min-w-0 flex-1">
         <p class="truncate text-xs text-slate-700 dark:text-slate-300">{host}</p>
-        <p class="truncate text-[10px] text-slate-500 dark:text-slate-400">{trimUrl(canonical)}</p>
+ <p class="truncate text-[10px] ms-muted">{trimUrl(canonical)}</p>
       </div>
     </div>
     <p class="line-clamp-1 text-base font-medium leading-tight text-blue-700 dark:text-blue-300">{title}</p>

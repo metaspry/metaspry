@@ -27,7 +27,7 @@
   on:click={onClick}
   class="flex h-7 w-7 items-center justify-center rounded-lg transition {active
     ? 'text-amber-500 hover:bg-amber-100/60 dark:text-amber-300 dark:hover:bg-amber-500/10'
-    : 'text-slate-400 hover:bg-white/60 hover:text-amber-500 dark:text-slate-500 dark:hover:bg-white/10 dark:hover:text-amber-300'}"
+ : 'ms-muted hover:bg-white/60 hover:text-amber-500 dark:hover:bg-white/10 dark:hover:text-amber-300'}"
 >
   {#if active}
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-4 w-4">

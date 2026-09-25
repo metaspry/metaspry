@@ -36,7 +36,7 @@
     <circle cx="12" cy="16.5" r="0.6" fill="currentColor" />
   </svg>
   <h2 bind:this={heading} tabindex="-1" class="text-base font-semibold text-slate-900 focus:outline-none dark:text-slate-50">Couldn't scan this page</h2>
-  <p class="max-w-xs break-words text-sm text-slate-600 dark:text-slate-400">{reason}</p>
+ <p class="max-w-xs break-words text-sm ms-muted">{reason}</p>
   <button
     type="button"
     on:click={() => dispatch('retry')}

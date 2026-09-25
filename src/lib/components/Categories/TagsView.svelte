@@ -58,7 +58,7 @@
   <CategoryChips {active} {counts} on:change={(e) => (active = e.detail)} />
   <ExportBar {meta} />
   {#if visible.length === 0}
-    <p class="py-6 text-center text-sm text-slate-500 dark:text-slate-400">
+ <p class="py-6 text-center text-sm ms-muted">
       No matches for current filter.
     </p>
   {:else}

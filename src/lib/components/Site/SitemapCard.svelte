@@ -39,9 +39,9 @@
                     {#if safeHref(child.url)}
                       <a href={safeHref(child.url)} target="_blank" rel="noopener noreferrer" class="block break-all text-[11px] text-indigo-600 hover:underline dark:text-indigo-300">{child.url}</a>
                     {:else}
-                      <span class="block break-all text-[11px] text-slate-600 dark:text-slate-400" use:tooltip={'Not an http(s) URL'}>{child.url}<span class="sr-only"> (not an http(s) URL)</span></span>
+ <span class="block break-all text-[11px] ms-muted" use:tooltip={'Not an http(s) URL'}>{child.url}<span class="sr-only"> (not an http(s) URL)</span></span>
                     {/if}
-                    <p class="text-[10px] text-slate-600 dark:text-slate-400">
+ <p class="text-[10px] ms-muted">
                       {#if child.error}
                         <span class="text-rose-600 dark:text-rose-400">{child.error}</span>
                       {:else}
@@ -60,14 +60,14 @@
         </p>
         {#if sitemap.sample.length > 0}
           <div class="space-y-1">
-            <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Sample (first 10)</p>
+ <p class="text-[10px] font-semibold uppercase tracking-wider ms-muted">Sample (first 10)</p>
             <ul class="space-y-0.5">
               {#each sitemap.sample as s, i (i)}
                 <li>
                   {#if safeHref(s)}
                     <a href={safeHref(s)} target="_blank" rel="noopener noreferrer" class="break-all text-indigo-600 hover:underline dark:text-indigo-300">{s}</a>
                   {:else}
-                    <span class="break-all text-slate-600 dark:text-slate-400" use:tooltip={'Not an http(s) URL'}>{s}<span class="sr-only"> (not an http(s) URL)</span></span>
+ <span class="break-all ms-muted" use:tooltip={'Not an http(s) URL'}>{s}<span class="sr-only"> (not an http(s) URL)</span></span>
                   {/if}
                 </li>
               {/each}
@@ -79,7 +79,7 @@
         <p class="text-amber-600 dark:text-amber-400">{sitemap.error}</p>
       {/if}
     {:else}
-      <p class="text-slate-500 dark:text-slate-400">{sitemap.error ?? 'No /sitemap.xml at this host.'}</p>
+ <p class="ms-muted">{sitemap.error ?? 'No /sitemap.xml at this host.'}</p>
     {/if}
   </div>
 </section>

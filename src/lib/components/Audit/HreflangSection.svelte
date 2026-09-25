@@ -6,7 +6,7 @@
 
 {#if hreflang.length > 0}
   <section class="flex flex-col gap-2">
-    <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">hreflang ({hreflang.length})</h4>
+ <h4 class="text-xs font-semibold uppercase tracking-wider ms-muted">hreflang ({hreflang.length})</h4>
     <div class="flex flex-col gap-1">
       {#each hreflang as h, i (i)}
         <div class="flex items-center gap-2 rounded-xl border border-white/40 bg-white/40 px-3 py-1.5 text-xs backdrop-blur-md dark:border-white/10 dark:bg-white/5">
