@@ -397,12 +397,12 @@
           >Reset to defaults</button>
         {/if}
         {#if dirty}
-          <span class="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Unsaved changes</span>
+          <span class="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Unsaved changes</span>
         {/if}
       </div>
     {:else}
       <section class="flex flex-col items-start gap-2 rounded-xl border border-indigo-400/30 bg-indigo-500/5 p-3">
-        <span class="rounded-full bg-indigo-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">Pro</span>
+        <span class="rounded-full bg-indigo-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">Pro</span>
         <h4 class="text-sm font-semibold text-slate-900 dark:text-slate-50">Custom scoring is a Pro feature</h4>
         <p class="text-xs text-slate-600 dark:text-slate-300">
           Free scans use Metaspry's default thresholds and rule weights. Upgrade to tune how the SEO/meta

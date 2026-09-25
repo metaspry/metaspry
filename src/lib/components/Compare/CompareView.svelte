@@ -153,9 +153,10 @@
       </p>
     {:else}
       <p class="px-1 text-[11px] text-slate-500 dark:text-slate-400">
-        Comparing the served HTML of both pages, fetched without your cookies — so tags added by
-        JavaScript after load are not included on either side, and a page that varies by login or
-        region may differ from what you see.
+        The rows below compare the served HTML of both pages, fetched without your cookies — tags
+        added by JavaScript after load are not included on either side, and a page that varies by
+        login or region may differ from what you see. The Current score is your rendered-page audit
+        from the Audit tab; the Compared score is an audit of the served HTML.
       </p>
     {/if}
     <div class="grid grid-cols-2 gap-2">

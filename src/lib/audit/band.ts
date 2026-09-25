@@ -37,17 +37,17 @@ export interface BandClasses {
 const CLASSES: Record<Band, BandClasses> = {
   good: {
     text: 'text-emerald-600 dark:text-emerald-400',
-    chip: 'bg-emerald-500/20 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300',
+    chip: 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300',
     stroke: 'text-emerald-500 dark:text-emerald-400',
   },
   warn: {
     text: 'text-amber-600 dark:text-amber-400',
-    chip: 'bg-amber-500/20 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300',
+    chip: 'bg-amber-500/20 text-amber-700 dark:text-amber-300',
     stroke: 'text-amber-500 dark:text-amber-400',
   },
   fail: {
     text: 'text-rose-600 dark:text-rose-400',
-    chip: 'bg-rose-500/20 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300',
+    chip: 'bg-rose-500/20 text-rose-700 dark:text-rose-300',
     stroke: 'text-rose-500 dark:text-rose-400',
   },
 };

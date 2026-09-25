@@ -18,7 +18,6 @@
     return `${d}d ago`;
   }
 
-
   function openInNewTab(url: string) {
     // active: false opens the new tab in the background so the popup retains
     // focus. Without it Chrome immediately closes the popup when the new tab
@@ -73,6 +72,7 @@
       {:else}
         <ul class="max-h-72 overflow-y-auto">
           {#each $history as entry (entry.timestamp)}
+            {@const label = scoreLabel(entry.score)}
             <li class="border-b border-white/40 last:border-b-0 dark:border-white/5">
               <button
                 type="button"
@@ -104,10 +104,10 @@
                 <!-- Verdict last, on the right: the same rule as every list in the web app. -->
                 <span
                   role="img"
-                  aria-label={scoreLabel(entry.score)}
-                  title={scoreLabel(entry.score)}
+                  aria-label={label}
+                  title={label}
                   class="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums {bandClasses(bandFor(entry.score)).chip}"
-                >{entry.score}</span>
+                >{Math.round(entry.score)}</span>
               </button>
             </li>
           {/each}

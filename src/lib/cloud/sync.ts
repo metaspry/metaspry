@@ -9,12 +9,9 @@ import type { PageMeta } from '../scrapers/PageMeta';
 import type { AuditResult, RuleStatus } from '../audit/AuditResult';
 import type { SiteFiles } from '../scrapers/SiteFiles';
 import type { SyncScope } from './workspaces';
+import { bandFor } from '../audit/band';
 
 const SCAN_SCHEMA_VERSION = 1;
-
-function bandFor(score: number): 'good' | 'warn' | 'fail' {
-  return score >= 80 ? 'good' : score >= 50 ? 'warn' : 'fail';
-}
 
 /** Stable, Firestore-safe doc id from a URL (djb2 hash). */
 function scanIdFor(url: string): string {

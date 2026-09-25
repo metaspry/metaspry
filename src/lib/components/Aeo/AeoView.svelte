@@ -67,8 +67,8 @@
     <div class="flex items-center gap-2">
       <span
         class="rounded-full px-2.5 py-0.5 text-xs font-semibold {result.chip === 'ready'
-          ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
-          : 'bg-amber-500/15 text-amber-700 dark:text-amber-300'}"
+          ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
+          : 'bg-amber-500/20 text-amber-700 dark:text-amber-300'}"
       >
         {result.chip === 'ready' ? 'AI-ready' : 'Needs work'}
       </span>
