@@ -25,6 +25,29 @@ html[data-mode="popup"] [data-bg-orb] {
   display: none;
 }
 
+/* `use:tooltip` (src/lib/actions/tooltip.ts): one shared body-level element, positioned by
+ * floating-ui. `fixed` + `z-[60]` so it clears the Settings drawer (z-50) and every dropdown.
+ * Same look as the web app's `.ms-tooltip`; keep the two in step. `invisible` while hidden keeps the
+ * idle element (and its last text) out of the accessibility tree; visibility is transitioned with
+ * opacity so the fade-out still plays. */
+.ms-tooltip {
+  @apply pointer-events-none fixed left-0 top-0 z-[60] max-w-[240px] rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white break-words opacity-0 shadow-lg invisible transition-[opacity,visibility] dark:bg-slate-100 dark:text-slate-900;
+}
+
+.ms-tooltip[data-show] {
+  @apply visible opacity-100;
+}
+
+.ms-tooltip-arrow {
+  @apply absolute h-2 w-2 rotate-45 bg-slate-900 dark:bg-slate-100;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ms-tooltip {
+    transition: none;
+  }
+}
+
 ::-webkit-scrollbar {
   @apply w-1.5;
 }

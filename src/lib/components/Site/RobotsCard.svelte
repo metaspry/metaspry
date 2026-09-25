@@ -1,5 +1,6 @@
 <script lang="ts">
   import { safeHref } from '../../util/safe-href';
+  import { tooltip } from '../../actions/tooltip';
   import type { RobotsInfo } from '../../scrapers/SiteFiles';
 
   export let robots: RobotsInfo;
@@ -30,7 +31,7 @@
                 {#if safeHref(s)}
                   <a href={safeHref(s)} target="_blank" rel="noopener noreferrer" class="break-all text-indigo-600 hover:underline dark:text-indigo-300">{s}</a>
                 {:else}
-                  <span class="break-all text-slate-600 dark:text-slate-400" title="Not an http(s) URL">{s}</span>
+                  <span class="break-all text-slate-600 dark:text-slate-400" use:tooltip={'Not an http(s) URL'}>{s}<span class="sr-only"> (not an http(s) URL)</span></span>
                 {/if}
               </li>
             {/each}

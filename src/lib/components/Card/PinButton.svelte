@@ -1,6 +1,7 @@
 <script lang="ts">
   import { pinned, togglePinned, isPinned } from '../../storage/pinned';
   import { toast } from '../Toast/toast';
+  import { tooltip } from '../../actions/tooltip';
 
   export let tagKey: string;
 
@@ -22,7 +23,7 @@
   type="button"
   aria-label={active ? `Unpin ${tagKey}` : `Pin ${tagKey}`}
   aria-pressed={active}
-  title={active ? 'Unpin from top' : 'Pin to top of list'}
+  use:tooltip={active ? 'Unpin from top' : 'Pin to top of list'}
   on:click={onClick}
   class="flex h-7 w-7 items-center justify-center rounded-lg transition {active
     ? 'text-amber-500 hover:bg-amber-100/60 dark:text-amber-300 dark:hover:bg-amber-500/10'

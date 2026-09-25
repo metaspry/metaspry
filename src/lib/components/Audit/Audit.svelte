@@ -2,6 +2,7 @@
   import type { AuditResult, RuleResult, RuleSeverity } from '../../audit/AuditResult';
   import type { PageMeta } from '../../scrapers/PageMeta';
   import { bandClasses, bandFor, scoreLabel } from '../../audit/band';
+  import { tooltip } from '../../actions/tooltip';
   import CharBar from './CharBar.svelte';
   import JsonLdSection from './JsonLdSection.svelte';
   import HreflangSection from './HreflangSection.svelte';
@@ -48,7 +49,7 @@
         {result.hasPending ? 'Resolving async checks…' : 'Score weighted by rule severity.'}
       </p>
     </div>
-    <div class="relative h-20 w-20 shrink-0" role="img" aria-label={ringLabel} title={ringLabel}>
+    <div class="relative h-20 w-20 shrink-0" role="img" aria-label={ringLabel} use:tooltip={ringLabel}>
       <svg viewBox="0 0 80 80" class="h-full w-full -rotate-90" aria-hidden="true">
         <circle cx="40" cy="40" r={RADIUS} stroke="currentColor" stroke-width="6" fill="none" class="text-slate-200 dark:text-slate-700/50" />
         <circle

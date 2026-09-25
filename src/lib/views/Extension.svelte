@@ -33,6 +33,7 @@
   import { registerShortcuts, helpOpen } from "../components/Shortcuts/keyboard";
   import { toolbarButtonClass, TOOLBAR_GROUP } from "../components/toolbar";
   import CloudSync from "../components/CloudSync/CloudSync.svelte";
+  import { tooltip } from "../actions/tooltip";
   import { cloudUser } from "../cloud/auth";
   import { syncScope } from "../cloud/workspaces";
   import { toScanPayload, uploadScan } from "../cloud/sync";
@@ -278,7 +279,7 @@
           <button
             type="button"
             aria-label="Settings"
-            title="Settings"
+            use:tooltip={"Settings"}
             aria-expanded={settingsOpen}
             on:click={() => (settingsOpen = true)}
             class={toolbarButtonClass(settingsOpen)}
@@ -292,7 +293,7 @@
           <button
             type="button"
             aria-label={$theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
-            title={$theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+            use:tooltip={$theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
             aria-pressed={$theme === "dark"}
             on:click={toggleTheme}
             class={toolbarButtonClass()}
@@ -312,7 +313,7 @@
           <button
             type="button"
             aria-label="Keyboard shortcuts"
-            title="Keyboard shortcuts"
+            use:tooltip={"Keyboard shortcuts"}
             aria-expanded={$helpOpen}
             on:click={() => helpOpen.set(true)}
             class={toolbarButtonClass($helpOpen)}

@@ -27,6 +27,7 @@ It is one of three sibling repositories:
 | Build | Vite `^4.4.2`, then `removeInlineScript.cjs` (MV3 CSP fix-up) |
 | Styling | Tailwind CSS `^3.3.5` (`darkMode: 'class'`), PostCSS, Autoprefixer |
 | Cloud | Firebase JS SDK `^12.15.0` (Auth + Firestore) |
+| Tooltips | `@floating-ui/dom` `^1.8.0` (bundled by Vite; positions the `use:tooltip` element, 3.17) |
 | Types | `@types/chrome`; `tsconfig.json` is strict (`strict`, `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`, `noImplicit*`) |
 | Asset scripts | `sharp` (icons, promo tiles, store screenshots), `tiny-glob` (CSP fixer) |
 | Declared but unused | `@sveltejs/adapter-auto` (commented out in `svelte.config.js`), `onchange` |
@@ -124,13 +125,14 @@ This is the complete inventory. There are no ports (`runtime.connect`), no conte
 | `src/app.html` | HTML shell. `%sveltekit.body%` sits in `<div style="display: contents">`; the CSP fixer depends on this (4.1) |
 | `src/routes/+page.svelte` | Root. Initialises theme, mode, settings, pinned, history and keyboard shortcuts; mounts `Extension`, `ToastHost`, `ShortcutsHelp` |
 | `src/routes/+layout.js` | `export const prerender = true` |
-| `src/routes/app.css` | Tailwind entry, popup sizing, scrollbar styles |
+| `src/routes/app.css` | Tailwind entry, popup sizing, tooltip (`.ms-tooltip`) and scrollbar styles |
 | `src/lib/views/Extension.svelte` | Orchestrator: view state machine, header, tabs, the scrape -> audit -> history -> upload pipeline, mode switching |
 | `src/lib/scrapers/` | `getHTML` (messaging), `getMetaTags` (+ `getJsonLd`, `getHreflang`, `getRobots`), `getSiteFiles` (network), types in `PageMeta.ts` and `SiteFiles.ts` |
 | `src/lib/audit/` | `rules.ts` (sync rules + scoring), `asyncRules.ts` (og:image dimensions), `AuditResult.ts` (types), `aeo.ts` (AI readiness) |
 | `src/lib/storage/` | `settings.ts`, `history.ts`, `pinned.ts`: Svelte stores persisted to `chrome.storage.local` |
 | `src/lib/mode.ts`, `src/lib/theme.ts` | Surface mode and theme stores |
 | `src/lib/cloud/` | `firebase.ts`, `auth.ts`, `plan.ts`, `settings.ts`, `sync.ts`, `workspaces.ts` |
+| `src/lib/actions/` | Svelte actions: `tooltip.ts` (`use:tooltip`, 3.17) |
 | `src/lib/categorize.ts` | Tag key -> category |
 | `src/lib/exporters/exporters.ts` | JSON and CSV serialisers, blob download |
 | `src/lib/components/` | One folder per UI feature: `Aeo`, `Audit`, `Card`, `Categories`, `CloudSync`, `Compare`, `EmptyState`, `ErrorState`, `Exporters`, `Grid`, `History`, `Preview`, `Previews`, `Screen`, `Settings`, `Shortcuts`, `Site`, `SiteIcon`, `Skeleton`, `Tabs`, `Toast` |
@@ -424,7 +426,7 @@ indexed, and "a canonical tag is present" passed it.
 
 ### 3.8 Scoring settings, Pro gating and settings sync
 
-**Purpose and flow.** The gear icon opens the Settings drawer, a modal dialog (`aria-modal`, focus moves to the first threshold input on open - or to the close button for non-Pro users; never the Surface radio, where one keypress would switch surface - Tab/Shift+Tab cycle inside, Esc / the close button / the backdrop close it and focus returns to the gear). Everyone first sees a **Preferences** fieldset holding the `Surface` radio group (Side panel / Popup, calling `switchMode`, 3.2); the subtitle reads "Preferences and scoring rules". Pro users then see a sync line ("Synced with your account", "Open in web app" -> `https://app.metaspry.com/settings`), the **Length thresholds (characters)** fieldset (Title, Description, og:description, each a min-max pair), the **Severity weights** fieldset (Required / Recommended / Best practice under the explainer "Each rule earns its weight on pass, half on warn, zero on fail. Score = earned / total × 100."), then **Save**, **Reset to defaults** and an "Unsaved changes" chip. Everyone else sees a "Custom scoring is a Pro feature" card whose "Go Pro" link opens `https://app.metaspry.com/upgrade`. The footer shows "Metaspry v<manifest version>" ("dev" outside the extension) and the links metaspry.com, Docs, Roadmap, Blog, "Report a bug".
+**Purpose and flow.** The gear icon opens the Settings drawer, a modal dialog (`aria-modal`, focus moves to the first threshold input on open - or to the close button for non-Pro users; never the Surface radio, where one keypress would switch surface - Tab/Shift+Tab cycle inside, Esc / the close button / the backdrop close it and focus returns to the gear). Everyone first sees a **Preferences** fieldset holding the `Surface` radio group (Side panel / Popup, calling `switchMode`, 3.2); the subtitle reads "Preferences and scoring rules". Pro users then see a sync line ("Synced with your account", "Open in web app" -> `https://app.metaspry.com/settings`), the **Length thresholds (characters)** fieldset (Title, Description, og:description, each a min-max pair), the **Severity weights** fieldset (Required / Recommended / Best practice under the explainer "Each rule earns its weight on pass, half on warn, zero on fail. Score = earned / total × 100."), then **Save**, **Reset to defaults** and an "Unsaved changes" chip. The close button, Save, Reset to defaults and "Open in web app" carry `use:tooltip` (3.17): "Close settings (Esc)", "Save scoring rules", "Restore the default thresholds and weights", "Edit these settings in the Metaspry web app (opens a new tab)". Everyone else sees a "Custom scoring is a Pro feature" card whose "Go Pro" link opens `https://app.metaspry.com/upgrade`. The footer shows "Metaspry v<manifest version>" ("dev" outside the extension) and the links metaspry.com, Docs, Roadmap, Blog, "Report a bug".
 
 - **The form edits a draft; nothing persists until Save.** Save calls `updateSettings(draft)` once (one `chrome.storage` write, one cloud push) and toasts "Scoring rules saved"; it is disabled while the draft equals the stored value or has a validation problem. Closing with unsaved edits discards them. A cloud pull or the other surface refreshes an untouched form only.
 - **Validation** (`src/lib/storage/validate-settings.ts`, modelled on the app's `validateAuditSettings` but requiring whole numbers everywhere): every threshold an integer >= 0 ("Enter a whole number of 0 or more."), each max >= its min ("Title max must be at least the min."), weights integers >= 0 ("Weights must be whole numbers of 0 or more."), not all zero ("At least one weight must be above 0, or nothing can score."). A cleared box is NaN and is reported, not ignored. Invalid inputs get `aria-invalid` and `aria-describedby` pointing at the message under the row.
@@ -481,7 +483,7 @@ indexed, and "a canonical tag is present" passed it.
 
 ### 3.10 History
 
-**Purpose and flow.** The History button in the header toolbar (3.17; `aria-expanded` while open) opens "Recent scrapes": the last 10 scans, each row left to right: site favicon (`SiteIcon`, 16 px; letter tile when missing or broken), title (or hostname) over hostname, relative time, then the score chip last (`bandClasses(...).chip` from `src/lib/audit/band.ts`, `role="img"` with the "Score N of 100, band" label). Clicking an entry opens its URL in a background tab (`active: false`, so a popup stays open). "Clear" empties the list.
+**Purpose and flow.** The History button in the header toolbar (3.17; `aria-expanded` while open) opens "Recent scrapes": the last 10 scans, each row left to right: site favicon (`SiteIcon`, 16 px; letter tile when missing or broken), title (or hostname) over hostname, relative time, then the score chip last (`bandClasses(...).chip` from `src/lib/audit/band.ts`, `role="img"` with the "Score N of 100, band" label and the same text as a hover tooltip). Each row button has the tooltip "Open in new tab" (hover and keyboard focus). Clicking an entry opens its URL in a background tab (`active: false`, so a popup stays open). "Clear" empties the list.
 
 **Key files.** `src/lib/components/History/HistoryDropdown.svelte`, `src/lib/storage/history.ts`, `src/lib/components/SiteIcon/SiteIcon.svelte`.
 
@@ -623,7 +625,7 @@ Checks in `src/lib/audit/aeo.ts`:
 - `r` re-scrapes.
 - `1` to `5` select tabs by position: Tags, Previews, Audit, Site, AI. Compare (sixth) has no key.
 
-In the tab strip, Arrow Left/Right, Home and End move between tabs. `Esc` closes the Settings drawer and the help modal (not the History or Cloud sync dropdowns). While the Settings drawer is open, Tab and Shift+Tab cycle inside it (3.8).
+In the tab strip, Arrow Left/Right, Home and End move between tabs. `Esc` closes the Settings drawer and the help modal (not the History or Cloud sync dropdowns). `Esc` also hides a visible tooltip (3.17); the tooltip's handler never calls `preventDefault` / `stopPropagation`, so one press both hides it and closes the drawer. While the Settings drawer is open, Tab and Shift+Tab cycle inside it (3.8).
 
 **Key files.** `src/lib/components/Shortcuts/keyboard.ts`, `src/lib/components/Shortcuts/ShortcutsHelp.svelte`, `src/lib/components/Tabs/Tabs.svelte`, `src/lib/views/Extension.svelte` (`registerShortcuts`).
 
@@ -637,11 +639,12 @@ In the tab strip, Arrow Left/Right, Home and End move between tabs. `Esc` closes
 ### 3.17 UI shell and shared components
 
 - `+page.svelte`: gradient background and two blurred decorative orbs (`data-bg-orb`, hidden in popup mode).
-- Header, left to right, one line at every width from 320 px: logo (wordmark hidden below 400 px); the account control (3.13); one `role="toolbar"` group styled by `src/lib/components/toolbar.ts` (`toolbarButtonClass(active)`, `TOOLBAR_GROUP`) holding History, Settings, theme toggle (`aria-pressed` in dark mode) and shortcuts `?`. Every button has a `title` equal to its `aria-label`; Arrow Left/Right, Home and End move focus inside the toolbar. The surface toggle lives in Settings (3.2).
+- Header, left to right, one line at every width from 320 px: logo (wordmark hidden below 400 px); the account control (3.13); one `role="toolbar"` group styled by `src/lib/components/toolbar.ts` (`toolbarButtonClass(active)`, `TOOLBAR_GROUP`) holding History, Settings, theme toggle (`aria-pressed` in dark mode) and shortcuts `?`. Every button has a `use:tooltip` equal to its `aria-label` (theme: "Switch to light/dark theme", following the state); the account control's tooltip is "Sign in to sync scans to your account" or "Signed in as <email> - saving scans to <target>". Arrow Left/Right, Home and End move focus inside the toolbar. The surface toggle lives in Settings (3.2).
 - Both header menus anchor to the header's right-hand block (`relative` in `Extension.svelte`). Nothing between that block and a menu may carry `backdrop-blur`, `filter` or `transform`: that element would become the menu's containing block and stacking context, re-anchoring it and painting it under later glass cards (this bit the toolbar group once).
 - Views: `landing` (Grid card "Get Meta Tags"), `loading` (`Skeleton`), `error` (`ErrorState`: "Couldn't scrape this page", Retry, links to docs and GitHub issues), `empty` (`EmptyState`: "No meta tags found", Try again, docs link), `results` (`Tabs` with Tags, Previews, Audit, Site, AI, Compare).
 - `Screen`: glass card wrapper. `Grid`: landing action cards (`GridProps` in `Grid.ts`).
 - Toasts: `toast(message, variant)`; at most 3 visible, 1.5 s each.
+- Tooltips: `use:tooltip={text | { text, placement?, delay? }}` (`src/lib/actions/tooltip.ts`, same API and behaviour as the web app's action). One shared body-level element (`role="tooltip"`, `id="ms-tooltip"`, class `.ms-tooltip` + `.ms-tooltip-arrow` in `src/routes/app.css`, `fixed z-[60]` so it clears the drawer and dropdowns; dark-aware; `invisible` while idle so it stays out of the accessibility tree; no transition under `prefers-reduced-motion`). Shows after `delay` (350 ms) on `pointerenter` (not touch), at once on keyboard focus (`:focus-visible` only, so a mouse click never pops it), hides on `pointerleave`, `blur`, `pointerdown`, `Escape`; `aria-describedby="ms-tooltip"` is on the trigger only while visible, and not at all when the text repeats its `aria-label` (so it is announced once). A newer hover cancels any pending one (the History chip inside its row). Tooltip text wraps (`break-words`), so long URLs stay in the box. floating-ui `computePosition` (`strategy: 'fixed'`, `offset(8)`, `flip()`, `shift({ padding: 8 })`, `arrow`) + `autoUpdate` keep it inside a 320 px side panel. Empty text never shows. Used by: header toolbar, account control, History rows and score chip, Audit ring, Compare URL and scores, `PinButton`, `TagCard` copy, `ExportBar`, Site cards' "Not an http(s) URL" spans (hover-only, so each also carries an `sr-only` " (not an http(s) URL)"), Settings drawer buttons. Controls use the action, never a native `title` (a title beside it doubles up); the one remaining `title` is the truncated href text in `Audit/HreflangSection.svelte`.
 - Scores: `src/lib/audit/band.ts` (`bandFor`, `bandLabel`, `scoreLabel`, `bandClasses`) is the only place a score turns into a band, a label or colour classes; the History chip, the Audit ring, the Compare numbers and the cloud payload's `band` all use it. Placement rule shared with the web app: identity left, score last on the right. Tailwind 3 gotcha: `bg-*/15` compiles to nothing (no 15 in the opacity scale) - use `/20`.
 
 **Gotchas.**
@@ -656,7 +659,7 @@ In the tab strip, Arrow Left/Right, Home and End move between tabs. `Esc` closes
 | `npm run check` | `svelte-check` against `tsconfig.json`. |
 | `npm run build` | `vite build` + `removeInlineScript.cjs`. Does not type-check on its own. |
 
-- Covered by unit tests: `audit/rules.ts`, `audit/asyncRules.ts`, `audit/url-match.ts`,
+- Covered by unit tests: `actions/tooltip.ts` (`tooltip.spec.ts`: options and listener wiring in node with a fake element; `tooltip.dom.spec.ts`: show/hide, owner hand-off, `aria-describedby`, Escape propagation, nested hover, update/destroy in happy-dom with floating-ui mocked), `audit/rules.ts`, `audit/asyncRules.ts`, `audit/url-match.ts`,
   `cloud/scan-identity.ts`, `cloud/settings.ts`, `scrapers/getHTML.ts`, `scrapers/getRobots.ts`,
   `scrapers/getHeaderRobots.ts`, `storage/watch.ts` and its key helper.
 - Manual verification is still required for anything that needs a real browser: `npm run build`, load

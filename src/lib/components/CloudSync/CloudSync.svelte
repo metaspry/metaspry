@@ -10,6 +10,7 @@
   import { initCloudSettingsSync } from "../../cloud/settings";
   import { initCloudPlan, APP_URL } from "../../cloud/plan";
   import { initialsFor } from "../../cloud/initials";
+  import { tooltip } from "../../actions/tooltip";
   import {
     initCloudWorkspaces,
     workspaces,
@@ -97,7 +98,7 @@
       on:click={() => (open = !open)}
       aria-label="Account and sync target"
       aria-expanded={open}
-      title="Signed in as {$cloudUser.email} - saving scans to {targetLabel}"
+      use:tooltip={`Signed in as ${$cloudUser.email} - saving scans to ${targetLabel}`}
       class="flex h-9 max-w-[170px] items-center gap-1.5 rounded-xl border border-slate-200/70 bg-white/70 py-0.5 pl-0.5 pr-2 text-xs font-medium text-slate-700 backdrop-blur-md transition hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
     >
       <span class="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500 text-[10px] font-bold text-white" aria-hidden="true">
@@ -112,7 +113,7 @@
       type="button"
       on:click={() => (open = !open)}
       aria-expanded={open}
-      title="Sign in to sync scans to your account"
+      use:tooltip={"Sign in to sync scans to your account"}
       class="flex h-9 shrink-0 items-center rounded-xl bg-indigo-600 px-3 text-xs font-semibold text-white shadow-sm shadow-indigo-500/30 transition hover:bg-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-1"
     >Sign in</button>
   {/if}
