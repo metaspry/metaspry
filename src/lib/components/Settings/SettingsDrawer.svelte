@@ -1,6 +1,6 @@
 <script lang="ts">
   import { fly, fade } from 'svelte/transition';
-  import { createEventDispatcher, tick } from 'svelte';
+  import { createEventDispatcher, onDestroy, tick } from 'svelte';
   import {
     settings,
     updateSettings,
@@ -49,6 +49,9 @@
   let draft: Settings = clone(DEFAULT_SETTINGS);
   let baseline: Settings = clone(DEFAULT_SETTINGS);
   let drawerEl: HTMLElement | null = null;
+  let resetBtn: HTMLButtonElement | null = null;
+  let confirmBtn: HTMLButtonElement | null = null;
+  let confirmGroup: HTMLElement | null = null;
   let opener: Element | null = null;
   let wasOpen = false;
   let resetArmed = false;
@@ -76,17 +79,25 @@
     draft = clone($settings);
   }
 
+  // The reset on open happens HERE, inside the reactive statement, so the compiler orders it
+  // before `dirty` and `problems`. Done inside a helper function those assignments were invisible
+  // to it: a reopen after a dirty close showed a stale "Unsaved changes" chip, an enabled Save on
+  // an unchanged form, and old validation errors on fields that were now valid.
   $: if (open !== wasOpen) {
     wasOpen = open;
-    if (open) void onOpen();
-    else onClose();
+    if (open) {
+      opener = document.activeElement;
+      baseline = clone($settings);
+      draft = clone($settings);
+      disarmReset();
+      void focusIn();
+    } else {
+      onClose();
+    }
   }
 
-  async function onOpen() {
-    opener = document.activeElement;
-    baseline = clone($settings);
-    draft = clone($settings);
-    disarmReset();
+  // The first input (Pro) or, when there is none, the first control (the close button).
+  async function focusIn() {
     await tick();
     (drawerEl?.querySelector<HTMLElement>('input') ?? focusables()[0])?.focus();
   }
@@ -96,6 +107,8 @@
     if (opener instanceof HTMLElement) opener.focus();
     opener = null;
   }
+
+  onDestroy(() => disarmReset());
 
   function close() {
     dispatch('close');
@@ -154,22 +167,32 @@
     if (!canSave) return;
     try {
       const next = clone(draft);
-      baseline = next;
       updateSettings(next);
+      // Only after the write: a throw must leave the form dirty, not "saved".
+      baseline = next;
       toast('Scoring rules saved', 'success');
     } catch {
       toast('Could not save', 'error');
     }
   }
 
-  function armReset() {
+  // Arming swaps the Reset button for "Reset? Yes, reset / Cancel", so focus follows the swap
+  // instead of falling to <body> (a keyboard or screen-reader user would otherwise lose their
+  // place, and "Reset?" would never be announced).
+  async function armReset() {
     resetArmed = true;
-    resetTimer = setTimeout(() => (resetArmed = false), RESET_ARM_MS);
+    resetTimer = setTimeout(() => disarmReset(true), RESET_ARM_MS);
+    await tick();
+    confirmBtn?.focus();
   }
-  function disarmReset() {
+  function disarmReset(refocus = false) {
+    const hadFocus = !!confirmGroup?.contains(document.activeElement);
     if (resetTimer) clearTimeout(resetTimer);
     resetTimer = null;
     resetArmed = false;
+    // Only take focus back when it was on the confirm controls; the timeout must not steal it from
+    // an input the user moved on to.
+    if (refocus && hadFocus) void tick().then(() => resetBtn?.focus());
   }
   function confirmReset() {
     disarmReset();
@@ -177,6 +200,8 @@
     draft = clone(DEFAULT_SETTINGS);
     resetSettings();
     toast('Scoring rules reset to defaults', 'success');
+    // Reset is now disabled (defaults, untouched), so focus goes to the first input instead.
+    void focusIn();
   }
 
   const inputClass =
@@ -247,6 +272,7 @@
                   step="1"
                   aria-label="{row.label} min"
                   aria-invalid={minProblem ? 'true' : undefined}
+                  aria-describedby={minProblem ? `settings-problem-${row.min}` : undefined}
                   value={Number.isNaN(draft[row.min]) ? '' : draft[row.min]}
                   on:input={(e) => setLength(row.min, e)}
                   class="{inputClass} {minProblem ? inputBad : inputOk}"
@@ -262,14 +288,18 @@
                   step="1"
                   aria-label="{row.label} max"
                   aria-invalid={maxProblem ? 'true' : undefined}
+                  aria-describedby={maxProblem ? `settings-problem-${row.max}` : undefined}
                   value={Number.isNaN(draft[row.max]) ? '' : draft[row.max]}
                   on:input={(e) => setLength(row.max, e)}
                   class="{inputClass} {maxProblem ? inputBad : inputOk}"
                 />
               </label>
             </div>
-            {#if minProblem || maxProblem}
-              <p class="text-xs text-rose-600 dark:text-rose-300" role="alert">{minProblem ?? maxProblem}</p>
+            {#if minProblem}
+              <p id="settings-problem-{row.min}" class="text-xs text-rose-600 dark:text-rose-300" role="alert">{minProblem}</p>
+            {/if}
+            {#if maxProblem}
+              <p id="settings-problem-{row.max}" class="text-xs text-rose-600 dark:text-rose-300" role="alert">{maxProblem}</p>
             {/if}
           </div>
         {/each}
@@ -290,6 +320,7 @@
                 min="0"
                 step="1"
                 aria-invalid={weightProblem ? 'true' : undefined}
+                aria-describedby={weightProblem ? 'settings-problem-weights' : undefined}
                 value={Number.isNaN(draft.weights[w.key]) ? '' : draft.weights[w.key]}
                 on:input={(e) => setWeight(w.key, e)}
                 class="{inputClass} {weightProblem ? inputBad : inputOk}"
@@ -298,7 +329,7 @@
           {/each}
         </div>
         {#if weightProblem}
-          <p class="text-xs text-rose-600 dark:text-rose-300" role="alert">{weightProblem}</p>
+          <p id="settings-problem-weights" class="text-xs text-rose-600 dark:text-rose-300" role="alert">{weightProblem}</p>
         {/if}
       </fieldset>
 
@@ -310,21 +341,23 @@
           class="rounded-full bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 disabled:cursor-not-allowed disabled:opacity-50"
         >Save</button>
         {#if resetArmed}
-          <span class="inline-flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-200" role="group" aria-label="Confirm reset">
+          <span bind:this={confirmGroup} class="inline-flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-200" role="group" aria-label="Confirm reset">
             Reset?
             <button
+              bind:this={confirmBtn}
               type="button"
               on:click={confirmReset}
               class="rounded-full bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-rose-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/40"
             >Yes, reset</button>
             <button
               type="button"
-              on:click={disarmReset}
-              class="rounded-full px-2 py-1.5 text-xs font-medium text-slate-600 hover:underline dark:text-slate-300"
+              on:click={() => disarmReset(true)}
+              class="rounded-full px-2 py-1.5 text-xs font-medium text-slate-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 dark:text-slate-300"
             >Cancel</button>
           </span>
         {:else}
           <button
+            bind:this={resetBtn}
             type="button"
             on:click={armReset}
             disabled={isDefault && !dirty}
