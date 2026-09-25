@@ -5,6 +5,11 @@
  */
 
 /**
+ * Forced colors (R-26): the ring is a box-shadow, which Windows contrast themes drop. `focus:outline-none`
+ * is Tailwind 3's `outline: 2px solid transparent; outline-offset: 2px`, which forced colors repaints
+ * in a system colour, and `app.css` makes it explicit (`outline: 2px solid Highlight` on
+ * `:focus-visible` under `@media (forced-colors: active)`). Never swap it for `outline: none`.
+ *
  * `:focus-visible` ring for standalone controls: solid indigo-600 (indigo-300 in dark), 2 px, with a
  * transparent 2 px offset so it reads as a 4 px ring flush to the control on any surface. Both
  * measure well over the 3:1 WCAG 2.4.13 minimum (the old `ring-indigo-500/40` blended to ~1.7:1).

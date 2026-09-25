@@ -7,6 +7,7 @@
   import { initSettings } from "../lib/storage/settings";
   import { initPinned } from "../lib/storage/pinned";
   import { initHistory } from "../lib/storage/history";
+  import { initShortcutsPref } from "../lib/storage/shortcuts";
   import ToastHost from "../lib/components/Toast/ToastHost.svelte";
   import ShortcutsHelp from "../lib/components/Shortcuts/ShortcutsHelp.svelte";
   import { attachShortcuts } from "../lib/components/Shortcuts/keyboard";
@@ -19,6 +20,7 @@
     initSettings();
     initPinned();
     initHistory();
+    initShortcutsPref();
     detach = attachShortcuts();
   });
 

@@ -136,7 +136,8 @@
       required
       placeholder="example.com"
       bind:value={url}
-      class="flex-1 rounded-full border border-white/40 bg-white/40 px-4 py-2 text-sm text-slate-900 placeholder:text-slate-500 backdrop-blur-md focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/40 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:placeholder:text-slate-500"
+      aria-label="URL to compare"
+      class="flex-1 rounded-full border border-slate-500 bg-white/60 px-4 py-2 text-sm text-slate-900 placeholder:text-muted backdrop-blur-md focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-400/40 dark:border-white/40 dark:bg-white/5 dark:text-slate-100 dark:placeholder:text-muted-dark dark:focus:border-indigo-300"
     />
     <button
       type="submit"

@@ -12,6 +12,7 @@
   import { validateSettings, type SettingsField } from '../../storage/validate-settings';
   import { cloudIsPro, APP_URL } from '../../cloud/plan';
   import { mode, switchMode, type Mode } from '../../mode';
+  import { shortcutsEnabled, setShortcutsEnabled } from '../../storage/shortcuts';
   import { toast } from '../Toast/toast';
   import { tooltip } from '../../actions/tooltip';
   import { cycleTab, focusables } from '../../actions/popover';
@@ -195,9 +196,11 @@
 
   const inputClass =
     'w-full rounded-lg border bg-white px-2.5 py-1.5 text-sm tabular-nums text-slate-900 shadow-sm outline-none transition focus:ring-2 dark:bg-slate-800 dark:text-slate-100';
-  const inputOk = 'border-slate-300 focus:border-indigo-500 focus:ring-indigo-500/30 dark:border-slate-600';
+  // R-30: slate-500 edge 4.76:1 on white, slate-400 5.71:1 on slate-800 (slate-300 was 1.48:1).
+  const inputOk = 'border-slate-500 focus:border-indigo-600 focus:ring-indigo-500/30 dark:border-slate-400';
   const inputBad = 'border-rose-500 focus:border-rose-500 focus:ring-rose-500/30';
-  const linkClass = `rounded hover:text-indigo-600 hover:underline dark:hover:text-indigo-300 ${FOCUS_RING}`;
+  // >= 24 px tall with 8 px between targets (WCAG 2.5.8, R-48); they were 16.5 px, 13-15 px apart.
+  const linkClass = `inline-flex h-6 items-center rounded px-1 hover:text-indigo-600 hover:underline dark:hover:text-indigo-300 ${FOCUS_RING}`;
 </script>
 
 <svelte:window on:keydown={onKey} />
@@ -250,6 +253,21 @@
           </label>
         {/each}
       </div>
+      <!-- WCAG 2.1.4: single-character shortcuts can be turned off. Off leaves ? and Esc. -->
+      <label class="mt-1 flex cursor-pointer items-start gap-2.5 rounded-lg border border-slate-300 px-3 py-2 transition hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-800">
+        <input
+          type="checkbox"
+          role="switch"
+          checked={$shortcutsEnabled}
+          on:change={(e) => setShortcutsEnabled(e.currentTarget.checked)}
+          aria-describedby="shortcuts-pref-hint"
+          class="mt-0.5 h-4 w-4 shrink-0 accent-indigo-600 {FOCUS_RING}"
+        />
+        <span class="flex flex-col gap-0.5">
+          <span class="text-xs font-semibold text-slate-800 dark:text-slate-100">Single-key shortcuts</span>
+          <span id="shortcuts-pref-hint" class="ms-muted text-[11px] leading-snug">/ search, r rescan, 1-6 tabs. Off: only ? and Esc work.</span>
+        </span>
+      </label>
     </fieldset>
 
     {#if $cloudIsPro}
@@ -404,7 +422,7 @@
 
     <footer class="mt-auto flex flex-col gap-1.5 border-t border-slate-200 pt-3 text-[11px] text-slate-500 dark:border-slate-800 dark:text-slate-400">
       <span>Metaspry v{version}</span>
-      <nav aria-label="About Metaspry" class="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+      <nav aria-label="About Metaspry" class="flex flex-wrap items-center gap-x-2 gap-y-2">
         {#each ABOUT_LINKS as link, i (link.href)}
           {#if i > 0}<span aria-hidden="true">·</span>{/if}
           <a href={link.href} target="_blank" rel="noopener noreferrer" class={linkClass}>{link.label}</a>

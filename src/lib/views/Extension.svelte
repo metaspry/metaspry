@@ -277,7 +277,7 @@
     registerShortcuts({
       focusSearch,
       selectTab: selectTabByIndex,
-      rescrape: () => void scrape(),
+      rescan: () => void scrape(),
     });
   });
 </script>
