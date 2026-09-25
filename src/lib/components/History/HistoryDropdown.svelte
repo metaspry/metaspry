@@ -95,7 +95,7 @@
       role="dialog"
       aria-labelledby={TITLE_ID}
       tabindex="-1"
-      class="absolute right-0 top-10 z-30 w-64 max-w-[calc(100vw-2.5rem)] overflow-hidden rounded-2xl border border-white/40 bg-white shadow-xl backdrop-blur-xl focus:outline-none dark:border-white/10 dark:bg-popover"
+      class="absolute right-0 top-10 z-30 w-64 max-w-[calc(100vw-2.5rem)] overflow-hidden rounded-2xl border border-white/40 bg-white shadow-xl focus:outline-none dark:border-white/10 dark:bg-popover"
     >
       <header class="flex items-center justify-between border-b border-white/40 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:border-white/10 dark:text-slate-400">
         <span id={TITLE_ID}>Recent scrapes</span>

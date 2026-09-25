@@ -59,10 +59,17 @@ export function cycleTab(event: KeyboardEvent, root: HTMLElement): boolean {
   return false;
 }
 
+/**
+ * The element focused when the panel mounts, or null when nothing is (focus on `<body>` / `<html>`,
+ * e.g. the `?` key pressed on a fresh popup). `<body>` must never become the trigger: it is in every
+ * `composedPath()`, so no press would ever count as "outside".
+ */
 function activeElement(): HTMLElement | null {
-  const el = typeof document === 'undefined' ? null : document.activeElement;
+  if (typeof document === 'undefined') return null;
+  const el = document.activeElement;
+  if (!el || el === document.body || el === document.documentElement) return null;
   // Duck-typed rather than `instanceof HTMLElement`: the node test environment has no DOM globals.
-  return el && typeof (el as HTMLElement).focus === 'function' ? (el as HTMLElement) : null;
+  return typeof (el as HTMLElement).focus === 'function' ? (el as HTMLElement) : null;
 }
 
 export function popover(node: HTMLElement, opts: PopoverOptions) {

@@ -143,6 +143,18 @@ describe('popover action', () => {
     expect(doc.activeElement).toBe(opener);
   });
 
+  it('never adopts <body> as the trigger: opened with nothing focused, an outside press still closes', () => {
+    doc.activeElement = doc.body;
+    const panel = el('panel', [el('first')]);
+    const onClose = vi.fn();
+    const action = popover(asEl(panel), { onClose });
+    fire('pointerdown', press(el('elsewhere'), doc.body));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    const bodyFocus = vi.spyOn(doc.body, 'focus');
+    action.destroy();
+    expect(bodyFocus).not.toHaveBeenCalled();
+  });
+
   it('update() swaps the trigger: the new one is not "outside" and gets focus back', () => {
     const { action, onClose } = mount();
     const next = el('next-trigger');

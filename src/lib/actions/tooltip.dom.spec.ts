@@ -218,8 +218,10 @@ describe('tooltip action (DOM)', () => {
     hover(el);
     leave(el);
     hover(b);
-    await vi.advanceTimersByTimeAsync(1000);
+    // Past the grace, before a fresh 350 ms delay could have re-shown it: it must never have hidden.
+    await vi.advanceTimersByTimeAsync(HIDE_GRACE_MS + 1);
     expect(el.hasAttribute('data-show')).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
     expect(el.textContent).toBe('Settings');
   });
 

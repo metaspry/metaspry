@@ -80,11 +80,25 @@ describe('popover action (DOM)', () => {
     expect(document.activeElement).toBe(other);
   });
 
-  it('cycleTab skips disabled controls and tabindex=-1', () => {
-    const root = panelWith('<button id="a">A</button><button disabled>D</button><div tabindex="-1">x</div><a id="z" href="#">Z</a>');
+  it('cycleTab skips disabled controls and tabindex=-1 at either end of the list', () => {
+    const root = panelWith('<div tabindex="-1">x</div><button id="a">A</button><a id="z" href="#">Z</a><button disabled id="d">D</button>');
     (root.querySelector('#z') as HTMLElement).focus();
     const tab = new KeyboardEvent('keydown', { key: 'Tab', cancelable: true });
     expect(cycleTab(tab, root)).toBe(true);
     expect(document.activeElement?.id).toBe('a');
+    const back = new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, cancelable: true });
+    expect(cycleTab(back, root)).toBe(true);
+    expect(document.activeElement?.id).toBe('z');
+  });
+
+  it('opened from <body> (the ? key on a fresh popup), a press on the overlay still closes', () => {
+    (document.activeElement as HTMLElement | null)?.blur?.();
+    const overlay = document.createElement('div');
+    document.body.appendChild(overlay);
+    const panel = panelWith('<button id="a">A</button>');
+    const onClose = vi.fn();
+    popover(panel, { onClose });
+    overlay.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

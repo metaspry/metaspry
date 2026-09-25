@@ -134,7 +134,7 @@
       use:popover={{ trigger, onClose: close, initialFocus: 'input[type="email"]' }}
       role="dialog"
       aria-label={$cloudUser ? "Account and sync target" : "Sign in"}
-      class="absolute right-0 z-50 mt-2 flex w-64 max-w-[calc(100vw-2.5rem)] flex-col gap-2 rounded-xl border border-white/40 bg-white p-3 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-popover"
+      class="absolute right-0 z-50 mt-2 flex w-64 max-w-[calc(100vw-2.5rem)] flex-col gap-2 rounded-xl border border-white/40 bg-white p-3 shadow-2xl dark:border-white/10 dark:bg-popover"
     >
       {#if $cloudUser}
         <div class="flex items-center gap-2">
