@@ -42,6 +42,12 @@ describe('normalizeAuditSettings', () => {
     expect(s.weights.recommended).toBe(DEFAULT_SETTINGS.weights.recommended);
   });
 
+  it('falls back to the default weights when all three are zero, like the app', () => {
+    expect(normalizeAuditSettings({ weights: { required: 0, recommended: 0, 'best-practice': 0 } }).weights).toEqual(
+      DEFAULT_SETTINGS.weights,
+    );
+  });
+
   it('is the defaults for a missing document', () => {
     expect(normalizeAuditSettings(undefined)).toEqual(DEFAULT_SETTINGS);
   });

@@ -15,7 +15,8 @@
   <div class="flex gap-3 bg-[#2b2d31] p-3">
     <div class="w-1 flex-shrink-0 rounded bg-indigo-500" />
     <div class="min-w-0 flex-1 space-y-1">
-      <p class="text-[11px] ms-muted">{host}</p>
+      <!-- Fixed dark mock surface in both themes: the raw light grey, not the theme-aware muted token. -->
+      <p class="text-[11px] text-slate-400">{host}</p>
       <p class="line-clamp-1 text-sm font-semibold text-indigo-300">{title}</p>
       <p class="line-clamp-3 text-xs text-slate-300">{description}</p>
       {#if image}

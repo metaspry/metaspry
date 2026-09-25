@@ -117,6 +117,9 @@
   const LINK_CLASS = `inline-flex h-6 items-center rounded px-1 font-medium text-indigo-600 hover:underline dark:text-indigo-300 ${FOCUS_RING}`;
 
   $: isPersonal = $syncScope.kind === "personal";
+  // Roving tabindex needs one item at 0: a stored workspace missing from the list (fetch failed,
+  // not loaded yet) checks nothing, so Personal history takes the Tab stop instead.
+  $: noneChecked = !isPersonal && !$workspaces.some((w) => $syncScope.kind === "workspace" && $syncScope.wsId === w.id);
   $: targetLabel = $syncScope.kind === "workspace" ? $syncScope.name : "Personal";
   $: initials = initialsFor($cloudUser?.email);
 </script>
@@ -191,7 +194,7 @@
             type="button"
             role="menuitemradio"
             aria-checked={isPersonal}
-            tabindex={isPersonal ? 0 : -1}
+            tabindex={isPersonal || noneChecked ? 0 : -1}
             on:click={pickPersonal}
             class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm transition hover:bg-white/70 dark:hover:bg-white/10 {FOCUS_RING} {isPersonal
               ? 'bg-white/70 dark:bg-white/10'

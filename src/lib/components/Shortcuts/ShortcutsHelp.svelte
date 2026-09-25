@@ -47,8 +47,8 @@
       {/if}
       <ul class="flex flex-col gap-1.5">
         {#each rows as r}
-          <li class="flex items-center justify-between gap-3 rounded-xl border border-white/40 bg-white/40 px-3 py-1.5 text-xs dark:border-white/10 dark:bg-white/5 {r.single && !$shortcutsEnabled ? 'opacity-60' : ''}">
-            <span class="text-slate-700 dark:text-slate-300">{r.label}</span>
+          <li class="flex items-center justify-between gap-3 rounded-xl border border-white/40 bg-white/40 px-3 py-1.5 text-xs dark:border-white/10 dark:bg-white/5">
+            <span class="text-slate-700 dark:text-slate-300">{r.label}{#if r.single && !$shortcutsEnabled}<span class="ms-muted"> (off)</span>{/if}</span>
             <kbd class="rounded bg-slate-900 px-2 py-0.5 font-mono text-[10px] font-semibold text-white dark:bg-slate-50 dark:text-slate-900">{r.key}</kbd>
           </li>
         {/each}
