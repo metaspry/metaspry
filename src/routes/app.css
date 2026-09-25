@@ -2,6 +2,30 @@
 @tailwind components;
 @tailwind utilities;
 
+/* The one muted-text token (tailwind.config.js `muted`). In the components layer so a utility
+ * (hover:, a state colour) on the same element still wins. */
+@layer components {
+  .ms-muted {
+    @apply text-muted dark:text-muted-dark;
+  }
+}
+
+/* Forced colors (Windows contrast themes) drop box-shadow, so every Tailwind `ring` focus style
+ * vanishes there. Tailwind 3's `outline-none` is already `2px solid transparent`, which forced
+ * colors repaints; this rule makes the outline explicit (Highlight, 2px, offset) for every
+ * keyboard-focused control, including the Settings Surface radios whose real input is sr-only
+ * (their label draws the focus). */
+@media (forced-colors: active) {
+  :focus-visible {
+    outline: 2px solid Highlight !important;
+    outline-offset: 2px;
+  }
+  label:has(> input.sr-only:focus-visible) {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+}
+
 html,
 body {
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;

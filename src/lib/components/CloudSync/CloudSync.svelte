@@ -10,6 +10,7 @@
   import { initCloudSettingsSync } from "../../cloud/settings";
   import { initCloudPlan, APP_URL } from "../../cloud/plan";
   import { initialsFor } from "../../cloud/initials";
+  import { signInErrorMessage, googleSignInErrorMessage } from "../../cloud/auth-errors";
   import { tooltip } from "../../actions/tooltip";
   import { popover } from "../../actions/popover";
   import { FOCUS_RING } from "../toolbar";
@@ -42,8 +43,9 @@
     try {
       await cloudSignIn(email.trim(), password);
       password = "";
-    } catch {
-      error = "Sign-in failed. Use the same email and password as the web app.";
+    } catch (e) {
+      // Mapped to a plain sentence: never the raw Firebase code (AGENTS 3.13).
+      error = signInErrorMessage(e);
     } finally {
       busy = false;
     }
@@ -56,7 +58,7 @@
     try {
       await cloudSignInWithGoogle();
     } catch (e) {
-      error = e instanceof Error ? e.message : "Google sign-in failed or was cancelled.";
+      error = googleSignInErrorMessage(e);
       if (import.meta.env.DEV) console.error("[metaspry] google sign-in", e);
     } finally {
       busy = false;
@@ -90,6 +92,28 @@
     chrome.tabs.create({ url: `${APP_URL}/dashboard`, active: true });
   }
 
+  // The sync-target list is a `role="menu"` of `menuitemradio`s: arrow keys, Home and End move
+  // between them, and only the checked one sits in the Tab order (roving tabindex).
+  function onTargetKey(event: KeyboardEvent) {
+    const keys = ["ArrowDown", "ArrowUp", "Home", "End"];
+    if (!keys.includes(event.key)) return;
+    const items = Array.from((event.currentTarget as HTMLElement).querySelectorAll<HTMLElement>('[role="menuitemradio"]'));
+    if (items.length === 0) return;
+    const index = items.indexOf(document.activeElement as HTMLElement);
+    event.preventDefault();
+    const last = items.length - 1;
+    const next =
+      event.key === "Home" ? 0 : event.key === "End" ? last : event.key === "ArrowDown" ? (index >= last ? 0 : index + 1) : index <= 0 ? last : index - 1;
+    items[next]?.focus();
+  }
+
+  // R-30: a >= 3:1 edge (slate-500 4.76:1 on white, white/40 3.53:1 on the popover tint) and the
+  // muted placeholder (>= 4.5:1). The forced-colors focus outline comes from app.css (R-26).
+  const FIELD_CLASS =
+    "w-full rounded-lg border border-slate-500 bg-white px-2.5 py-1.5 text-sm font-normal text-slate-900 placeholder:text-muted focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:border-white/40 dark:bg-white/5 dark:text-slate-100 dark:placeholder:text-muted-dark dark:focus:border-indigo-300";
+  // >= 24 px tall (WCAG 2.5.8), like the Settings footer links.
+  const LINK_CLASS = `inline-flex h-6 items-center rounded px-1 font-medium text-indigo-600 hover:underline dark:text-indigo-300 ${FOCUS_RING}`;
+
   $: isPersonal = $syncScope.kind === "personal";
   $: targetLabel = $syncScope.kind === "workspace" ? $syncScope.name : "Personal";
   $: initials = initialsFor($cloudUser?.email);
@@ -114,7 +138,7 @@
         <span class="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500 dark:border-slate-900"></span>
       </span>
       <span class="hidden min-w-0 truncate min-[460px]:inline">{targetLabel}</span>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-3 w-3 shrink-0 text-slate-400" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ms-muted h-3 w-3 shrink-0" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
     </button>
   {:else}
     <button
@@ -141,7 +165,7 @@
           <span class="h-2 w-2 shrink-0 rounded-full bg-emerald-500" aria-hidden="true"></span>
           <div class="min-w-0">
             <p class="text-sm font-medium text-slate-800 dark:text-slate-100">Synced</p>
-            <p class="truncate text-xs text-slate-500 dark:text-slate-400">{$cloudUser.email}</p>
+            <p class="ms-muted truncate text-xs">{$cloudUser.email}</p>
           </div>
         </div>
 
@@ -156,13 +180,16 @@
           <span class="min-w-0 flex-1 truncate">Open Metaspry web app</span>
         </button>
 
-        <p class="mt-1 px-0.5 text-[10px] font-semibold tracking-wider text-slate-400 uppercase dark:text-slate-500">
+        <p id="sync-target-label" class="ms-muted mt-1 px-0.5 text-[10px] font-semibold tracking-wider uppercase">
           Save new scans to
         </p>
         <!-- Scrolls past ~6 workspaces instead of pushing Sign out below the fold. -->
-        <div class="flex max-h-56 flex-col gap-0.5 overflow-y-auto">
+        <div role="menu" aria-labelledby="sync-target-label" tabindex="-1" on:keydown={onTargetKey} class="flex max-h-56 flex-col gap-0.5 overflow-y-auto focus:outline-none">
           <button
             type="button"
+            role="menuitemradio"
+            aria-checked={isPersonal}
+            tabindex={isPersonal ? 0 : -1}
             on:click={pickPersonal}
             class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm transition hover:bg-white/70 dark:hover:bg-white/10 {FOCUS_RING} {isPersonal
               ? 'bg-white/70 dark:bg-white/10'
@@ -176,17 +203,20 @@
           </button>
 
           {#each $workspaces as w (w.id)}
+            {@const checked = $syncScope.kind === "workspace" && $syncScope.wsId === w.id}
             <button
               type="button"
+              role="menuitemradio"
+              aria-checked={checked}
+              tabindex={checked ? 0 : -1}
               on:click={() => pickWorkspace(w)}
-              class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm transition hover:bg-white/70 dark:hover:bg-white/10 {FOCUS_RING} {$syncScope.kind ===
-                'workspace' && $syncScope.wsId === w.id
+              class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm transition hover:bg-white/70 dark:hover:bg-white/10 {FOCUS_RING} {checked
                 ? 'bg-white/70 dark:bg-white/10'
                 : ''}"
             >
               <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[11px] font-bold text-white" style="background: linear-gradient(135deg,#6a55e0,#9b8bff)">{(w.name[0] ?? "W").toUpperCase()}</span>
               <span class="min-w-0 flex-1 truncate text-slate-800 dark:text-slate-100">{w.name}</span>
-              {#if $syncScope.kind === "workspace" && $syncScope.wsId === w.id}<span class="text-indigo-500" aria-hidden="true">✓</span>{/if}
+              {#if checked}<span class="text-indigo-500" aria-hidden="true">✓</span>{/if}
             </button>
           {/each}
         </div>
@@ -207,37 +237,50 @@
             aria-label="Close"
             use:tooltip={"Close (Esc)"}
             on:click={close}
-            class="-mr-1 -mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-white/70 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-slate-50 {FOCUS_RING}"
+            class="-mr-1 -mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ms-muted transition hover:bg-white/70 hover:text-slate-900 dark:hover:bg-white/10 dark:hover:text-slate-50 {FOCUS_RING}"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
           </button>
         </div>
-        <p class="text-xs text-slate-500 dark:text-slate-400">
+        <p class="ms-muted text-xs">
           Sign in to save every scan to your history at app.metaspry.com.
         </p>
-        <input
-          type="email"
-          bind:value={email}
-          placeholder="you@company.com"
-          class="w-full rounded-lg border border-white/40 bg-white/60 px-2.5 py-1.5 text-sm text-slate-900 dark:border-white/10 dark:bg-slate-800/60 dark:text-slate-100"
-        />
-        <input
-          type="password"
-          bind:value={password}
-          placeholder="Password"
-          class="w-full rounded-lg border border-white/40 bg-white/60 px-2.5 py-1.5 text-sm text-slate-900 dark:border-white/10 dark:bg-slate-800/60 dark:text-slate-100"
-          on:keydown={(e) => e.key === "Enter" && submit()}
-        />
-        {#if error}
-          <p class="text-xs text-rose-500">{error}</p>
-        {/if}
-        <button
-          type="button"
-          on:click={submit}
-          disabled={busy || !email.trim() || !password}
-          class="rounded-full bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-500 disabled:opacity-60 {FOCUS_RING}"
-          >{busy ? "Signing in…" : "Sign in"}</button
-        >
+        <!-- A real form: labels, names and autocomplete let password managers fill it, and Enter in
+             either field submits. -->
+        <form class="flex flex-col gap-2" on:submit|preventDefault={submit}>
+          <label class="flex flex-col gap-1 text-xs font-medium text-slate-700 dark:text-slate-200">
+            Email
+            <input
+              type="email"
+              name="email"
+              autocomplete="email"
+              required
+              bind:value={email}
+              placeholder="you@company.com"
+              class={FIELD_CLASS}
+            />
+          </label>
+          <label class="flex flex-col gap-1 text-xs font-medium text-slate-700 dark:text-slate-200">
+            Password
+            <input
+              type="password"
+              name="password"
+              autocomplete="current-password"
+              required
+              bind:value={password}
+              class={FIELD_CLASS}
+            />
+          </label>
+          {#if error}
+            <p class="text-xs text-rose-600 dark:text-rose-300" role="alert">{error}</p>
+          {/if}
+          <button
+            type="submit"
+            disabled={busy || !email.trim() || !password}
+            class="rounded-full bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-500 disabled:opacity-60 {FOCUS_RING}"
+            >{busy ? "Signing in…" : "Sign in"}</button
+          >
+        </form>
         <button
           type="button"
           on:click={google}
@@ -245,7 +288,19 @@
           class="rounded-full border border-white/40 bg-white/60 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-white/80 disabled:opacity-60 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 {FOCUS_RING}"
           >Continue with Google</button
         >
-        <p class="text-[11px] text-slate-400 dark:text-slate-500">Same login as the web app.</p>
+        <p class="ms-muted text-[11px]">Same login as the web app.</p>
+        <!-- First run: the extension has no sign-up of its own, so both links open the web app's real
+             routes: `/signup`, and `/login`, whose "Forgot password?" sends the reset email. -->
+        <div class="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-xs">
+          <a href={`${APP_URL}/signup`} target="_blank" rel="noopener noreferrer" class={LINK_CLASS}>Create an account</a>
+          <a
+            href={`${APP_URL}/login`}
+            target="_blank"
+            rel="noopener noreferrer"
+            use:tooltip={"Reset it from the web app's sign-in page (opens a new tab)"}
+            class={LINK_CLASS}>Forgot password?</a
+          >
+        </div>
       {/if}
     </div>
   {/if}

@@ -17,6 +17,7 @@
   import AeoView from "../components/Aeo/AeoView.svelte";
 
   import { getHTML, unscriptableMessage } from "../scrapers/getHTML";
+  import { describeScanError } from "../scrapers/scan-error";
   import { scanUrlFor } from "../cloud/scan-identity";
   import { getMetaTags } from "../scrapers/getMetaTags";
   import { resolveIcon } from "../scrapers/icon";
@@ -47,7 +48,12 @@
   let pageMeta: PageMeta | null = null;
   let pageHtml: HTMLElement | null = null;
   let auditResult: AuditResult | null = null;
-  let errorMessage = "";
+  // The error card's plain reason and the raw text behind its "Details" (R-37).
+  let errorReason = "";
+  let errorDetail: string | null = null;
+  // Screen-reader announcement of a failed scan (the assertive region below, R-34). Cleared when a
+  // scan starts so the same failure twice is announced twice.
+  let announcement = "";
   let activeTab: ActiveTab = "tags";
   let pageUrl = "";
   /** What the browser shows as this page's favicon (declared link -> tab icon -> /favicon.ico). */
@@ -98,14 +104,15 @@
     if (view === "loading") return;
     const id = ++scrapeId;
     view = "loading";
-    errorMessage = "";
+    errorReason = "";
+    errorDetail = null;
+    announcement = "";
     cloudScan = null;
     try {
       const { html, url: tabUrl, reason, favIconUrl } = await getHTML();
       if (id !== scrapeId) return;
       if (!html) {
-        view = "error";
-        errorMessage = unscriptableMessage(tabUrl, reason);
+        fail(unscriptableMessage(tabUrl, reason), tabUrl ? `Page: ${tabUrl}` : null);
         return;
       }
       const meta = getMetaTags(html, tabUrl);
@@ -158,9 +165,16 @@
       }
     } catch (error) {
       if (id !== scrapeId) return;
-      view = "error";
-      errorMessage = error instanceof Error ? error.message : String(error);
+      const described = describeScanError(error);
+      fail(described.reason, described.detail);
     }
+  }
+
+  function fail(reason: string, detail: string | null) {
+    errorReason = reason;
+    errorDetail = detail;
+    view = "error";
+    announcement = `Couldn't scan this page. ${reason}`;
   }
 
   function retry() {
@@ -180,6 +194,10 @@
       onClick: () => void scrape(),
     },
   ];
+
+  // R-35: the document title names the view, so a screen reader and the tab strip say where you are.
+  $: activeTabLabel = tabs.find((t) => t.id === activeTab)?.label ?? "";
+  $: documentTitle = view === "results" && activeTabLabel ? `Metaspry - ${activeTabLabel}` : "Metaspry";
 
   function isActiveTab(v: string): v is ActiveTab {
     return (
@@ -264,13 +282,22 @@
   });
 </script>
 
+<svelte:head>
+  <title>{documentTitle}</title>
+</svelte:head>
+
+<!-- Assertive: a failed scan replaces the button that started it, so it is announced here as well as
+     by moving focus to the error heading (R-34). -->
+<div class="sr-only" aria-live="assertive" aria-atomic="true">{announcement}</div>
+
 <div class="flex h-full w-full flex-col p-3">
   <Screen>
     <header class="flex items-center justify-between gap-2">
-      <div class="flex min-w-0 items-center gap-2">
-        <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500 text-xs font-bold text-white shadow-md shadow-indigo-500/30">M</span>
-        <span class="hidden shrink-0 text-base font-semibold tracking-tight text-slate-900 min-[400px]:inline dark:text-slate-50">Metaspry</span>
-      </div>
+      <!-- The page's one h1 is the wordmark: visible from 400 px, screen-reader only below (R-35). -->
+      <h1 class="flex min-w-0 items-center gap-2">
+        <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500 text-xs font-bold text-white shadow-md shadow-indigo-500/30" aria-hidden="true">M</span>
+        <span class="sr-only shrink-0 text-base font-semibold tracking-tight text-slate-900 min-[400px]:not-sr-only dark:text-slate-50">Metaspry</span>
+      </h1>
 
       <!-- One line at every width from 320 px: the account control, then one grouped toolbar.
            `relative` here, not on the dropdown components: their menus anchor to this block's
@@ -297,10 +324,13 @@
             </svg>
           </button>
 
+          <!-- One state model (R-36): a fixed name, "Dark theme", and aria-pressed = dark is on. The
+               old name flipped with the state AND carried aria-pressed ("Switch to light theme,
+               pressed"). -->
           <button
             type="button"
-            aria-label={$theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
-            use:tooltip={$theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+            aria-label="Dark theme"
+            use:tooltip={"Dark theme"}
             aria-pressed={$theme === "dark"}
             on:click={toggleTheme}
             class={toolbarButtonClass()}
@@ -361,6 +391,7 @@
       </aside>
     {/if}
 
+    <main class="flex min-h-0 flex-1 flex-col gap-4">
     {#if view === "landing"}
       <div class="flex flex-col gap-1">
         <h2 class="text-base font-semibold text-slate-900 dark:text-slate-50">What would you like to do?</h2>
@@ -370,7 +401,7 @@
     {:else if view === "loading"}
       <Skeleton />
     {:else if view === "error"}
-      <ErrorState message={errorMessage} on:retry={retry} />
+      <ErrorState reason={errorReason} detail={errorDetail} on:retry={retry} />
     {:else if view === "empty"}
       <EmptyState on:retry={retry} />
     {:else if view === "results" && pageMeta && auditResult}
@@ -408,6 +439,7 @@
         Re-scrape this page
       </button>
     {/if}
+    </main>
   </Screen>
 </div>
 

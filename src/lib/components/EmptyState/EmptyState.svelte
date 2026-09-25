@@ -23,7 +23,7 @@
     <circle cx="92" cy="92" r="14" />
     <path d="M88 92 L96 92" />
   </svg>
-  <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">No meta tags found</h3>
+  <h2 class="text-base font-semibold text-slate-900 dark:text-slate-50">No meta tags found</h2>
   <p class="max-w-xs text-sm text-slate-600 dark:text-slate-400">
     This page has no Open Graph, Twitter, or standard meta tags to analyze.
   </p>
