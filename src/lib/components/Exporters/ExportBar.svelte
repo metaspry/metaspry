@@ -2,6 +2,7 @@
   import type { PageMeta } from '../../scrapers/PageMeta';
   import { toJson, toCsv, download } from '../../exporters/exporters';
   import { toast } from '../Toast/toast';
+  import { tooltip } from '../../actions/tooltip';
 
   export let meta: PageMeta;
 
@@ -34,21 +35,25 @@
   <button
     type="button"
     on:click={() => copyText(toJson(meta), 'JSON')}
+    use:tooltip={'Copy every tag on this page as JSON'}
     class="inline-flex items-center gap-1 rounded-full border border-white/40 bg-white/40 px-3 py-1 text-xs font-medium text-slate-700 backdrop-blur-md transition hover:bg-white/70 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
   >Copy JSON</button>
   <button
     type="button"
     on:click={() => copyText(toCsv(meta), 'CSV')}
+    use:tooltip={'Copy every tag on this page as CSV'}
     class="inline-flex items-center gap-1 rounded-full border border-white/40 bg-white/40 px-3 py-1 text-xs font-medium text-slate-700 backdrop-blur-md transition hover:bg-white/70 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
   >Copy CSV</button>
   <button
     type="button"
     on:click={() => download(`${safeName()}.json`, toJson(meta), 'application/json')}
+    use:tooltip={'Save every tag on this page as a .json file'}
     class="inline-flex items-center gap-1 rounded-full border border-white/40 bg-white/40 px-3 py-1 text-xs font-medium text-slate-700 backdrop-blur-md transition hover:bg-white/70 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
   >Download .json</button>
   <button
     type="button"
     on:click={() => download(`${safeName()}.csv`, toCsv(meta), 'text/csv')}
+    use:tooltip={'Save every tag on this page as a .csv file'}
     class="inline-flex items-center gap-1 rounded-full border border-white/40 bg-white/40 px-3 py-1 text-xs font-medium text-slate-700 backdrop-blur-md transition hover:bg-white/70 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
   >Download .csv</button>
 </div>

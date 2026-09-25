@@ -1,5 +1,6 @@
 <script lang="ts">
   import { safeHref } from '../../util/safe-href';
+  import { tooltip } from '../../actions/tooltip';
   import type { LlmsInfo } from '../../scrapers/SiteFiles';
 
   export let llms: LlmsInfo;
@@ -30,7 +31,7 @@
                     {#if safeHref(link.url)}
                       <a href={safeHref(link.url)} target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:underline dark:text-indigo-300">{link.label}</a>
                     {:else}
-                      <span class="text-slate-600 dark:text-slate-400" title="Not an http(s) URL">{link.label}</span>
+                      <span class="text-slate-600 dark:text-slate-400" use:tooltip={'Not an http(s) URL'}>{link.label}</span>
                     {/if}
                   </li>
                 {/each}

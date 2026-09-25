@@ -5,6 +5,7 @@
   import { needsAsyncResolution, resolveAsyncRules } from '../../audit/asyncRules';
   import { effectiveSettings } from '../../cloud/plan';
   import { bandClasses, bandFor, scoreLabel } from '../../audit/band';
+  import { tooltip } from '../../actions/tooltip';
   import { diffMeta, type DiffRow } from './diff';
   import { sameUrl } from '../../audit/url-match';
 
@@ -165,13 +166,13 @@
         <div class="flex items-center justify-between gap-2 rounded-xl border border-white/40 bg-white/40 px-3 py-2 backdrop-blur-md dark:border-white/10 dark:bg-white/5">
           <div class="min-w-0 flex-1">
             <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{card.label}</p>
-            <p class="truncate text-xs text-slate-700 dark:text-slate-300" title={card.url}>{card.url}</p>
+            <p class="truncate text-xs text-slate-700 dark:text-slate-300" use:tooltip={card.url}>{card.url}</p>
           </div>
           <p
             class="shrink-0 text-lg font-bold tabular-nums {scoreColor(card.score)}"
             role="img"
             aria-label={scoreLabel(card.score)}
-            title={scoreLabel(card.score)}
+            use:tooltip={scoreLabel(card.score)}
           >{card.score}</p>
         </div>
       {/each}

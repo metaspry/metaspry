@@ -13,6 +13,7 @@
   import { cloudIsPro, APP_URL } from '../../cloud/plan';
   import { mode, switchMode, type Mode } from '../../mode';
   import { toast } from '../Toast/toast';
+  import { tooltip } from '../../actions/tooltip';
 
   const SURFACES: { value: Mode; label: string; hint: string }[] = [
     { value: 'sidepanel', label: 'Side panel', hint: 'Stays open beside the page while you browse.' },
@@ -239,6 +240,7 @@
       <button
         type="button"
         aria-label="Close settings"
+        use:tooltip={'Close settings (Esc)'}
         on:click={close}
         class="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-50"
       >
@@ -280,6 +282,7 @@
           href={`${APP_URL}/settings`}
           target="_blank"
           rel="noopener noreferrer"
+          use:tooltip={'Edit these settings in the Metaspry web app (opens a new tab)'}
           class="inline-flex items-center gap-1 font-medium text-indigo-600 hover:underline dark:text-indigo-300"
         >
           Open in web app
@@ -369,6 +372,7 @@
         <button
           type="button"
           on:click={save}
+          use:tooltip={'Save scoring rules'}
           disabled={!canSave}
           class="rounded-full bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 disabled:cursor-not-allowed disabled:opacity-50"
         >Save</button>
@@ -392,6 +396,7 @@
             bind:this={resetBtn}
             type="button"
             on:click={armReset}
+            use:tooltip={'Restore the default thresholds and weights'}
             disabled={isDefault && !dirty}
             class="rounded-full border border-slate-300 px-3.5 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
           >Reset to defaults</button>

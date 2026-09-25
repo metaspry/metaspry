@@ -3,6 +3,7 @@
   import { toast } from '../Toast/toast';
   import PinButton from './PinButton.svelte';
   import UrlValue from './UrlValue.svelte';
+  import { tooltip } from '../../actions/tooltip';
 
   export let tag: MetaTag;
 
@@ -24,7 +25,9 @@
     <PinButton tagKey={tag.key} />
     <button
       on:click={copy}
+      type="button"
       aria-label="Copy value"
+      use:tooltip={`Copy ${tag.key} value`}
       class="flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 transition hover:bg-white/60 hover:text-indigo-600 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-indigo-300"
     >
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4">

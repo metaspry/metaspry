@@ -4,6 +4,7 @@
   import SiteIcon from '../SiteIcon/SiteIcon.svelte';
   import { toolbarButtonClass } from '../toolbar';
   import { bandClasses, bandFor, scoreLabel } from '../../audit/band';
+  import { tooltip } from '../../actions/tooltip';
 
   let open = false;
 
@@ -38,7 +39,7 @@
   <button
     type="button"
     aria-label="History"
-    title="History"
+    use:tooltip={'History'}
     aria-expanded={open}
     on:click={() => (open = !open)}
     class={toolbarButtonClass(open)}
@@ -76,7 +77,7 @@
             <li class="border-b border-white/40 last:border-b-0 dark:border-white/5">
               <button
                 type="button"
-                title="Open in new tab"
+                use:tooltip={'Open in new tab'}
                 on:click={() => openInNewTab(entry.url)}
                 class="group/row flex w-full items-center gap-2 px-3 py-2 text-left transition hover:bg-white/60 dark:hover:bg-white/5"
               >
@@ -105,7 +106,7 @@
                 <span
                   role="img"
                   aria-label={label}
-                  title={label}
+                  use:tooltip={label}
                   class="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums {bandClasses(bandFor(entry.score)).chip}"
                 >{Math.round(entry.score)}</span>
               </button>
