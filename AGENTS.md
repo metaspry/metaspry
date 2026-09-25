@@ -424,26 +424,30 @@ indexed, and "a canonical tag is present" passed it.
 
 ### 3.8 Scoring settings, Pro gating and settings sync
 
-**Purpose and flow.** The gear icon opens the Settings drawer (Esc or the backdrop closes it). Pro users see six length thresholds, three rule weights and "Restore defaults". Everyone else sees a "Custom scoring is a Pro feature" card whose "Go Pro" link opens `https://app.metaspry.com/upgrade`. The drawer's About list links to metaspry.com, Docs, Roadmap, Blog and "Report a bug".
+**Purpose and flow.** The gear icon opens the Settings drawer, a modal dialog (`aria-modal`, focus moves to the first input on open, Tab/Shift+Tab cycle inside, Esc / the close button / the backdrop close it and focus returns to the gear). Pro users see a sync line ("Synced with your account", "Open in web app" -> `https://app.metaspry.com/settings`), the **Length thresholds (characters)** fieldset (Title, Description, og:description, each a min-max pair), the **Severity weights** fieldset (Required / Recommended / Best practice under the explainer "Each rule earns its weight on pass, half on warn, zero on fail. Score = earned / total × 100."), then **Save**, **Reset to defaults** and an "Unsaved changes" chip. Everyone else sees a "Custom scoring is a Pro feature" card whose "Go Pro" link opens `https://app.metaspry.com/upgrade`. The footer shows "Metaspry v<manifest version>" ("dev" outside the extension) and the links metaspry.com, Docs, Roadmap, Blog, "Report a bug".
+
+- **The form edits a draft; nothing persists until Save.** Save calls `updateSettings(draft)` once (one `chrome.storage` write, one cloud push) and toasts "Scoring rules saved"; it is disabled while the draft equals the stored value or has a validation problem. Closing with unsaved edits discards them. A cloud pull or the other surface refreshes an untouched form only.
+- **Validation** (`src/lib/storage/validate-settings.ts`, a port of the app's `validateAuditSettings`): every threshold a whole number >= 0 ("Enter a whole number of 0 or more."), each max >= its min ("Title max must be at least the min."), weights >= 0 ("Weights must be 0 or more."), not all zero ("At least one weight must be above 0, or nothing can score."). A cleared box is NaN and is reported, not ignored. Invalid inputs get `aria-invalid` and the message under the row.
+- **Reset** is two-step and inline ("Reset? Yes, reset / Cancel", auto-cancels after 5 s); confirming calls `resetSettings()` and toasts "Scoring rules reset to defaults". Disabled when the stored value is already the defaults and the form is untouched.
 
 - `DEFAULT_SETTINGS`: title 30-60, description 70-160, og:description 50-200, weights 10 / 5 / 3. These equal the web app's `DEFAULT_AUDIT_SETTINGS`.
 - `effectiveSettings` (`cloud/plan.ts`) is `settings` when `cloudIsPro`, otherwise `DEFAULT_SETTINGS`. Custom values are kept while not Pro and apply again when Pro returns.
 - `cloudIsPro` is a live `onSnapshot` of `users/{uid}`: `plan === 'pro'`. It resets to `false` on every auth change.
 - Settings sync (`cloud/settings.ts`): on sign-in it reads `users/{uid}/settings/audit` and overwrites the local settings (cloud wins). After that, every local change is written back with `merge: true`. Writes are blocked until the read for the current user finishes (`pulledUid`), and a `suppress` flag stops the pulled value from being written straight back.
 
-**Key files.** `src/lib/components/Settings/SettingsDrawer.svelte`, `src/lib/storage/settings.ts`, `src/lib/cloud/plan.ts`, `src/lib/cloud/settings.ts`.
+**Key files.** `src/lib/components/Settings/SettingsDrawer.svelte`, `src/lib/storage/settings.ts`, `src/lib/storage/validate-settings.ts`, `src/lib/cloud/plan.ts`, `src/lib/cloud/settings.ts`.
 
 **Data.** `settings` (local). Firestore `users/{uid}` (read) and `users/{uid}/settings/audit` (read and write).
 
 **Permissions.** `storage`.
 
-**Tests.** None. Manually check that a free account scores with defaults and a Pro account with custom values.
+**Tests.** `src/lib/storage/validate-settings.spec.ts` (every rule and message), `src/lib/cloud/settings.spec.ts` (sync). Manually check that a free account scores with defaults and a Pro account with custom values.
 
 **Gotchas.**
 - Only a personal `plan: 'pro'` unlocks custom scoring. Team workspace plans do not (stated in `plan.ts`).
-- The extension always syncs the personal settings document, even when scans upload to a workspace. The app keeps separate `workspaces/{wsId}/settings/audit` documents.
-- Inputs accept any finite number of 0 or more. There is no min <= max check, and setting every weight to 0 makes `possible` 0 and the score `NaN`.
-- "Restore defaults" also writes the defaults to the cloud when signed in.
+- The extension always syncs the personal settings document, even when scans upload to a workspace. The app keeps separate `workspaces/{wsId}/settings/audit` documents, so the extension and the app agree only in the app's Personal scope.
+- The validator is stricter than the store: `storage/settings.ts` still accepts any finite number >= 0 on read (old stored decimals survive); only the drawer refuses them.
+- "Reset to defaults" also writes the defaults to the cloud when signed in.
 - `initCloudSettingsSync` runs before `initSettings` (section 2, startup order). The `pulledUid` guard exists because an early local write once overwrote saved cloud settings (commit `42402d0`).
 
 ### 3.9 Site tab: robots.txt, sitemap.xml, llms.txt
@@ -618,7 +622,7 @@ Checks in `src/lib/audit/aeo.ts`:
 - `r` re-scrapes.
 - `1` to `5` select tabs by position: Tags, Previews, Audit, Site, AI. Compare (sixth) has no key.
 
-In the tab strip, Arrow Left/Right, Home and End move between tabs. `Esc` closes the Settings drawer and the help modal (not the History or Cloud sync dropdowns).
+In the tab strip, Arrow Left/Right, Home and End move between tabs. `Esc` closes the Settings drawer and the help modal (not the History or Cloud sync dropdowns). While the Settings drawer is open, Tab and Shift+Tab cycle inside it (3.8).
 
 **Key files.** `src/lib/components/Shortcuts/keyboard.ts`, `src/lib/components/Shortcuts/ShortcutsHelp.svelte`, `src/lib/components/Tabs/Tabs.svelte`, `src/lib/views/Extension.svelte` (`registerShortcuts`).
 
