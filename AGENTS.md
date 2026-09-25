@@ -215,13 +215,13 @@ Each feature lists: purpose and user flow, key files, data and storage, permissi
 
 ### 3.2 Surfaces: side panel and popup
 
-**Purpose and flow.** Clicking the toolbar icon opens the side panel (default) or a popup. The header radio group "Side panel / Popup" switches between them. In popup mode an amber note ("Popup closes when you switch tabs. Use side panel") shows until it is dismissed.
+**Purpose and flow.** Clicking the toolbar icon opens the side panel (default) or a popup. Settings -> **Preferences** -> `Surface` (a two-option radio group, "Side panel" / "Popup", shown to everyone, 3.8) switches between them; the popup note's "Use side panel" link does the same. In popup mode an amber note ("Popup closes when you switch tabs. Use side panel") shows until it is dismissed.
 
 - `setMode()` writes `mode`. `background.js` `applyMode()` then calls `chrome.action.setPopup({ popup: 'index.html' })` or `({ popup: '' })` and `chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick })`.
 - `switchMode()` opens the other surface inside the click handler (`chrome.action.openPopup()`, or `chrome.windows.getCurrent().then(...)` -> `chrome.sidePanel.open`), saves the mode, then calls `window.close()` after 50 ms.
 - `mode.ts` sets `document.documentElement.dataset.mode`; `app.css` gives the popup a 720px width and 600px minimum height and hides the background orbs.
 
-**Key files.** `src/lib/mode.ts`, `static/scripts/background.js`, `src/lib/views/Extension.svelte` (`switchMode`, popup note), `src/routes/app.css`.
+**Key files.** `src/lib/mode.ts` (`switchMode`), `static/scripts/background.js`, `src/lib/components/Settings/SettingsDrawer.svelte` (Surface radio group), `src/lib/views/Extension.svelte` (popup note), `src/routes/app.css`.
 
 **Data.** `mode`, `popupHintDismissed`.
 
@@ -424,7 +424,7 @@ indexed, and "a canonical tag is present" passed it.
 
 ### 3.8 Scoring settings, Pro gating and settings sync
 
-**Purpose and flow.** The gear icon opens the Settings drawer, a modal dialog (`aria-modal`, focus moves to the first input on open - or to the close button when there is none - Tab/Shift+Tab cycle inside, Esc / the close button / the backdrop close it and focus returns to the gear). Pro users see a sync line ("Synced with your account", "Open in web app" -> `https://app.metaspry.com/settings`), the **Length thresholds (characters)** fieldset (Title, Description, og:description, each a min-max pair), the **Severity weights** fieldset (Required / Recommended / Best practice under the explainer "Each rule earns its weight on pass, half on warn, zero on fail. Score = earned / total × 100."), then **Save**, **Reset to defaults** and an "Unsaved changes" chip. Everyone else sees a "Custom scoring is a Pro feature" card whose "Go Pro" link opens `https://app.metaspry.com/upgrade`. The footer shows "Metaspry v<manifest version>" ("dev" outside the extension) and the links metaspry.com, Docs, Roadmap, Blog, "Report a bug".
+**Purpose and flow.** The gear icon opens the Settings drawer, a modal dialog (`aria-modal`, focus moves to the first input on open - or to the close button when there is none - Tab/Shift+Tab cycle inside, Esc / the close button / the backdrop close it and focus returns to the gear). Everyone first sees a **Preferences** fieldset holding the `Surface` radio group (Side panel / Popup, calling `switchMode`, 3.2); the subtitle reads "Preferences and scoring rules". Pro users then see a sync line ("Synced with your account", "Open in web app" -> `https://app.metaspry.com/settings`), the **Length thresholds (characters)** fieldset (Title, Description, og:description, each a min-max pair), the **Severity weights** fieldset (Required / Recommended / Best practice under the explainer "Each rule earns its weight on pass, half on warn, zero on fail. Score = earned / total × 100."), then **Save**, **Reset to defaults** and an "Unsaved changes" chip. Everyone else sees a "Custom scoring is a Pro feature" card whose "Go Pro" link opens `https://app.metaspry.com/upgrade`. The footer shows "Metaspry v<manifest version>" ("dev" outside the extension) and the links metaspry.com, Docs, Roadmap, Blog, "Report a bug".
 
 - **The form edits a draft; nothing persists until Save.** Save calls `updateSettings(draft)` once (one `chrome.storage` write, one cloud push) and toasts "Scoring rules saved"; it is disabled while the draft equals the stored value or has a validation problem. Closing with unsaved edits discards them. A cloud pull or the other surface refreshes an untouched form only.
 - **Validation** (`src/lib/storage/validate-settings.ts`, modelled on the app's `validateAuditSettings` but requiring whole numbers everywhere): every threshold an integer >= 0 ("Enter a whole number of 0 or more."), each max >= its min ("Title max must be at least the min."), weights integers >= 0 ("Weights must be whole numbers of 0 or more."), not all zero ("At least one weight must be above 0, or nothing can score."). A cleared box is NaN and is reported, not ignored. Invalid inputs get `aria-invalid` and `aria-describedby` pointing at the message under the row.
@@ -481,7 +481,7 @@ indexed, and "a canonical tag is present" passed it.
 
 ### 3.10 History
 
-**Purpose and flow.** The clock icon opens "Recent scrapes": the last 10 scans with the site favicon (`SiteIcon`, 16 px; letter tile when missing or broken), a score badge, the title (or hostname) and a relative time. Clicking an entry opens its URL in a background tab (`active: false`, so a popup stays open). "Clear" empties the list.
+**Purpose and flow.** The History button in the header toolbar (3.17; `aria-expanded` while open) opens "Recent scrapes": the last 10 scans with the site favicon (`SiteIcon`, 16 px; letter tile when missing or broken), a score badge, the title (or hostname) and a relative time. Clicking an entry opens its URL in a background tab (`active: false`, so a popup stays open). "Clear" empties the list.
 
 **Key files.** `src/lib/components/History/HistoryDropdown.svelte`, `src/lib/storage/history.ts`, `src/lib/components/SiteIcon/SiteIcon.svelte`.
 
@@ -550,7 +550,7 @@ Checks in `src/lib/audit/aeo.ts`:
 
 ### 3.13 Cloud sign-in
 
-**Purpose and flow.** The header pill reads "Sync off" (grey dot) when signed out, or the sync target's name (green dot) when signed in. Signed out, its dropdown offers an email and password form ("Same login as the web app") and "Continue with Google". Signed in, it shows the email, the sync target picker (3.14) and "Sign out".
+**Purpose and flow.** The header's account control (`CloudSync.svelte`) is a primary "Sign in" button when signed out, and, when signed in, an initials circle (`initialsFor(email)`, `src/lib/cloud/initials.ts`) with a green dot, the sync target's name (hidden below 400 px) and a chevron; both expose `aria-expanded`. Signed out, its dropdown offers an email and password form ("Same login as the web app") and "Continue with Google". Signed in, it shows the email, "Open Metaspry web app" (new tab, `app.metaspry.com/dashboard`), the sync target picker (3.14) and "Sign out".
 
 - `cloud/firebase.ts` initialises Firebase from the public web config (project `metaspry`). Firestore uses `ignoreUndefinedProperties: true`.
 - Email and password: `signInWithEmailAndPassword`.
@@ -601,7 +601,7 @@ Checks in `src/lib/audit/aeo.ts`:
 - `setDoc` without `merge` replaces the whole document on a re-scan, including `createdAt` and any field another client added.
 - The upload waits for the image check (up to 5 s) and a fresh `fetchSiteFiles` (several 4 s timeouts are possible). Closing the popup before it finishes drops the upload without any message.
 - From reading the code (not tested at runtime): `initCloudWorkspaces()` subscribes to `cloudUser` while it is still `null`, which immediately calls `setSyncScope({ kind: 'personal' })` and stores `personal` over the saved choice. The earlier storage read still restores the workspace in memory for that session, but the stored value is now `personal`, so a workspace choice does not survive the next reopen.
-- `main` has no "open dashboard" link. The only link into the app is the Pro upsell (3.8).
+- Links into the app: "Open Metaspry web app" in the signed-in account dropdown (3.13), "Open in web app" on the Settings sync line and the Pro upsell (3.8).
 
 ### 3.15 Theme
 
@@ -631,13 +631,13 @@ In the tab strip, Arrow Left/Right, Home and End move between tabs. `Esc` closes
 
 **Gotchas.**
 - The help modal still says "1 / 2 / 3 / 4: Switch to Tags / Previews / Audit / Compare", which no longer matches the key handler.
-- The `?` header button is hidden below 460px width.
+- The `?` button is always visible in the header toolbar (3.17) and reports `aria-expanded` while the sheet is open.
 - The marketing site documents shortcuts in `docs/keyboard-shortcuts`.
 
 ### 3.17 UI shell and shared components
 
 - `+page.svelte`: gradient background and two blurred decorative orbs (`data-bg-orb`, hidden in popup mode).
-- Header, left to right: logo, mode toggle, History, Settings, Cloud sync pill, theme toggle, shortcuts `?`.
+- Header, left to right, one line at every width from 320 px: logo (wordmark hidden below 360 px); the account control (3.13); one `role="toolbar"` group styled by `src/lib/components/toolbar.ts` (`toolbarButtonClass(active)`, `TOOLBAR_GROUP`) holding History, Settings, theme toggle (`aria-pressed` in dark mode) and shortcuts `?`. Every button has a `title`. The surface toggle lives in Settings (3.2).
 - Views: `landing` (Grid card "Get Meta Tags"), `loading` (`Skeleton`), `error` (`ErrorState`: "Couldn't scrape this page", Retry, links to docs and GitHub issues), `empty` (`EmptyState`: "No meta tags found", Try again, docs link), `results` (`Tabs` with Tags, Previews, Audit, Site, AI, Compare).
 - `Screen`: glass card wrapper. `Grid`: landing action cards (`GridProps` in `Grid.ts`).
 - Toasts: `toast(message, variant)`; at most 3 visible, 1.5 s each.

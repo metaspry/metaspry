@@ -26,11 +26,12 @@
   import type { AuditResult } from "../audit/AuditResult";
 
   import { theme, toggleTheme } from "../theme";
-  import { mode, setMode, type Mode } from "../mode";
+  import { mode, switchMode } from "../mode";
   import type { Settings } from "../storage/settings";
-  import { effectiveSettings, APP_URL } from "../cloud/plan";
+  import { effectiveSettings } from "../cloud/plan";
   import { pushHistory } from "../storage/history";
   import { registerShortcuts, helpOpen } from "../components/Shortcuts/keyboard";
+  import { toolbarButtonClass, TOOLBAR_GROUP } from "../components/toolbar";
   import CloudSync from "../components/CloudSync/CloudSync.svelte";
   import { cloudUser } from "../cloud/auth";
   import { syncScope } from "../cloud/workspaces";
@@ -172,11 +173,6 @@
     },
   ];
 
-  const modeOptions: { value: Mode; label: string; short: string }[] = [
-    { value: "sidepanel", label: "Side panel", short: "Panel" },
-    { value: "popup", label: "Popup", short: "Popup" },
-  ];
-
   function isActiveTab(v: string): v is ActiveTab {
     return (
       v === "tags" ||
@@ -228,55 +224,8 @@
 
   function onRuntimeMessage(_msg: any) {
     // Reserved for future cross-surface coordination. Mode-switch reopening
-    // is handled in switchMode() below, inside the user-gesture click, so
-    // chrome.sidePanel.open / chrome.action.openPopup retain gesture context.
-  }
-
-  function switchMode(next: Mode) {
-    if (next === $mode) return;
-    const current = $mode;
-
-    // The click that fired this handler is a valid user gesture. We MUST
-    // call chrome.sidePanel.open / chrome.action.openPopup synchronously
-    // before any awaits, otherwise Chrome drops the gesture and rejects
-    // with "must be called in response to a user gesture".
-    try {
-      if (next === 'popup') {
-        chrome.action.openPopup().catch((err) => {
-          if (import.meta.env.DEV) console.warn('openPopup:', err);
-        });
-      } else {
-        chrome.windows.getCurrent().then((win) => {
-          if (win?.id != null) {
-            chrome.sidePanel.open({ windowId: win.id }).catch((err) => {
-              if (import.meta.env.DEV) console.warn('sidePanel.open:', err);
-            });
-          }
-        });
-      }
-    } catch (err) {
-      if (import.meta.env.DEV) console.warn('switchMode open failed:', err);
-    }
-
-    // Persist the new mode so background script updates action behavior.
-    setMode(next);
-
-    // Close the surface we were in. window.close() works for popup; the
-    // side panel doesn't always honor it, but it's safe to call.
-    setTimeout(() => {
-      try { window.close(); } catch { /* ignore */ }
-    }, 50);
-
-    void current;
-  }
-
-  function openApp() {
-    // Guarded like every other chrome.* entry point in this file: `npm run dev` renders this
-    // component in a plain browser, where `chrome` is undefined and the click would throw.
-    if (typeof chrome === 'undefined' || !chrome.tabs) return;
-    // `active: true` on purpose, unlike HistoryDropdown's background tab: the user is deliberately
-    // leaving for the web app, so letting the popup close is the wanted behaviour.
-    chrome.tabs.create({ url: `${APP_URL}/dashboard`, active: true });
+    // is handled in `switchMode()` (`src/lib/mode.ts`), inside the user-gesture
+    // click, so chrome.sidePanel.open / chrome.action.openPopup retain gesture context.
   }
 
   onMount(() => {
@@ -294,92 +243,64 @@
 
 <div class="flex h-full w-full flex-col p-3">
   <Screen>
-    <header class="flex flex-wrap items-center justify-between gap-2">
-      <div class="flex shrink-0 items-center gap-2">
-        <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500 text-xs font-bold text-white shadow-md shadow-indigo-500/30">M</span>
-        <span class="text-base font-semibold tracking-tight text-slate-900 dark:text-slate-50">Metaspry</span>
+    <header class="flex items-center justify-between gap-2">
+      <div class="flex min-w-0 items-center gap-2">
+        <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500 text-xs font-bold text-white shadow-md shadow-indigo-500/30">M</span>
+        <span class="hidden truncate text-base font-semibold tracking-tight text-slate-900 min-[360px]:inline dark:text-slate-50">Metaspry</span>
       </div>
 
-      <div class="flex flex-wrap items-center justify-end gap-1.5">
-        <div
-          role="radiogroup"
-          aria-label="Surface mode"
-          class="inline-flex h-8 items-center rounded-full border border-white/40 bg-white/40 p-0.5 text-xs font-medium backdrop-blur-md dark:border-white/10 dark:bg-white/5"
-        >
-          {#each modeOptions as opt}
-            <button
-              type="button"
-              role="radio"
-              aria-checked={$mode === opt.value}
-              on:click={() => switchMode(opt.value)}
-              class="flex h-full items-center rounded-full px-2.5 transition {$mode === opt.value
-                ? 'bg-white text-indigo-600 shadow-sm dark:bg-slate-900 dark:text-indigo-300'
-                : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100'}"
-            >
-              <span class="hidden min-[400px]:inline">{opt.label}</span>
-              <span class="min-[400px]:hidden">{opt.short}</span>
-            </button>
-          {/each}
-        </div>
-
-        <HistoryDropdown />
-
-        <button
-          type="button"
-          aria-label="Settings"
-          on:click={() => (settingsOpen = true)}
-          class="flex h-8 w-8 items-center justify-center rounded-full border border-white/40 bg-white/40 text-slate-700 backdrop-blur-md transition hover:bg-white/70 hover:text-indigo-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 dark:hover:text-indigo-300"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4">
-            <circle cx="12" cy="12" r="3" />
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-          </svg>
-        </button>
-
+      <!-- One line at every width from 320 px: the account control, then one grouped toolbar. -->
+      <div class="flex shrink-0 items-center gap-2">
         <CloudSync />
 
-        {#if $cloudUser}
+        <div role="toolbar" aria-label="Extension controls" class={TOOLBAR_GROUP}>
+          <HistoryDropdown />
+
           <button
             type="button"
-            aria-label="Open Metaspry web app"
-            title="Open Metaspry web app"
-            on:click={openApp}
-            class="flex h-8 w-8 items-center justify-center rounded-full border border-white/40 bg-white/40 text-slate-700 backdrop-blur-md transition hover:bg-white/70 hover:text-indigo-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 dark:hover:text-indigo-300"
+            aria-label="Settings"
+            title="Settings"
+            aria-expanded={settingsOpen}
+            on:click={() => (settingsOpen = true)}
+            class={toolbarButtonClass(settingsOpen)}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4">
-              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-              <path d="M15 3h6v6" />
-              <path d="M10 14 21 3" />
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
             </svg>
           </button>
-        {/if}
 
-        <button
-          type="button"
-          aria-label="Toggle theme"
-          on:click={toggleTheme}
-          class="flex h-8 w-8 items-center justify-center rounded-full border border-white/40 bg-white/40 text-slate-700 backdrop-blur-md transition hover:bg-white/70 hover:text-indigo-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 dark:hover:text-indigo-300"
-        >
-          {#if $theme === "dark"}
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4">
-              <circle cx="12" cy="12" r="4" />
-              <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
-            </svg>
-          {:else}
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4">
-              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-            </svg>
-          {/if}
-        </button>
+          <button
+            type="button"
+            aria-label="Toggle theme"
+            title={$theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+            aria-pressed={$theme === "dark"}
+            on:click={toggleTheme}
+            class={toolbarButtonClass()}
+          >
+            {#if $theme === "dark"}
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true">
+                <circle cx="12" cy="12" r="4" />
+                <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+              </svg>
+            {:else}
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+              </svg>
+            {/if}
+          </button>
 
-        <button
-          type="button"
-          aria-label="Keyboard shortcuts"
-          on:click={() => helpOpen.set(true)}
-          class="hidden h-8 w-8 items-center justify-center rounded-full border border-white/40 bg-white/40 text-slate-700 backdrop-blur-md transition hover:bg-white/70 hover:text-indigo-600 min-[460px]:flex dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 dark:hover:text-indigo-300"
-        >
-          <span class="text-sm font-semibold">?</span>
-        </button>
+          <button
+            type="button"
+            aria-label="Keyboard shortcuts"
+            title="Keyboard shortcuts (?)"
+            aria-expanded={$helpOpen}
+            on:click={() => helpOpen.set(true)}
+            class={toolbarButtonClass($helpOpen)}
+          >
+            <span class="text-sm font-semibold" aria-hidden="true">?</span>
+          </button>
+        </div>
       </div>
     </header>
 
