@@ -2,7 +2,7 @@
 
 Feature map for AI coding agents working in this repo. It describes only what `main` does.
 
-Verified against `origin/main` at `b5797fb` (extension `1.0.25`) plus the `fix/ext-qa-2026-09-25` changes on 2026-09-25. If this file and the code disagree, the code wins: fix this file in the same PR (section 6).
+Verified against `origin/main` at `e9f0a0b` plus the `fix/ultra-ext-2026-09-25` changes (extension `1.0.26`) on 2026-09-25. If this file and the code disagree, the code wins: fix this file in the same PR (section 6).
 
 ---
 
@@ -71,8 +71,6 @@ These summarise the maintainer's agent instructions in `CLAUDE.md` and `.github/
 - `src/lib/gpt-actions/`, a user-supplied OpenAI key, the `compromise` NLP library, components `KeywordsInfo` / `MetaInfo` / `ScreenInfo`, and scrapers `getKeywords` / `getMostUsedWords` / `getWindow` do not exist.
 - The "use `$lib/...` imports" rule is not followed anywhere; every import is relative.
 - "Type-check runs during `vite build`" is false.
-- `README.md` lists `Component.svelte`, `getWindow.ts` and a `content.js` content script (all deleted), and says there are four tabs (there are six).
-- `README.md`'s Chrome Web Store copy predates cloud sync (section 4.4).
 - `.github/instructions/testing.instructions.md` and `styling.instructions.md` are unfilled template stubs.
 
 ---
@@ -126,12 +124,12 @@ This is the complete inventory. There are no ports (`runtime.connect`), no conte
 | `src/routes/+page.svelte` | Root. Initialises theme, mode, settings, pinned, history and keyboard shortcuts; mounts `Extension`, `ToastHost`, `ShortcutsHelp` |
 | `src/routes/+layout.js` | `export const prerender = true` |
 | `src/routes/app.css` | Tailwind entry, popup sizing, tooltip (`.ms-tooltip`) and scrollbar styles |
-| `src/lib/views/Extension.svelte` | Orchestrator: view state machine, header, tabs, the scrape -> audit -> history -> upload pipeline, mode switching |
-| `src/lib/scrapers/` | `getHTML` (messaging), `getMetaTags` (+ `getJsonLd`, `getHreflang`, `getRobots`), `getSiteFiles` (network), types in `PageMeta.ts` and `SiteFiles.ts` |
+| `src/lib/views/Extension.svelte` | Orchestrator: view state machine, header, tabs, the scan -> audit -> history -> upload pipeline, mode switching |
+| `src/lib/scrapers/` | `getHTML` (messaging), `getMetaTags` (+ `getJsonLd`, `getHreflang`, `getRobots`), `getSiteFiles` (network), `scan-error.ts` (a failed scan -> plain reason + raw detail, 3.17), types in `PageMeta.ts` and `SiteFiles.ts` |
 | `src/lib/audit/` | `rules.ts` (sync rules + scoring), `asyncRules.ts` (og:image dimensions), `AuditResult.ts` (types), `aeo.ts` (AI readiness) |
-| `src/lib/storage/` | `settings.ts`, `history.ts`, `pinned.ts`: Svelte stores persisted to `chrome.storage.local` |
+| `src/lib/storage/` | `settings.ts`, `history.ts`, `pinned.ts`, `shortcuts.ts`: Svelte stores persisted to `chrome.storage.local` |
 | `src/lib/mode.ts`, `src/lib/theme.ts` | Surface mode and theme stores |
-| `src/lib/cloud/` | `firebase.ts`, `auth.ts`, `plan.ts`, `settings.ts`, `sync.ts`, `workspaces.ts`, `compare-link.ts` (deep link into the app's `/compare`) |
+| `src/lib/cloud/` | `firebase.ts`, `auth.ts`, `auth-errors.ts` (sign-in failures -> plain messages), `plan.ts`, `settings.ts`, `sync.ts`, `workspaces.ts`, `workspace-scoring.ts` (workspace rules, 3.8), `compare-link.ts` (deep link into the app's `/compare`) |
 | `src/lib/util/` | `time-ago.ts` (relative time shared by History and the Audit "Last scan" row), `safe-href.ts` |
 | `src/lib/actions/` | Svelte actions: `tooltip.ts` (`use:tooltip`, 3.17) |
 | `src/lib/categorize.ts` | Tag key -> category |
@@ -161,6 +159,7 @@ This is the complete inventory. There are no ports (`runtime.connect`), no conte
 | `pinnedKeys` | `string[]` of lower-cased tag keys | `[]` | `src/lib/storage/pinned.ts` | - |
 | `syncScope__<uid>` | `{ kind: 'personal' } \| { kind: 'workspace', wsId, name }` | personal | `src/lib/cloud/workspaces.ts` (`scopeKeyFor`) | - |
 | `popupHintDismissed` | `true` | unset | `src/lib/views/Extension.svelte` | - |
+| `shortcuts` | `boolean` (single-key shortcuts on) | unset = on; anything but `false` reads as on | `src/lib/storage/shortcuts.ts` | `components/Shortcuts/keyboard.ts` (through the store) |
 
 Other storage:
 
@@ -176,7 +175,7 @@ accounts the extension still showed - and could upload to - the previous user's 
 **Cross-surface rehydration (`src/lib/storage/watch.ts`).** The popup and the side panel are separate
 documents with separate store instances. Each hydrates once at mount and then writes its **whole**
 value on every change, so a scan recorded in one surface was erased the next time the other wrote its
-stale copy back. Every persisted key (`history`, `settings`, `pinnedKeys`, `theme`, `mode`) now
+stale copy back. Every persisted key (`history`, `settings`, `pinnedKeys`, `theme`, `mode`, `shortcuts`) now
 re-hydrates through `watchKey`, and `makeWriteGuard` suppresses the store's own writer while an
 external change is being applied so the two surfaces cannot echo each other into a loop.
 
@@ -212,7 +211,7 @@ Each feature lists: purpose and user flow, key files, data and storage, permissi
 **Tests.** None. After a manifest change, reload the unpacked extension and check that Chrome shows no manifest errors.
 
 **Gotchas.**
-- Every permission needs store justification copy (`README.md` -> "Justification copy (Permissions)"). That table has no `identity` row today.
+- Every permission needs store justification copy (`README.md` -> "Justification copy (Permissions)"); the table matches the v1.0.26 manifest (it has `identity`, and no `activeTab`, which the manifest does not declare).
 - There is no `key`, so an unpacked build gets a different extension ID from the store build (`kibedpkbadcofhbcpfigjmjanmdkmaji`). This matters for the Google sign-in redirect URI (3.13).
 - The store's keyword-spam filter scans the manifest `description`. Keep platform brand names out of it (`docs/chrome-store-resubmit.md`).
 
@@ -252,24 +251,24 @@ Each feature lists: purpose and user flow, key files, data and storage, permissi
 **Tests.** None.
 
 **Gotchas.**
-- It only opens the UI. It does not start a scan; the user still clicks "Get Meta Tags".
+- It only opens the UI. It does not start a scan; the user still clicks "Scan this page".
 - The item is recreated (`removeAll` then `create`) on install, on browser startup and whenever the service worker starts.
 - The store justification promises exactly one top-level item.
 
 ### 3.4 Page capture and the scan pipeline
 
-**Purpose and flow.** The landing view shows one card, "Get Meta Tags". Clicking it (or pressing `r`) runs `scrape()` in `Extension.svelte`:
+**Purpose and flow.** The landing view says what the extension does (heading "Scan this page's meta tags", the line "Titles, descriptions, Open Graph, Twitter cards, robots and structured data - scored in seconds.") and shows one card, "Scan this page". Clicking it (or pressing `r`) runs `scrape()` in `Extension.svelte`:
 
 1. Sets the view to `loading` (skeleton). A second call while loading is ignored.
 2. `getHTML()` sends `getHTML`. The background queries `{ active: true, lastFocusedWindow: true }`, injects a function that returns `document.documentElement.outerHTML`, and replies with the HTML, the tab URL and `tab.favIconUrl` (Chrome's resolved favicon, null until loaded). The page parses the string with `DOMParser` into an inert document.
 3. `getMetaTags(html, tabUrl)` builds `PageMeta`: `<title>`; canonical and icon (`rel=icon`, then `shortcut icon`, then `apple-touch-icon`), both resolved to absolute URLs; every `<meta>` with non-empty `content`, keyed by `property` (preferred) or `name` and categorised; plus `jsonLd`, `hreflang` (resolved) and meta `robots`.
    Then `resolveIcon(meta.icon, favIconUrl, tabUrl)` (`src/lib/scrapers/icon.ts`) computes the **page icon** (`pageIcon` in `Extension.svelte`): the first http(s) URL of the declared link, Chrome's tab icon, `/favicon.ico` at the page origin. `data:`/`chrome:`/`blob:` tab icons are skipped so no icon bytes ever enter a scan document. `PageMeta.icon` itself stays the declared link, so the Tags tab (3.5), the exports and the empty-page check only report markup that exists; the page icon feeds the SERP preview (3.6), History (3.10) and the cloud payload (3.14).
 4. `pageUrl` = the first `og:url` value, else the canonical, else the tab URL.
-5. No tags, title, canonical or declared icon -> `empty` view ("No meta tags found"); the page icon fallback does not count. Any error -> `error` view with the message and Retry.
+5. No tags, title, canonical or declared icon -> `empty` view ("No meta tags found"); the page icon fallback does not count. Any error -> `error` view (3.17): an unscriptable page gives `unscriptableMessage()` as the reason (the tab URL behind "Details"); a thrown error goes through `describeScanError()` (`scrapers/scan-error.ts`), which maps the message-channel failures (`sendMessage` missing, "Receiving end does not exist", "No response from background script", a closed port) to "This page can't be scanned (browser or store page)...", permission and bad-URL failures to their own sentence, anything else to a generic one, and keeps the raw text for "Details".
 6. Otherwise the `results` view opens on the Tags tab. `runAudit()` shows the synchronous result at once and the async result when ready.
 7. After the final score: `pushHistory()` (3.10), then the cloud upload if signed in (3.14).
 
-A "Re-scrape this page" button sits under the tab content. `scrapeId` and `auditId` counters drop results from superseded runs.
+A "Re-scan this page" button sits under the tab content. `scrapeId` and `auditId` counters drop results from superseded runs.
 
 **Unscriptable pages answer honestly.** `chrome://`/`edge://`/`brave://` pages, the New Tab page, the
 Chrome Web Store, PDFs and policy-blocked pages cannot be injected into. The background replies
@@ -430,7 +429,7 @@ indexed, and "a canonical tag is present" passed it.
 
 ### 3.8 Scoring settings, Pro gating and settings sync
 
-**Purpose and flow.** The gear icon opens the Settings drawer, a modal dialog (`aria-modal`, focus moves to the first threshold input on open - or to the close button for non-Pro users; never the Surface radio, where one keypress would switch surface - Tab/Shift+Tab cycle inside, Esc / the close button / the backdrop close it and focus returns to the gear). Everyone first sees a **Preferences** fieldset holding the `Surface` radio group (Side panel / Popup, calling `switchMode`, 3.2); the subtitle reads "Preferences and scoring rules". Pro users then see a sync line ("Synced with your account", "Open in web app" -> `https://app.metaspry.com/settings`), the **Length thresholds (characters)** fieldset (Title, Description, og:description, each a min-max pair), the **Severity weights** fieldset (Required / Recommended / Best practice under the explainer "Each rule earns its weight on pass, half on warn, zero on fail. Score = earned / total × 100."), then **Save**, **Reset to defaults** and an "Unsaved changes" chip. The close button, Save, Reset to defaults and "Open in web app" carry `use:tooltip` (3.17): "Close settings (Esc)", "Save scoring rules", "Restore the default thresholds and weights", "Edit these settings in the Metaspry web app (opens a new tab)". Everyone else sees a "Custom scoring is a Pro feature" card whose "Go Pro" link opens `https://app.metaspry.com/upgrade`. The footer shows "Metaspry v<manifest version>" ("dev" outside the extension) and the links metaspry.com, Docs, Roadmap, Blog, "Report a bug".
+**Purpose and flow.** The gear icon opens the Settings drawer, a modal dialog (`aria-modal`, focus moves to the first threshold input on open - or to the close button for non-Pro users; never the Surface radio, where one keypress would switch surface - Tab/Shift+Tab cycle inside, Esc / the close button / the backdrop close it and focus returns to the gear). Everyone first sees a **Preferences** fieldset holding the `Surface` radio group (Side panel / Popup, calling `switchMode`, 3.2) and the **Single-key shortcuts** switch (`input type="checkbox" role="switch"`, hint "/ search, r re-scan, 1-6 tabs. Off: only ? and Esc work.", 3.16); the subtitle reads "Preferences and scoring rules". When the sync target is an entitled workspace (below) everyone then sees a read-only "Scoring rules from <workspace>" card (its thresholds and weights, "Edit in web app" -> `https://app.metaspry.com/settings`) instead of the form. Otherwise Pro users see a sync line ("Synced with your account", "Open in web app" -> `https://app.metaspry.com/settings`), the **Length thresholds (characters)** fieldset (Title, Description, og:description, each a min-max pair), the **Severity weights** fieldset (Required / Recommended / Best practice under the explainer "Each rule earns its weight on pass, half on warn, zero on fail. Score = earned / total × 100."), then **Save**, **Reset to defaults** and an "Unsaved changes" chip. The close button, Save, Reset to defaults and "Open in web app" carry `use:tooltip` (3.17): "Close settings (Esc)", "Save scoring rules", "Restore the default thresholds and weights", "Edit these settings in the Metaspry web app (opens a new tab)". A non-Pro member of any entitled workspace sees "Custom scoring comes with your workspace" (pick the workspace under "Save new scans to"), never "Go Pro". Everyone else sees a "Custom scoring is a Pro feature" card whose "Go Pro" link opens `https://app.metaspry.com/upgrade`. The footer shows "Metaspry v<manifest version>" ("dev" outside the extension) and the links metaspry.com, Docs, Roadmap, Blog, "Report a bug": each `inline-flex h-6 px-1` (24 px tall) with 8 px gaps (WCAG 2.5.8).
 
 - **The form edits a draft; nothing persists until Save.** Save calls `updateSettings(draft)` once (one `chrome.storage` write, one cloud push) and toasts "Scoring rules saved"; it is disabled while the draft equals the stored value or has a validation problem. Closing with unsaved edits discards them. A cloud pull or the other surface refreshes an untouched form only.
 - **Validation** (`src/lib/storage/validate-settings.ts`, modelled on the app's `validateAuditSettings` but requiring whole numbers everywhere): every threshold an integer >= 0 ("Enter a whole number of 0 or more."), each max >= its min ("Title max must be at least the min."), weights integers >= 0 ("Weights must be whole numbers of 0 or more."), not all zero ("At least one weight must be above 0, or nothing can score."). A cleared box is NaN and is reported, not ignored. Invalid inputs get `aria-invalid` and `aria-describedby` pointing at the message under the row.
@@ -438,7 +437,8 @@ indexed, and "a canonical tag is present" passed it.
 - The open/close reset of the draft lives inside the `$:` statement that watches `open`, not in a helper: Svelte 4 orders reactive statements by the assignments it can see, and a reset hidden in a function ran after `dirty`/`problems` were computed, so a reopen after a dirty close showed stale state.
 
 - `DEFAULT_SETTINGS`: title 30-60, description 70-160, og:description 50-200, weights 10 / 5 / 3. These equal the web app's `DEFAULT_AUDIT_SETTINGS`.
-- `effectiveSettings` (`cloud/plan.ts`) is `settings` when `cloudIsPro`, otherwise `DEFAULT_SETTINGS`. Custom values are kept while not Pro and apply again when Pro returns.
+- `effectiveSettings` (`cloud/plan.ts`) is `resolveEffectiveSettings(settings, cloudIsPro, workspaceRules)` (`cloud/workspace-scoring.ts`): the target workspace's rules when the sync target (3.14) is an **entitled** workspace, else `settings` when `cloudIsPro`, else `DEFAULT_SETTINGS`. Custom values are kept while not Pro and apply again when Pro returns.
+- Workspace rules (R-39): the web app licenses per workspace - an entitled workspace (`plan !== 'inactive'`, the app's `workspaceEntitled`: the Pro plan's 2-seat workspace, Team, legacy) unlocks custom scoring for every member. `workspaces.ts` carries `entitled` per workspace; `initWorkspaceScoring()` (started from `CloudSync`'s `onMount`) watches `workspaces/{wsId}/settings/audit` with `onSnapshot` while such a workspace is the target, merged over the defaults by `normalizeAuditSettings` (the defaults until the document arrives or when it is missing or unreadable), and sets `workspaceRules` (null otherwise). Read-only here; the rules are edited in the app. `hasEntitledWorkspace` drives the no-upsell card.
 - `cloudIsPro` is a live `onSnapshot` of `users/{uid}`: `plan === 'pro'`. It resets to `false` on every auth change.
 - Settings sync (`cloud/settings.ts`): on sign-in it reads `users/{uid}/settings/audit` and overwrites the local settings (cloud wins). After that, every local change is written back with `merge: true`. Writes are blocked until the read for the current user finishes (`pulledUid`), and a `suppress` flag stops the pulled value from being written straight back.
 
@@ -451,8 +451,8 @@ indexed, and "a canonical tag is present" passed it.
 **Tests.** `src/lib/storage/validate-settings.spec.ts` (every rule and message), `src/lib/cloud/settings.spec.ts` (sync). Manually check that a free account scores with defaults and a Pro account with custom values.
 
 **Gotchas.**
-- Only a personal `plan: 'pro'` unlocks custom scoring. Team workspace plans do not (stated in `plan.ts`).
-- The extension always syncs the personal settings document, even when scans upload to a workspace. The app keeps separate `workspaces/{wsId}/settings/audit` documents, so the extension and the app agree only in the app's Personal scope.
+- `cloudIsPro` is still the personal plan only; workspace plans reach scoring through `workspaceRules` alone, so a personal Pro saving to an entitled workspace scores with the workspace's rules (the same rules the app applies in that scope), and their personal rules apply again on Personal history.
+- The extension only ever WRITES the personal settings document (`users/{uid}/settings/audit`); it reads `workspaces/{wsId}/settings/audit` for an entitled target and never writes it.
 - The validator is stricter than both the store and the app: `storage/settings.ts` accepts any finite number >= 0 on read and the app's `validateAuditSettings` accepts decimals, so a decimal saved in the app (or stored earlier) opens the drawer already invalid with Save blocked until it is corrected.
 - "Reset to defaults" also writes the defaults to the cloud when signed in.
 - `initCloudSettingsSync` runs before `initSettings` (section 2, startup order). The `pulledUid` guard exists because an early local write once overwrote saved cloud settings (commit `42402d0`).
@@ -487,7 +487,7 @@ indexed, and "a canonical tag is present" passed it.
 
 ### 3.10 History
 
-**Purpose and flow.** The History button in the header toolbar (3.17; `aria-expanded` while open) opens "Recent scrapes", a non-modal `role="dialog"` panel run by `use:popover` (3.17): focus lands on the first row (on the panel itself when there is none), Escape or a press outside closes it, and focus returns to the History button. Rows are the last 10 scans, each left to right: site favicon (`SiteIcon`, 16 px; letter tile when missing or broken), title (or hostname) over hostname, relative time, then the score chip last (`bandClasses(...).chip` from `src/lib/audit/band.ts`, `role="img"` with the "Score N of 100, band" label and the same text as a hover tooltip). Each row button has the tooltip "Open in new tab" (hover and keyboard focus) and an inset focus ring (`FOCUS_RING_INSET`). Clicking an entry opens its URL in a background tab (`active: false`, so a popup stays open). "Clear" is two steps: the first press swaps the button for "Clear all? Yes / No" (11 px, `rose-600` / `dark:rose-300`, focus on Yes); only Yes empties the list; No, Escape (which cancels without closing the panel) or focus leaving the pair cancels. After a clear, focus stays on the panel.
+**Purpose and flow.** The History button in the header toolbar (3.17; `aria-expanded` while open) opens "Recent scans", a non-modal `role="dialog"` panel run by `use:popover` (3.17): focus lands on the first row (on the panel itself when there is none), Escape or a press outside closes it, and focus returns to the History button. Rows are the last 10 scans, each left to right: site favicon (`SiteIcon`, 16 px; letter tile when missing or broken), title (or hostname) over hostname, relative time, then the score chip last (`bandClasses(...).chip` from `src/lib/audit/band.ts`, `role="img"` with the "Score N of 100, band" label and the same text as a hover tooltip). Each row button has the tooltip "Open in new tab" (hover and keyboard focus) and an inset focus ring (`FOCUS_RING_INSET`). Clicking an entry opens its URL in a background tab (`active: false`, so a popup stays open). "Clear" is two steps: the first press swaps the button for "Clear all? Yes / No" (11 px, `rose-600` / `dark:rose-300`, focus on Yes); only Yes empties the list; No, Escape (which cancels without closing the panel) or focus leaving the pair cancels. After a clear, focus stays on the panel.
 
 **Key files.** `src/lib/components/History/HistoryDropdown.svelte`, `src/lib/storage/history.ts`, `src/lib/components/SiteIcon/SiteIcon.svelte`, `src/lib/actions/popover.ts`.
 
@@ -559,7 +559,7 @@ Checks in `src/lib/audit/aeo.ts`:
 
 ### 3.13 Cloud sign-in
 
-**Purpose and flow.** The header's account control (`CloudSync.svelte`) is a primary "Sign in" button when signed out, and, when signed in, an initials circle (`initialsFor(email)`, `src/lib/cloud/initials.ts`) with a green dot, the sync target's name (hidden below 460 px) and a chevron; both expose `aria-expanded`. Its dropdown (and History's) is positioned against the header's right-hand block in `Extension.svelte`, not against its own button, so it stays inside a narrow side panel. The dropdown is one `role="dialog"` panel run by `use:popover` (3.17): focus lands on the email field (signed out) or the first item (signed in), Escape or a press outside closes it (there is no click-away backdrop button any more), and focus returns to the account control. Signed out, it offers an email and password form ("Same login as the web app"), "Continue with Google" and a visible Close (x) button beside the title. Signed in, it shows the email, "Open Metaspry web app" (new tab, `app.metaspry.com/dashboard`), the sync target picker (3.14) and "Sign out". Every button in it carries `FOCUS_RING` (3.17).
+**Purpose and flow.** The header's account control (`CloudSync.svelte`) is a primary "Sign in" button when signed out, and, when signed in, an initials circle (`initialsFor(email)`, `src/lib/cloud/initials.ts`) with a green dot, the sync target's name (hidden below 460 px) and a chevron; both expose `aria-expanded`. Its dropdown (and History's) is positioned against the header's right-hand block in `Extension.svelte`, not against its own button, so it stays inside a narrow side panel. The dropdown is one `role="dialog"` panel run by `use:popover` (3.17): focus lands on the email field (signed out) or the first item (signed in), Escape or a press outside closes it (there is no click-away backdrop button any more), and focus returns to the account control. Signed out, it offers a real `<form>` with labelled "Email" (`name="email"`, `autocomplete="email"`) and "Password" (`name="password"`, `autocomplete="current-password"`) fields (Enter submits), "Continue with Google", "Same login as the web app.", a visible Close (x) button beside the title, and two 24 px links into the web app (new tab): **Create an account** -> `${APP_URL}/signup` and **Forgot password?** -> `${APP_URL}/login` (the app's reset lives on its sign-in page as a button that needs the email; there is no reset query parameter). Fields have a >= 3:1 edge (`border-slate-500` 4.76:1 on white; `dark:border-white/40` 3.53:1 on `popover`) and the muted placeholder. Signed in, it shows the email, "Open Metaspry web app" (new tab, `app.metaspry.com/dashboard`), the sync target picker (3.14) and "Sign out". Every button in it carries `FOCUS_RING` (3.17).
 
 - `cloud/firebase.ts` initialises Firebase from the public web config (project `metaspry`). Firestore uses `ignoreUndefinedProperties: true`.
 - Email and password: `signInWithEmailAndPassword`.
@@ -577,7 +577,7 @@ Checks in `src/lib/audit/aeo.ts`:
 
 **Gotchas.**
 - The redirect URI is `https://<extension-id>.chromiumapp.org/`, and it must be listed in that OAuth client's authorised redirect URIs. Unpacked builds have their own extension ID, so each needs its own entry. A "Chrome Extension" OAuth client type does not work here (comment in `auth.ts`; history in commits `77cd51f` to `9703b91`).
-- Email and password errors are replaced with one generic message.
+- Sign-in errors go through `signInErrorMessage` (`cloud/auth-errors.ts`, specced): unknown user -> "No account with that email - create one on the web app.", wrong password -> "Wrong password...", `auth/invalid-credential` (what current Firebase returns for BOTH, email-enumeration protection) -> "Wrong email or password. No account yet? Create one on the web app.", network -> "Couldn't reach Metaspry...", plus invalid email, too many requests, disabled; never the raw code. Google failures go through `googleSignInErrorMessage` ("Google sign-in was cancelled." or a plain retry sentence). The message is `role="alert"`.
 - The bundle imports the default `firebase/auth` entry (see the store-review note in 4.4).
 - **Settings reset on every auth change, sign-out included** (`src/lib/cloud/settings.ts`
   `resolveSettingsForAuth`). The reset happens FIRST, before any cloud load, mirroring what
@@ -588,7 +588,7 @@ Checks in `src/lib/audit/aeo.ts`:
 
 ### 3.14 Scan upload and sync target
 
-**Purpose and flow.** When signed in, every successful scan uploads after its final audit. The dropdown sets where new scans go: "Personal history" or any workspace where the user's role is `owner` or `member`.
+**Purpose and flow.** When signed in, every successful scan uploads after its final audit. The dropdown sets where new scans go: "Personal history" or any workspace where the user's role is `owner` or `member`. The list is a `role="menu"` (labelled "Save new scans to") of `role="menuitemradio"` buttons with `aria-checked`; Arrow Up/Down, Home and End move between them and only the checked one is in the Tab order (roving `tabindex`). The target also picks the scoring rules when it is an entitled workspace (3.8).
 
 - `toScanPayload(meta, auditResult, pageUrl, siteFiles)` builds the web app's scan document: `schemaVersion: 1`, `url`, `hostname`, `scannedAt`, `title`, `source: 'extension'`, `starred: false`, `workspaceId`, `score`, `band`, `pageMeta` (`title`, `description`, `canonical`, `ogImage` from `og:image` then `twitter:image`, `favicon` = the page icon from 3.4 (`Extension.svelte` passes `{ ...meta, icon: pageIcon }`), so it is set for every http(s) page, `tagCount`, `tags`), `audit` (`score`, `band`, and `rules` of `{ id, label, status, severity, message, meta }`), and an optional `siteFiles` summary.
 - Site-files summary caps: 8 robots groups (counts only), 10 sitemap directives, 20 sitemap children, 10 sample URLs, 15 llms sections with 15 links each. No raw file text.
@@ -611,7 +611,7 @@ Checks in `src/lib/audit/aeo.ts`:
 - `setDoc` without `merge` replaces the whole document on a re-scan, including `createdAt` and any field another client added.
 - The upload waits for the image check (up to 5 s) and a fresh `fetchSiteFiles` (several 4 s timeouts are possible). Closing the popup before it finishes drops the upload without any message.
 - From reading the code (not tested at runtime): `initCloudWorkspaces()` subscribes to `cloudUser` while it is still `null`, which immediately calls `setSyncScope({ kind: 'personal' })` and stores `personal` over the saved choice. The earlier storage read still restores the workspace in memory for that session, but the stored value is now `personal`, so a workspace choice does not survive the next reopen.
-- Links into the app: "Open Metaspry web app" in the signed-in account dropdown (3.13), "Open in web app" on the Settings sync line and the Pro upsell (3.8).
+- Links into the app: "Open Metaspry web app" in the signed-in account dropdown (3.13), "Create an account" / "Forgot password?" in the signed-out popover (3.13), "Open in web app" on the Settings sync line, "Edit in web app" on the workspace-rules card and the Pro upsell (3.8).
 
 ### 3.15 Theme
 
@@ -633,7 +633,7 @@ Checks in `src/lib/audit/aeo.ts`:
 **Purpose and flow.** Keys are ignored while typing in an input, textarea, select or contenteditable element:
 - `/` focuses the tag search (switching to Tags).
 - `?` toggles the help modal.
-- `r` re-scrapes.
+- `r` re-scans.
 - `1` to `6` select tabs by position: Tags, Previews, Audit, Site, AI, Compare.
 
 In the tab strip, Arrow Left/Right, Home and End move between tabs. `Esc` closes every open layer: the Settings drawer, the help modal, the History panel and the account popover (the last three through `use:popover`, 3.17), each returning focus to the control that opened it. `Esc` also hides a visible tooltip (3.17); neither the tooltip's handler nor the popover action calls `stopPropagation`, so one press hides the tooltip and closes whatever is open behind it. While the Settings drawer or the help modal is open, Tab and Shift+Tab cycle inside it (`cycleTab` in `src/lib/actions/popover.ts`; 3.8).
@@ -642,7 +642,9 @@ The help modal (`ShortcutsHelp.svelte`) is `role="dialog" aria-modal="true"`, la
 
 **Key files.** `src/lib/components/Shortcuts/keyboard.ts`, `src/lib/components/Shortcuts/ShortcutsHelp.svelte`, `src/lib/components/Tabs/Tabs.svelte`, `src/lib/views/Extension.svelte` (`registerShortcuts`), `src/lib/actions/popover.ts`.
 
-**Data.** None. **Permissions.** None. **Tests.** None for the key handler; the modal behaviour is the popover action's (3.18).
+**Turning them off (WCAG 2.1.4).** Settings > Preferences > "Single-key shortcuts" (storage key `shortcuts`, `src/lib/storage/shortcuts.ts`, default on). Off, only `?` (help) and `Esc` work; `/`, `r` and `1`-`6` do nothing. `shortcutFor(key, shiftKey, enabled)` in `keyboard.ts` is the pure mapping. The help sheet shows an amber note when they are off, dims the single-key rows, and always ends with "Single-key shortcuts can be turned off in Settings > Preferences."
+
+**Data.** `shortcuts`. **Permissions.** `storage`. **Tests.** `src/lib/components/Shortcuts/keyboard.spec.ts` (every key on and off, `parseShortcutsPref`); the modal behaviour is the popover action's (3.18).
 
 **Gotchas.**
 - The `?` button is always visible in the header toolbar (3.17) and reports `aria-expanded` while the sheet is open.
@@ -651,16 +653,19 @@ The help modal (`ShortcutsHelp.svelte`) is `role="dialog" aria-modal="true"`, la
 ### 3.17 UI shell and shared components
 
 - `+page.svelte`: gradient background and two blurred decorative orbs (`data-bg-orb`, hidden in popup mode).
-- Header, left to right, one line at every width from 320 px: logo (wordmark hidden below 400 px); the account control (3.13); one `role="toolbar"` group styled by `src/lib/components/toolbar.ts` (`toolbarButtonClass(active)`, `TOOLBAR_GROUP`; the file also exports the shell's focus rings, below) holding History, Settings, theme toggle (`aria-pressed` in dark mode) and shortcuts `?`. Every button has a `use:tooltip` equal to its `aria-label` (theme: "Switch to light/dark theme", following the state); the account control's tooltip is "Sign in to sync scans to your account" or "Signed in as <email> - saving scans to <target>". Arrow Left/Right, Home and End move focus inside the toolbar. The surface toggle lives in Settings (3.2).
+- Document: `<title>` is "Metaspry", or "Metaspry - <tab label>" while results show (`<svelte:head>` in `Extension.svelte`). The views sit in one `<main>`; the header's logo block is the page's one `<h1>` (the "Metaspry" wordmark is `sr-only` below 400 px, `min-[400px]:not-sr-only` above); view headings (landing, error, empty) are `h2`. An `sr-only` `aria-live="assertive"` region in `Extension.svelte` announces "Couldn't scan this page. <reason>" on a failed scan (cleared when a scan starts).
+- Header, left to right, one line at every width from 320 px: logo (wordmark visible from 400 px); the account control (3.13); one `role="toolbar"` group styled by `src/lib/components/toolbar.ts` (`toolbarButtonClass(active)`, `TOOLBAR_GROUP`; the file also exports the shell's focus rings, below) holding History, Settings, theme toggle and shortcuts `?`. The theme toggle has ONE state model: a fixed name "Dark theme" with `aria-pressed` true in dark mode (the old name flipped with the state AND carried `aria-pressed`). Every button has a `use:tooltip` equal to its `aria-label`; the account control's tooltip is "Sign in to sync scans to your account" or "Signed in as <email> - saving scans to <target>". Arrow Left/Right, Home and End move focus inside the toolbar. The surface toggle lives in Settings (3.2).
 - Both header menus anchor to the header's right-hand block (`relative` in `Extension.svelte`). Nothing between that block and a menu may carry `backdrop-blur`, `filter` or `transform`: that element would become the menu's containing block and stacking context, re-anchoring it and painting it under later glass cards (this bit the toolbar group once).
-- Views: `landing` (Grid: the "Get Meta Tags" card is a `<button type="button">`, first in the tab order after the header, Enter / Space start the scan), `loading` (`Skeleton`), `error` (`ErrorState`: "Couldn't scrape this page", Retry, links to docs and GitHub issues), `empty` (`EmptyState`: "No meta tags found", Try again, docs link), `results` (`Tabs` with Tags, Previews, Audit, Site, AI, Compare).
+- Views: `landing` (heading + value line, then Grid: the "Scan this page" card is a `<button type="button">`, first in the tab order after the header, Enter / Space start the scan), `loading` (`Skeleton`), `error` (`ErrorState`: `h2` "Couldn't scan this page" with `tabindex="-1"` that takes focus on mount - the button that started the scan is gone - then the plain `reason`, Retry, a `<details>` "Details" with the raw `detail` when there is one, links to docs and GitHub issues), `empty` (`EmptyState`: "No meta tags found", Try again, docs link), `results` (`Tabs` with Tags, Previews, Audit, Site, AI, Compare).
 - `Screen`: glass card wrapper. `Grid`: landing action cards (`GridProps` in `Grid.ts`).
-- Toasts: `toast(message, variant)`; at most 3 visible, 1.5 s each; the default variant is `dark:bg-popover/90` with a `white/10` border (success and error keep emerald / rose).
+- Toasts: `toast(message, variant)`; at most 3 visible, 1.5 s each; the default variant is `dark:bg-popover/90` with a `white/10` border. Success / error are dark text on `emerald-100` / `rose-100` with a `-300` border in light (8.57:1 / 7.97:1) and the `-300` hue on `bg-popover` in dark (9.43:1 / 7.61:1); white on `emerald-600` was 3.77:1. Toasts have no close control.
 - Popovers and dialogs: `use:popover={{ onClose, trigger?, initialFocus?, modal? }}` (`src/lib/actions/popover.ts`) on the panel element inside `{#if open}`. On mount it focuses `initialFocus`, else the first focusable, else the panel itself (given `tabindex="-1"`); Escape (with `preventDefault`, no `stopPropagation`) and a `pointerdown` whose `composedPath()` contains neither the panel nor the trigger call `onClose`; on destroy focus returns to `trigger` (default: the element focused at mount, never `<body>`: opened by the `?` key with nothing focused there is no trigger, so every press outside closes and no focus is returned) when it was inside the panel or fell to `<body>`, never when the user already moved it. There is no click-eating backdrop: the press that closes a panel also reaches whatever was pressed. `modal: true` adds Tab cycling (`cycleTab`, also used by the Settings drawer; `focusables` / `FOCUSABLE` are the shared selector). Users: History panel (3.10), account popover (3.13), shortcuts help (3.16, modal). The Settings drawer keeps its own open/close and calls `cycleTab` from its key handler.
 - Dark floating tint: the `popover` colour (`#2a2159`, `tailwind.config.js`; mirrors the web app's `--color-popover-dark`) is the dark background of everything that floats: History `dark:bg-popover`, account popover `dark:bg-popover`, Settings drawer `dark:bg-popover`, help `dark:bg-popover/95` (it sits on a dimmed, blurred overlay, so nothing bleeds through), default toast `dark:bg-popover/90`. The two header panels are opaque in both themes on purpose (`bg-white` / `dark:bg-popover`, no `backdrop-blur`): at `white/90` and `popover/95` the landing heading still showed through them at 320 px. Never `slate-900` for a floating surface.
-- Focus rings: `FOCUS_RING` (`toolbar.ts`) is `focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent dark:focus-visible:ring-indigo-300`, on every button and link in the shell (toolbar, landing card, account control and its popover, History Clear / confirm, help Close, every drawer button and link including the footer links, the Audit "what changed" button); `FOCUS_RING_INSET` is the same ring drawn inside for the full-bleed History rows. The old `ring-indigo-500/40` blended to about 1.7:1; the solid ring measures about 6.3:1 on white and 7.2:1 / 9.0:1 on `popover` / `slate-900` (WCAG 2.4.13 needs 3:1). Inputs keep their `focus:border-*` + faint `focus:ring` style. The Surface radio labels use the same colours with `focus-within:`.
+- Focus rings: `FOCUS_RING` (`toolbar.ts`) is `focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent dark:focus-visible:ring-indigo-300`, on every button and link in the shell (toolbar, landing card, account control and its popover, History Clear / confirm, help Close, every drawer button and link including the footer links, the Audit "what changed" button); `FOCUS_RING_INSET` is the same ring drawn inside for the full-bleed History rows. The old `ring-indigo-500/40` blended to about 1.7:1; the solid ring measures about 6.3:1 on white and 7.2:1 / 9.0:1 on `popover` / `slate-900` (WCAG 2.4.13 needs 3:1). Inputs keep their `focus:border-*` + faint `focus:ring` style. The Surface radio labels use the same colours with `focus-within:`. **Forced colors (R-26):** rings are box-shadows, which Windows contrast themes drop. Tailwind 3's `focus:outline-none` is `outline: 2px solid transparent`, which forced colors repaints, and `app.css` makes it explicit: under `@media (forced-colors: active)` every `:focus-visible` gets `outline: 2px solid Highlight` (offset 2 px), and a label whose `sr-only` input is focused (the Surface radios) gets the same. Never write a bare `outline: none`.
+- Text fields: a >= 3:1 edge - `border-slate-500` light (4.76:1 on white, 4.21:1 on the light Screen), `dark:border-white/40` (3.53:1) or `dark:border-slate-400` on `slate-800` (Settings numbers) - and the muted placeholder (`placeholder:text-muted dark:placeholder:text-muted-dark`). Applies to the sign-in fields, the tag search, the Compare URL field (`aria-label="URL to compare"`) and the Settings number inputs.
+- Muted text (R-33): secondary text (captions, section labels, hints, idle icons) uses `.ms-muted` (`app.css`, components layer so a hover utility still wins) = the `muted` colour in `tailwind.config.js`: `#475569` (slate-600) light, `#94a3b8` (slate-400) dark - 6.71:1 on the light Screen, 7.58:1 on white, 5.61:1 on `popover`. Never a raw `text-slate-400` / `text-slate-500` (they measured 2.27:1 and 3.02:1); `grep -rnE "text-slate-(400|500)" src` is 0.
 - Tooltips: `use:tooltip={text | { text, placement?, delay? }}` (`src/lib/actions/tooltip.ts`, same API and behaviour as the web app's action). One shared body-level element (`role="tooltip"`, `id="ms-tooltip"`, class `.ms-tooltip` + `.ms-tooltip-arrow` in `src/routes/app.css`, `fixed z-[60]` so it clears the drawer and dropdowns; dark-aware; `invisible` while idle so it stays out of the accessibility tree; no transition under `prefers-reduced-motion`). Shows after `delay` (350 ms) on `pointerenter` (not touch), at once on keyboard focus (`:focus-visible` only, so a mouse click never pops it). Hoverable (WCAG 1.4.13): `pointerleave` and `blur` hide it after `HIDE_GRACE_MS` (120 ms); while visible the element carries `is-open`, which is the only time it takes pointer events (`.ms-tooltip.is-open { pointer-events: auto }`), so moving onto the bubble cancels the hide, leaving the bubble starts the same grace, and re-entering the trigger from the bubble keeps it with no new delay. `pointerdown`, `Escape`, emptied text and another trigger's show hide it at once. `aria-describedby="ms-tooltip"` is on the trigger only while visible, and not at all when the text repeats its `aria-label` (so it is announced once). A newer hover cancels any pending one (the History chip inside its row), and a parent's grace never hides a child's tooltip (owner check). Tooltip text wraps (`break-words`), so long URLs stay in the box. floating-ui `computePosition` (`strategy: 'fixed'`, `offset(8)`, `flip()`, `shift({ padding: 8 })`, `arrow`) + `autoUpdate` keep it inside a 320 px side panel. Empty text never shows. Used by: header toolbar, account control, History rows and score chip, Audit ring, Compare URL and scores, `PinButton`, `TagCard` copy, `ExportBar`, Site cards' "Not an http(s) URL" spans (hover-only, so each also carries an `sr-only` " (not an http(s) URL)"), Settings drawer buttons. Controls use the action, never a native `title` (a title beside it doubles up); the one remaining `title` is the truncated href text in `Audit/HreflangSection.svelte`.
-- Scores: `src/lib/audit/band.ts` (`bandFor`, `bandLabel`, `scoreLabel`, `bandClasses`) is the only place a score turns into a band, a label or colour classes; the History chip, the Audit ring, the Compare numbers and the cloud payload's `band` all use it. Placement rule shared with the web app: identity left, score last on the right. Tailwind 3 gotcha: `bg-*/15` compiles to nothing (no 15 in the opacity scale) - use `/20`.
+- Scores: `src/lib/audit/band.ts` (`bandFor`, `bandLabel`, `scoreLabel`, `bandClasses`) is the only place a score turns into a band, a label or colour classes; the History chip, the Audit ring, the Compare numbers and the cloud payload's `band` all use it. Light hues are `-600 / -700` like the web app (ring stroke and Compare number: emerald-600 3.34:1, amber-700 4.45:1, rose-600 4.16:1 on the light Screen; the old `-500` measured 2.25 / 1.90 / 3.25); dark keeps `-400`; chips keep `-700` / `-300` text on `-500/20`. Placement rule shared with the web app: identity left, score last on the right. Tailwind 3 gotcha: `bg-*/15` compiles to nothing (no 15 in the opacity scale) - use `/20`.
 
 **Gotchas.**
 - `Tabs` renders `tab.icon` with `{@html}`. Pass only static trusted markup there, never page data. No tab uses an icon today.
@@ -674,7 +679,7 @@ The help modal (`ShortcutsHelp.svelte`) is `role="dialog" aria-modal="true"`, la
 | `npm run check` | `svelte-check` against `tsconfig.json`. |
 | `npm run build` | `vite build` + `removeInlineScript.cjs`. Does not type-check on its own. |
 
-- Covered by unit tests: `cloud/sync.ts` (`sync.spec.ts`, in-memory Firestore mock), `cloud/compare-link.ts`, `util/time-ago.ts`, `actions/tooltip.ts` (`tooltip.spec.ts`: options and listener wiring in node with a fake element; `tooltip.dom.spec.ts`: show/hide, owner hand-off, `aria-describedby`, Escape propagation, nested hover, the hover grace and the bubble bridge, `is-open`, update/destroy in happy-dom with floating-ui mocked), `actions/popover.ts` (`popover.spec.ts`: listener wiring, Escape, outside press, focus in / return, trigger swap, Tab cycling in node with a fake element and document; `popover.dom.spec.ts`: the same against real elements in happy-dom), `motion.ts` (`motion.spec.ts`), `audit/rules.ts`, `audit/asyncRules.ts`, `audit/url-match.ts`,
+- Covered by unit tests: `cloud/sync.ts` (`sync.spec.ts`, in-memory Firestore mock), `cloud/compare-link.ts`, `cloud/auth-errors.ts`, `cloud/workspace-scoring.ts` (resolution, normalisation, entitlement), `scrapers/scan-error.ts`, `components/Shortcuts/keyboard.ts` (`shortcutFor`), `audit/band.ts` (bands, labels, light hues), `util/time-ago.ts`, `actions/tooltip.ts` (`tooltip.spec.ts`: options and listener wiring in node with a fake element; `tooltip.dom.spec.ts`: show/hide, owner hand-off, `aria-describedby`, Escape propagation, nested hover, the hover grace and the bubble bridge, `is-open`, update/destroy in happy-dom with floating-ui mocked), `actions/popover.ts` (`popover.spec.ts`: listener wiring, Escape, outside press, focus in / return, trigger swap, Tab cycling in node with a fake element and document; `popover.dom.spec.ts`: the same against real elements in happy-dom), `motion.ts` (`motion.spec.ts`), `audit/rules.ts`, `audit/asyncRules.ts`, `audit/url-match.ts`,
   `cloud/scan-identity.ts`, `cloud/settings.ts`, `scrapers/getHTML.ts`, `scrapers/getRobots.ts`,
   `scrapers/getHeaderRobots.ts`, `storage/watch.ts` and its key helper.
 - Manual verification is still required for anything that needs a real browser: `npm run build`, load
@@ -733,9 +738,15 @@ The README's "Version bump checklist": bump the version, build, load unpacked an
 Store item ID: `kibedpkbadcofhbcpfigjmjanmdkmaji`. Privacy policy URL: `https://metaspry.com/docs/privacy/`.
 
 **Before the next submission.**
-- The README's listing copy and privacy answers predate cloud sync. They say there is no account, no first-party servers and nothing is synced, answer "Authentication info: No", and the permission table has no `identity` row. The manifest description was already corrected (commit `41ef21d`). Reconcile the listing with the Firebase sign-in and upload before submitting.
+- The README's listing copy, permission justifications and privacy answers were reconciled with sign-in and upload for v1.0.26 (six tabs, 19 rules, `identity` row, "Authentication info: Yes, only when signed in", Free 10 / Pro 50 + 20 versions). Re-read `static/manifest.json` the day you submit. The v1.0.26 landing changed the store screenshots' first frame: refresh them with this release.
 - The shipped bundle contains the strings `https://apis.google.com/js/api.js` and `https://www.google.com/recaptcha/api.js`, which come from the default `firebase/auth` entry. Store review for MV3 checks for remotely hosted code, and these URLs are a commonly reported rejection trigger for extensions that use `firebase/auth`. The installed Firebase version also ships a `firebase/auth/web-extension` entry intended for extensions.
 - `docs/chrome-store-resubmit.md` is a record from the v1.0.5 era; its version numbers are historical.
+
+### 4.5 UI vocabulary
+
+- **Scan, never scrape**, in every user-facing string: "Scan this page", "Re-scan this page", "Couldn't scan this page", "Recent scans", "Re-scan current page". "Scrape" survives only in code identifiers (`scrape()`, `scrapeId`, `src/lib/scrapers/`).
+- **Rule** for an audit rule (19 rules), not "check"; the AI tab's items are "checks" (3.11).
+- Same words as the web app and the site: workspace / Personal history, "Last scan", "Open what changed".
 
 ---
 
@@ -751,10 +762,12 @@ Store item ID: `kibedpkbadcofhbcpfigjmjanmdkmaji`. Privacy policy URL: `https://
 | `users/{uid}` | Live read of `plan` | `cloud/plan.ts` | Written only by the server (rules deny client writes) |
 | `users/{uid}/settings/audit` | Read at sign-in; merge-write on local change | `cloud/settings.ts` | The app's personal scoring settings; its server scorer reads `<scope>/settings/audit` |
 | `users/{uid}/scans/{id}` | Whole-document write per scan | `cloud/sync.ts` | Rendered from `ScanPayload` (`app/src/lib/scan/types.ts`) |
-| `workspaces` (query `memberUids` array-contains uid) | Read | `cloud/workspaces.ts` | Workspace documents with `name`, `memberUids`, `roles` |
+| `workspaces` (query `memberUids` array-contains uid) | Read | `cloud/workspaces.ts` | Workspace documents with `name`, `memberUids`, `roles`, `plan` |
+| `workspaces/{wsId}/settings/audit` | Live read while an entitled workspace is the sync target | `cloud/workspace-scoring.ts` | The app's workspace scoring rules |
 | `workspaces/{wsId}/scans/{id}` | Whole-document write per scan | `cloud/sync.ts` | Writable by owners and members under `app/firestore.rules` |
 
-- Links into the app: only "Go Pro" -> `${APP_URL}/upgrade` in the Settings drawer. The sign-in copy tells users their scans go to "your history at app.metaspry.com".
+- Links into the app: "Go Pro" -> `${APP_URL}/upgrade`, "Open in web app" / "Edit in web app" -> `${APP_URL}/settings` (Settings drawer), "Create an account" -> `${APP_URL}/signup` and "Forgot password?" -> `${APP_URL}/login` (sign-in popover; both routes exist in `app/src/routes/(auth)`), "Open Metaspry web app" -> `${APP_URL}/dashboard`, "Open what changed" -> `${APP_URL}/compare?...` (3.7). The sign-in copy tells users their scans go to "your history at app.metaspry.com".
+- Read (never written) from the app's data: `workspaces/{wsId}.plan` (entitlement) and `workspaces/{wsId}/settings/audit` (workspace scoring rules, 3.8); members may read both under `app/firestore.rules`.
 - Kept in sync by hand across the two repos: `DEFAULT_SETTINGS` and the app's `DEFAULT_AUDIT_SETTINGS`; `aeo.ts` and `app/functions/src/aeo.ts`; `toScanPayload` and the app's `ScanPayload`. A change to any of these is a two-repo change.
 - The app's `ScanPayload` also has optional `note`, `tags` and `aeo` fields. The extension sends none of them.
 
