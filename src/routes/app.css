@@ -38,6 +38,12 @@ html[data-mode="popup"] [data-bg-orb] {
   @apply visible opacity-100;
 }
 
+/* Only a visible bubble takes the pointer, so hovering it keeps the tooltip (WCAG 1.4.13); the idle,
+ * invisible element must never sit on top of what is under it. `is-open` is set by tooltip.ts. */
+.ms-tooltip.is-open {
+  @apply pointer-events-auto;
+}
+
 .ms-tooltip-arrow {
   @apply absolute h-2 w-2 rotate-45 bg-slate-900 dark:bg-slate-100;
 }
