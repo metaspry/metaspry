@@ -11,7 +11,13 @@
   } from '../../storage/settings';
   import { validateSettings, type SettingsField } from '../../storage/validate-settings';
   import { cloudIsPro, APP_URL } from '../../cloud/plan';
+  import { mode, switchMode, type Mode } from '../../mode';
   import { toast } from '../Toast/toast';
+
+  const SURFACES: { value: Mode; label: string; hint: string }[] = [
+    { value: 'sidepanel', label: 'Side panel', hint: 'Stays open beside the page while you browse.' },
+    { value: 'popup', label: 'Popup', hint: 'Opens from the toolbar icon; closes when you click away.' },
+  ];
 
   export let open = false;
 
@@ -96,10 +102,12 @@
     }
   }
 
-  // The first input (Pro) or, when there is none, the first control (the close button).
+  // The first threshold input (Pro) or, when there is none, the first control (the close
+  // button). Never the Surface radio: in popup mode one Space or arrow key on it switches surface
+  // and closes the window.
   async function focusIn() {
     await tick();
-    (drawerEl?.querySelector<HTMLElement>('input') ?? focusables()[0])?.focus();
+    (drawerEl?.querySelector<HTMLElement>('input[type="number"]') ?? focusables()[0])?.focus();
   }
 
   function onClose() {
@@ -226,7 +234,7 @@
     <header class="flex items-center justify-between">
       <div class="flex flex-col">
         <h3 id={TITLE_ID} class="text-base font-semibold text-slate-900 dark:text-slate-50">Settings</h3>
-        <p class="text-xs text-slate-500 dark:text-slate-400">Scoring rules for the Audit tab</p>
+        <p class="text-xs text-slate-500 dark:text-slate-400">Preferences and scoring rules</p>
       </div>
       <button
         type="button"
@@ -237,6 +245,30 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
       </button>
     </header>
+
+    <fieldset class="flex flex-col gap-2">
+      <legend class="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Preferences</legend>
+      <div role="radiogroup" aria-label="Surface" class="grid grid-cols-2 gap-2">
+        {#each SURFACES as s (s.value)}
+          <label
+            class="flex cursor-pointer flex-col gap-0.5 rounded-lg border px-3 py-2 transition focus-within:ring-2 focus-within:ring-indigo-500/40 {$mode === s.value
+              ? 'border-indigo-500 bg-indigo-500/10'
+              : 'border-slate-300 hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-800'}"
+          >
+            <input
+              type="radio"
+              name="surface"
+              value={s.value}
+              checked={$mode === s.value}
+              on:change={() => switchMode(s.value)}
+              class="sr-only"
+            />
+            <span class="text-xs font-semibold text-slate-800 dark:text-slate-100">{s.label}</span>
+            <span class="text-[11px] leading-snug text-slate-500 dark:text-slate-400">{s.hint}</span>
+          </label>
+        {/each}
+      </div>
+    </fieldset>
 
     {#if $cloudIsPro}
       <p class="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-indigo-500/10 px-3 py-2 text-xs text-slate-700 dark:text-slate-200">
