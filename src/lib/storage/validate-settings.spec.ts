@@ -43,9 +43,14 @@ describe('validateSettings', () => {
     expect(problems).toEqual([{ field: 'titleMin', message: 'Enter a whole number of 0 or more.' }]);
   });
 
-  it('rejects a negative or NaN weight', () => {
-    expect(validateSettings(withSettings({ weights: { required: -1 } as Settings['weights'] }))).toEqual([
-      { field: 'weights', message: 'Weights must be 0 or more.' },
+  it('rejects a negative, NaN or decimal weight with one message', () => {
+    const msg = { field: 'weights', message: 'Weights must be whole numbers of 0 or more.' };
+    expect(validateSettings(withSettings({ weights: { required: -1 } as Settings['weights'] }))).toEqual([msg]);
+    expect(validateSettings(withSettings({ weights: { recommended: Number.NaN } as Settings['weights'] }))).toEqual([
+      msg,
+    ]);
+    expect(validateSettings(withSettings({ weights: { 'best-practice': 2.5 } as Settings['weights'] }))).toEqual([
+      msg,
     ]);
   });
 
