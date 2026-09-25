@@ -87,7 +87,8 @@
   $: initials = initialsFor($cloudUser?.email);
 </script>
 
-<div class="relative">
+<!-- Not `relative`: the dropdown anchors to the header's right-hand block (Extension.svelte). -->
+<div>
   <!-- Account control. Signed out it is the one "Sign in" call to action in the header; signed in
        it shows who and where scans go, and opens the account dropdown. -->
   {#if $cloudUser}
@@ -103,7 +104,7 @@
         {initials}
         <span class="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500 dark:border-slate-900"></span>
       </span>
-      <span class="hidden min-w-0 truncate min-[400px]:inline">{targetLabel}</span>
+      <span class="hidden min-w-0 truncate min-[460px]:inline">{targetLabel}</span>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-3 w-3 shrink-0 text-slate-400" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
     </button>
   {:else}
@@ -126,7 +127,7 @@
     ></button>
 
     <div
-      class="absolute right-0 z-50 mt-2 flex w-64 flex-col gap-2 rounded-xl border border-white/40 bg-white/95 p-3 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/95"
+      class="absolute right-0 z-50 mt-2 flex w-64 max-w-[calc(100vw-2.5rem)] flex-col gap-2 rounded-xl border border-white/40 bg-white/95 p-3 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/95"
     >
       {#if $cloudUser}
         <div class="flex items-center gap-2">
@@ -151,7 +152,8 @@
         <p class="mt-1 px-0.5 text-[10px] font-semibold tracking-wider text-slate-400 uppercase dark:text-slate-500">
           Save new scans to
         </p>
-        <div class="flex flex-col gap-0.5">
+        <!-- Scrolls past ~6 workspaces instead of pushing Sign out below the fold. -->
+        <div class="flex max-h-56 flex-col gap-0.5 overflow-y-auto">
           <button
             type="button"
             on:click={pickPersonal}

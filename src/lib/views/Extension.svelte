@@ -246,11 +246,13 @@
     <header class="flex items-center justify-between gap-2">
       <div class="flex min-w-0 items-center gap-2">
         <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500 text-xs font-bold text-white shadow-md shadow-indigo-500/30">M</span>
-        <span class="hidden truncate text-base font-semibold tracking-tight text-slate-900 min-[360px]:inline dark:text-slate-50">Metaspry</span>
+        <span class="hidden shrink-0 text-base font-semibold tracking-tight text-slate-900 min-[400px]:inline dark:text-slate-50">Metaspry</span>
       </div>
 
-      <!-- One line at every width from 320 px: the account control, then one grouped toolbar. -->
-      <div class="flex shrink-0 items-center gap-2">
+      <!-- One line at every width from 320 px: the account control, then one grouped toolbar.
+           `relative` here, not on the dropdown components: their menus anchor to this block's
+           right edge, so a 256/288 px menu never runs off the left of a narrow side panel. -->
+      <div class="relative flex shrink-0 items-center gap-2">
         <CloudSync />
 
         <div role="toolbar" aria-label="Extension controls" class={TOOLBAR_GROUP}>

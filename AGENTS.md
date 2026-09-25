@@ -550,7 +550,7 @@ Checks in `src/lib/audit/aeo.ts`:
 
 ### 3.13 Cloud sign-in
 
-**Purpose and flow.** The header's account control (`CloudSync.svelte`) is a primary "Sign in" button when signed out, and, when signed in, an initials circle (`initialsFor(email)`, `src/lib/cloud/initials.ts`) with a green dot, the sync target's name (hidden below 400 px) and a chevron; both expose `aria-expanded`. Signed out, its dropdown offers an email and password form ("Same login as the web app") and "Continue with Google". Signed in, it shows the email, "Open Metaspry web app" (new tab, `app.metaspry.com/dashboard`), the sync target picker (3.14) and "Sign out".
+**Purpose and flow.** The header's account control (`CloudSync.svelte`) is a primary "Sign in" button when signed out, and, when signed in, an initials circle (`initialsFor(email)`, `src/lib/cloud/initials.ts`) with a green dot, the sync target's name (hidden below 460 px) and a chevron; both expose `aria-expanded`. Its dropdown (and History's) is positioned against the header's right-hand block in `Extension.svelte`, not against its own button, so it stays inside a narrow side panel. Signed out, its dropdown offers an email and password form ("Same login as the web app") and "Continue with Google". Signed in, it shows the email, "Open Metaspry web app" (new tab, `app.metaspry.com/dashboard`), the sync target picker (3.14) and "Sign out".
 
 - `cloud/firebase.ts` initialises Firebase from the public web config (project `metaspry`). Firestore uses `ignoreUndefinedProperties: true`.
 - Email and password: `signInWithEmailAndPassword`.
@@ -637,7 +637,7 @@ In the tab strip, Arrow Left/Right, Home and End move between tabs. `Esc` closes
 ### 3.17 UI shell and shared components
 
 - `+page.svelte`: gradient background and two blurred decorative orbs (`data-bg-orb`, hidden in popup mode).
-- Header, left to right, one line at every width from 320 px: logo (wordmark hidden below 360 px); the account control (3.13); one `role="toolbar"` group styled by `src/lib/components/toolbar.ts` (`toolbarButtonClass(active)`, `TOOLBAR_GROUP`) holding History, Settings, theme toggle (`aria-pressed` in dark mode) and shortcuts `?`. Every button has a `title`. The surface toggle lives in Settings (3.2).
+- Header, left to right, one line at every width from 320 px: logo (wordmark hidden below 400 px); the account control (3.13); one `role="toolbar"` group styled by `src/lib/components/toolbar.ts` (`toolbarButtonClass(active)`, `TOOLBAR_GROUP`) holding History, Settings, theme toggle (`aria-pressed` in dark mode) and shortcuts `?`. Every button has a `title`. The surface toggle lives in Settings (3.2).
 - Views: `landing` (Grid card "Get Meta Tags"), `loading` (`Skeleton`), `error` (`ErrorState`: "Couldn't scrape this page", Retry, links to docs and GitHub issues), `empty` (`EmptyState`: "No meta tags found", Try again, docs link), `results` (`Tabs` with Tags, Previews, Audit, Site, AI, Compare).
 - `Screen`: glass card wrapper. `Grid`: landing action cards (`GridProps` in `Grid.ts`).
 - Toasts: `toast(message, variant)`; at most 3 visible, 1.5 s each.
