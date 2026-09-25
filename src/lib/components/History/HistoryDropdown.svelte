@@ -3,6 +3,7 @@
   import { history, clearHistory } from '../../storage/history';
   import SiteIcon from '../SiteIcon/SiteIcon.svelte';
   import { toolbarButtonClass } from '../toolbar';
+  import { bandClasses, bandFor, scoreLabel } from '../../audit/band';
 
   let open = false;
 
@@ -15,12 +16,6 @@
     if (h < 24) return `${h}h ago`;
     const d = Math.floor(h / 24);
     return `${d}d ago`;
-  }
-
-  function bandColor(score: number): string {
-    if (score >= 80) return 'bg-emerald-500/20 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300';
-    if (score >= 50) return 'bg-amber-500/20 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300';
-    return 'bg-rose-500/20 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300';
   }
 
   function openInNewTab(url: string) {
@@ -77,6 +72,7 @@
       {:else}
         <ul class="max-h-72 overflow-y-auto">
           {#each $history as entry (entry.timestamp)}
+            {@const label = scoreLabel(entry.score)}
             <li class="border-b border-white/40 last:border-b-0 dark:border-white/5">
               <button
                 type="button"
@@ -85,7 +81,6 @@
                 class="group/row flex w-full items-center gap-2 px-3 py-2 text-left transition hover:bg-white/60 dark:hover:bg-white/5"
               >
                 <SiteIcon src={entry.icon ?? null} hostname={entry.hostname} size={16} />
-                <span class="rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums {bandColor(entry.score)}">{entry.score}</span>
                 <span class="min-w-0 flex-1">
                   <span class="flex items-center gap-1">
                     <span class="truncate text-xs font-medium text-slate-900 dark:text-slate-50">{entry.title || entry.hostname}</span>
@@ -105,7 +100,14 @@
                   </span>
                   <span class="block truncate text-[10px] text-slate-500 dark:text-slate-400">{entry.hostname}</span>
                 </span>
-                <span class="text-[10px] text-slate-400 dark:text-slate-500">{rel(entry.timestamp)}</span>
+                <span class="shrink-0 text-[10px] text-slate-400 dark:text-slate-500">{rel(entry.timestamp)}</span>
+                <!-- Verdict last, on the right: the same rule as every list in the web app. -->
+                <span
+                  role="img"
+                  aria-label={label}
+                  title={label}
+                  class="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums {bandClasses(bandFor(entry.score)).chip}"
+                >{Math.round(entry.score)}</span>
               </button>
             </li>
           {/each}

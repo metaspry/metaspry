@@ -1,6 +1,7 @@
 <script lang="ts">
-  import type { AuditResult, RuleResult, RuleSeverity, ScoreBand } from '../../audit/AuditResult';
+  import type { AuditResult, RuleResult, RuleSeverity } from '../../audit/AuditResult';
   import type { PageMeta } from '../../scrapers/PageMeta';
+  import { bandClasses, bandFor, scoreLabel } from '../../audit/band';
   import CharBar from './CharBar.svelte';
   import JsonLdSection from './JsonLdSection.svelte';
   import HreflangSection from './HreflangSection.svelte';
@@ -13,12 +14,10 @@
   const CIRC = 2 * Math.PI * RADIUS;
 
   $: dashOffset = CIRC * (1 - result.score / 100);
-
-  const BAND_COLOR: Record<ScoreBand, string> = {
-    success: 'text-emerald-500 dark:text-emerald-400',
-    warning: 'text-amber-500 dark:text-amber-400',
-    danger: 'text-rose-500 dark:text-rose-400',
-  };
+  // Colour from the shared band helper (80 / 50), not from `result.band`, so the ring can never
+  // disagree with the History chip or the Compare numbers.
+  $: ringStroke = bandClasses(bandFor(result.score)).stroke;
+  $: ringLabel = scoreLabel(result.score);
 
   const SEVERITY_LABEL: Record<RuleSeverity, string> = {
     required: 'Required',
@@ -41,9 +40,16 @@
 </script>
 
 <div class="flex flex-col gap-4">
-  <header class="flex items-center gap-4 rounded-2xl border border-white/40 bg-white/50 p-4 backdrop-blur-md dark:border-white/10 dark:bg-white/5">
-    <div class="relative h-20 w-20">
-      <svg viewBox="0 0 80 80" class="h-full w-full -rotate-90">
+  <!-- Identity left, verdict right: the same order as every list and header in the web app. -->
+  <header class="flex items-center justify-between gap-4 rounded-2xl border border-white/40 bg-white/50 p-4 backdrop-blur-md dark:border-white/10 dark:bg-white/5">
+    <div class="flex min-w-0 flex-1 flex-col">
+      <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">SEO Health</h3>
+      <p class="text-xs text-slate-600 dark:text-slate-400">
+        {result.hasPending ? 'Resolving async checks…' : 'Score weighted by rule severity.'}
+      </p>
+    </div>
+    <div class="relative h-20 w-20 shrink-0" role="img" aria-label={ringLabel} title={ringLabel}>
+      <svg viewBox="0 0 80 80" class="h-full w-full -rotate-90" aria-hidden="true">
         <circle cx="40" cy="40" r={RADIUS} stroke="currentColor" stroke-width="6" fill="none" class="text-slate-200 dark:text-slate-700/50" />
         <circle
           cx="40"
@@ -55,18 +61,12 @@
           stroke-linecap="round"
           stroke-dasharray={CIRC}
           stroke-dashoffset={dashOffset}
-          class="{BAND_COLOR[result.band]} transition-[stroke-dashoffset] duration-700 ease-out"
+          class="{ringStroke} transition-[stroke-dashoffset] duration-700 ease-out"
         />
       </svg>
-      <div class="absolute inset-0 flex items-center justify-center">
+      <div class="absolute inset-0 flex items-center justify-center" aria-hidden="true">
         <span class="text-xl font-bold tabular-nums text-slate-900 dark:text-slate-50">{result.score}</span>
       </div>
-    </div>
-    <div class="flex flex-1 flex-col">
-      <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">SEO Health</h3>
-      <p class="text-xs text-slate-600 dark:text-slate-400">
-        {result.hasPending ? 'Resolving async checks…' : 'Score weighted by rule severity.'}
-      </p>
     </div>
   </header>
 

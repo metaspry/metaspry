@@ -143,7 +143,7 @@
           on:click={openApp}
           class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-slate-800 transition hover:bg-white/70 dark:text-slate-100 dark:hover:bg-white/10"
         >
-          <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-indigo-500/15 text-indigo-600 dark:text-indigo-300">
+          <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-indigo-500/20 text-indigo-600 dark:text-indigo-300">
             <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><path d="M15 3h6v6" /><path d="M10 14 21 3" /></svg>
           </span>
           <span class="min-w-0 flex-1 truncate">Open Metaspry web app</span>
@@ -161,7 +161,7 @@
               ? 'bg-white/70 dark:bg-white/10'
               : ''}"
           >
-            <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-indigo-500/15 text-indigo-600 dark:text-indigo-300">
+            <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-indigo-500/20 text-indigo-600 dark:text-indigo-300">
               <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
             </span>
             <span class="min-w-0 flex-1 truncate text-slate-800 dark:text-slate-100">Personal history</span>

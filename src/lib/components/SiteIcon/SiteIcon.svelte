@@ -34,7 +34,7 @@
 {:else}
   <span
     aria-hidden="true"
-    class="inline-flex shrink-0 select-none items-center justify-center rounded-full bg-indigo-500/15 font-semibold leading-none text-indigo-600 dark:text-indigo-300"
+    class="inline-flex shrink-0 select-none items-center justify-center rounded-full bg-indigo-500/20 font-semibold leading-none text-indigo-600 dark:text-indigo-300"
     style="width:{size}px;height:{size}px;font-size:{fontPx}px">{letter}</span
   >
 {/if}

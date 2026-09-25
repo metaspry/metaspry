@@ -356,7 +356,7 @@ Fallback chains (`Preview.svelte`):
 
 ### 3.7 Audit tab: engine, rules and scoring
 
-**Purpose and flow.** A score ring (0-100, coloured by band) titled "SEO Health", then the rules grouped Required / Recommended / Best Practice with pass, warn, fail or spinning pending icons and a length bar for length rules. Below: JSON-LD entities, the hreflang list and duplicate keys.
+**Purpose and flow.** A header card with "SEO Health" and its caption on the left and the score ring (0-100, coloured through `src/lib/audit/band.ts`, `role="img"` "Score 92 of 100, healthy") on the right - identity left, verdict right, the same rule as every list in the web app - then the rules grouped Required / Recommended / Best Practice with pass, warn, fail or spinning pending icons and a length bar for length rules. Below: JSON-LD entities, the hreflang list and duplicate keys.
 
 **Engine.** `audit(meta, settings)` runs every rule synchronously. `og:image-dimensions` returns `pending`; `resolveAsyncRules()` loads the image (`new Image()`, 5 s timeout, `referrerPolicy = 'no-referrer'`), replaces that rule's result and rescores with `rescoreAfterAsync()`.
 
@@ -481,7 +481,7 @@ indexed, and "a canonical tag is present" passed it.
 
 ### 3.10 History
 
-**Purpose and flow.** The History button in the header toolbar (3.17; `aria-expanded` while open) opens "Recent scrapes": the last 10 scans with the site favicon (`SiteIcon`, 16 px; letter tile when missing or broken), a score badge, the title (or hostname) and a relative time. Clicking an entry opens its URL in a background tab (`active: false`, so a popup stays open). "Clear" empties the list.
+**Purpose and flow.** The History button in the header toolbar (3.17; `aria-expanded` while open) opens "Recent scrapes": the last 10 scans, each row left to right: site favicon (`SiteIcon`, 16 px; letter tile when missing or broken), title (or hostname) over hostname, relative time, then the score chip last (`bandClasses(...).chip` from `src/lib/audit/band.ts`, `role="img"` with the "Score N of 100, band" label). Clicking an entry opens its URL in a background tab (`active: false`, so a popup stays open). "Clear" empties the list.
 
 **Key files.** `src/lib/components/History/HistoryDropdown.svelte`, `src/lib/storage/history.ts`, `src/lib/components/SiteIcon/SiteIcon.svelte`.
 
@@ -532,7 +532,7 @@ Checks in `src/lib/audit/aeo.ts`:
 
 ### 3.12 Compare tab
 
-**Purpose and flow.** A URL field pre-filled with `pageUrl`. Input like `example.com` gets `https://` added, and the hostname must contain a dot. The tab fetches the URL, requires a `text/html` content type, parses it, then shows Current and Compared score cards and one row per key: same (green), different (amber) or present on one side only (grey). Priority keys come first (title, description, canonical, `og:title`, `og:description`, `og:image`, `og:url`, `og:type`, `twitter:card`, `twitter:title`, `twitter:description`, `twitter:image`), then the rest alphabetically.
+**Purpose and flow.** A URL field pre-filled with `pageUrl`. Input like `example.com` gets `https://` added, and the hostname must contain a dot. The tab re-fetches the current page and fetches the compared URL as served HTML (both sides without cookies; the rendered DOM is used for the left side only when that fetch fails, with a warning), requires a `text/html` content type, parses it, then shows the Current and Compared cards (label and URL on the left, the coloured score on the right of the same line, `role="img"` labelled - the Current score is the rendered-page audit from the Audit tab, the Compared score is an audit of the served HTML, so on a JavaScript-rendered site the two scores measure different things while the diff rows below compare served HTML on both sides) and one row per key: same (green), different (amber) or present on one side only (grey). Priority keys come first (title, description, canonical, `og:title`, `og:description`, `og:image`, `og:url`, `og:type`, `twitter:card`, `twitter:title`, `twitter:description`, `twitter:image`), then the rest alphabetically.
 
 **Key files.** `src/lib/components/Compare/CompareView.svelte`, `src/lib/components/Compare/diff.ts`.
 
@@ -642,6 +642,7 @@ In the tab strip, Arrow Left/Right, Home and End move between tabs. `Esc` closes
 - Views: `landing` (Grid card "Get Meta Tags"), `loading` (`Skeleton`), `error` (`ErrorState`: "Couldn't scrape this page", Retry, links to docs and GitHub issues), `empty` (`EmptyState`: "No meta tags found", Try again, docs link), `results` (`Tabs` with Tags, Previews, Audit, Site, AI, Compare).
 - `Screen`: glass card wrapper. `Grid`: landing action cards (`GridProps` in `Grid.ts`).
 - Toasts: `toast(message, variant)`; at most 3 visible, 1.5 s each.
+- Scores: `src/lib/audit/band.ts` (`bandFor`, `bandLabel`, `scoreLabel`, `bandClasses`) is the only place a score turns into a band, a label or colour classes; the History chip, the Audit ring, the Compare numbers and the cloud payload's `band` all use it. Placement rule shared with the web app: identity left, score last on the right. Tailwind 3 gotcha: `bg-*/15` compiles to nothing (no 15 in the opacity scale) - use `/20`.
 
 **Gotchas.**
 - `Tabs` renders `tab.icon` with `{@html}`. Pass only static trusted markup there, never page data. No tab uses an icon today.

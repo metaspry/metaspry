@@ -4,6 +4,7 @@
   import { audit } from '../../audit/rules';
   import { needsAsyncResolution, resolveAsyncRules } from '../../audit/asyncRules';
   import { effectiveSettings } from '../../cloud/plan';
+  import { bandClasses, bandFor, scoreLabel } from '../../audit/band';
   import { diffMeta, type DiffRow } from './diff';
   import { sameUrl } from '../../audit/url-match';
 
@@ -118,11 +119,7 @@
     return 'border-slate-200/60 bg-slate-50/40 dark:border-slate-700/40 dark:bg-slate-900/20';
   }
 
-  function scoreColor(s: number): string {
-    if (s >= 80) return 'text-emerald-600 dark:text-emerald-400';
-    if (s >= 50) return 'text-amber-600 dark:text-amber-400';
-    return 'text-rose-600 dark:text-rose-400';
-  }
+  const scoreColor = (s: number): string => bandClasses(bandFor(s)).text;
 </script>
 
 <div class="flex flex-col gap-3">
@@ -156,22 +153,28 @@
       </p>
     {:else}
       <p class="px-1 text-[11px] text-slate-500 dark:text-slate-400">
-        Comparing the served HTML of both pages, fetched without your cookies — so tags added by
-        JavaScript after load are not included on either side, and a page that varies by login or
-        region may differ from what you see.
+        The rows below compare the served HTML of both pages, fetched without your cookies — tags
+        added by JavaScript after load are not included on either side, and a page that varies by
+        login or region may differ from what you see. The Current score is your rendered-page audit
+        from the Audit tab; the Compared score is an audit of the served HTML.
       </p>
     {/if}
     <div class="grid grid-cols-2 gap-2">
-      <div class="rounded-xl border border-white/40 bg-white/40 px-3 py-2 backdrop-blur-md dark:border-white/10 dark:bg-white/5">
-        <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Current</p>
-        <p class="truncate text-xs text-slate-700 dark:text-slate-300" title={leftUrl}>{leftUrl}</p>
-        <p class="text-lg font-bold tabular-nums {scoreColor(leftScore)}">{leftScore}</p>
-      </div>
-      <div class="rounded-xl border border-white/40 bg-white/40 px-3 py-2 backdrop-blur-md dark:border-white/10 dark:bg-white/5">
-        <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Compared</p>
-        <p class="truncate text-xs text-slate-700 dark:text-slate-300" title={rightUrl}>{rightUrl}</p>
-        <p class="text-lg font-bold tabular-nums {scoreColor(rightScore)}">{rightScore}</p>
-      </div>
+      <!-- Label + url on the left, score on the right of the same card: the shared placement rule. -->
+      {#each [{ label: 'Current', url: leftUrl, score: leftScore }, { label: 'Compared', url: rightUrl, score: rightScore }] as card (card.label)}
+        <div class="flex items-center justify-between gap-2 rounded-xl border border-white/40 bg-white/40 px-3 py-2 backdrop-blur-md dark:border-white/10 dark:bg-white/5">
+          <div class="min-w-0 flex-1">
+            <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{card.label}</p>
+            <p class="truncate text-xs text-slate-700 dark:text-slate-300" title={card.url}>{card.url}</p>
+          </div>
+          <p
+            class="shrink-0 text-lg font-bold tabular-nums {scoreColor(card.score)}"
+            role="img"
+            aria-label={scoreLabel(card.score)}
+            title={scoreLabel(card.score)}
+          >{card.score}</p>
+        </div>
+      {/each}
     </div>
 
     <div class="flex flex-col gap-1">
