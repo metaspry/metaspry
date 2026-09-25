@@ -39,7 +39,7 @@
                     {#if safeHref(child.url)}
                       <a href={safeHref(child.url)} target="_blank" rel="noopener noreferrer" class="block break-all text-[11px] text-indigo-600 hover:underline dark:text-indigo-300">{child.url}</a>
                     {:else}
-                      <span class="block break-all text-[11px] text-slate-600 dark:text-slate-400" use:tooltip={'Not an http(s) URL'}>{child.url}</span>
+                      <span class="block break-all text-[11px] text-slate-600 dark:text-slate-400" use:tooltip={'Not an http(s) URL'}>{child.url}<span class="sr-only"> (not an http(s) URL)</span></span>
                     {/if}
                     <p class="text-[10px] text-slate-600 dark:text-slate-400">
                       {#if child.error}
@@ -67,7 +67,7 @@
                   {#if safeHref(s)}
                     <a href={safeHref(s)} target="_blank" rel="noopener noreferrer" class="break-all text-indigo-600 hover:underline dark:text-indigo-300">{s}</a>
                   {:else}
-                    <span class="break-all text-slate-600 dark:text-slate-400" use:tooltip={'Not an http(s) URL'}>{s}</span>
+                    <span class="break-all text-slate-600 dark:text-slate-400" use:tooltip={'Not an http(s) URL'}>{s}<span class="sr-only"> (not an http(s) URL)</span></span>
                   {/if}
                 </li>
               {/each}

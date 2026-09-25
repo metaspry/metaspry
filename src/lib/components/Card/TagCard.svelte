@@ -26,7 +26,7 @@
     <button
       on:click={copy}
       type="button"
-      aria-label="Copy value"
+      aria-label={`Copy ${tag.key} value`}
       use:tooltip={`Copy ${tag.key} value`}
       class="flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 transition hover:bg-white/60 hover:text-indigo-600 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-indigo-300"
     >

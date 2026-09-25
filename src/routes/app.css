@@ -31,7 +31,7 @@ html[data-mode="popup"] [data-bg-orb] {
  * idle element (and its last text) out of the accessibility tree; visibility is transitioned with
  * opacity so the fade-out still plays. */
 .ms-tooltip {
-  @apply pointer-events-none fixed left-0 top-0 z-[60] max-w-[240px] rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 shadow-lg invisible transition-[opacity,visibility] dark:bg-slate-100 dark:text-slate-900;
+  @apply pointer-events-none fixed left-0 top-0 z-[60] max-w-[240px] rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white break-words opacity-0 shadow-lg invisible transition-[opacity,visibility] dark:bg-slate-100 dark:text-slate-900;
 }
 
 .ms-tooltip[data-show] {

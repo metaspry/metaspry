@@ -46,6 +46,12 @@ export function withDescribedBy(current: string | null, id: string, present: boo
   return ids.length > 0 ? ids.join(' ') : null;
 }
 
+/** True when the tooltip text only repeats the trigger's `aria-label` (compared trimmed, case-blind). */
+export function repeatsName(node: Pick<HTMLElement, 'getAttribute'>, text: string): boolean {
+  const name = node.getAttribute('aria-label');
+  return name !== null && name.trim().toLowerCase() === text.trim().toLowerCase();
+}
+
 interface Tip {
   root: HTMLDivElement;
   label: HTMLSpanElement;
@@ -55,6 +61,8 @@ interface Tip {
 let tip: Tip | null = null;
 let owner: HTMLElement | null = null;
 let stopAutoUpdate: (() => void) | null = null;
+/** The one hover delay in flight. A nested trigger (History chip inside its row) cancels its parent's. */
+let cancelPending: (() => void) | null = null;
 
 function ensureTip(): Tip | null {
   if (typeof document === 'undefined' || !document.body) return null;
@@ -111,7 +119,10 @@ function show(node: HTMLElement, o: ResolvedTooltipOptions): void {
   stopAutoUpdate?.();
   owner = node;
   t.label.textContent = o.text;
-  node.setAttribute('aria-describedby', withDescribedBy(node.getAttribute('aria-describedby'), TOOLTIP_ID, true) ?? TOOLTIP_ID);
+  // Text that repeats the accessible name would be read twice ("History, button, History").
+  if (!repeatsName(node, o.text)) {
+    node.setAttribute('aria-describedby', withDescribedBy(node.getAttribute('aria-describedby'), TOOLTIP_ID, true) ?? TOOLTIP_ID);
+  }
   stopAutoUpdate = autoUpdate(node, t.root, () => position(node, t, o.placement));
   window.addEventListener('keydown', onWindowKey);
 }
@@ -144,13 +155,17 @@ export function tooltip(node: HTMLElement, opts: string | TooltipOptions) {
   const clear = () => {
     if (timer !== null) clearTimeout(timer);
     timer = null;
+    if (cancelPending === clear) cancelPending = null;
   };
   const onEnter = (event: Event) => {
     // A tap sends pointerenter too; a tooltip left behind by a finger has no leave to close it.
     if ((event as PointerEvent).pointerType === 'touch' || o.text === '') return;
     clear();
+    cancelPending?.();
+    cancelPending = clear;
     timer = setTimeout(() => {
       timer = null;
+      if (cancelPending === clear) cancelPending = null;
       show(node, o);
     }, o.delay);
   };
