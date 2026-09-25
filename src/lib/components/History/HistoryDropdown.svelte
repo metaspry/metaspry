@@ -1,13 +1,32 @@
 <script lang="ts">
   import { fade } from 'svelte/transition';
+  import { tick } from 'svelte';
   import { history, clearHistory } from '../../storage/history';
   import SiteIcon from '../SiteIcon/SiteIcon.svelte';
-  import { toolbarButtonClass } from '../toolbar';
+  import { toolbarButtonClass, FOCUS_RING, FOCUS_RING_INSET } from '../toolbar';
   import { bandClasses, bandFor, scoreLabel } from '../../audit/band';
   import { tooltip } from '../../actions/tooltip';
+  import { popover } from '../../actions/popover';
+  import { dur } from '../../motion';
   import { timeAgo } from '../../util/time-ago';
 
+  const TITLE_ID = 'history-title';
+  const CONFIRM_CLASS = `rounded px-1 underline-offset-2 hover:underline ${FOCUS_RING}`;
+
   let open = false;
+  let trigger: HTMLButtonElement | null = null;
+  let panel: HTMLElement | null = null;
+  let clearBtn: HTMLButtonElement | null = null;
+  let confirmBtn: HTMLButtonElement | null = null;
+  let confirmGroup: HTMLElement | null = null;
+  // "Clear" is two steps: the button turns into "Clear all? Yes / No" and only Yes clears.
+  let clearArmed = false;
+
+  $: if (!open) clearArmed = false;
+
+  function close() {
+    open = false;
+  }
 
   function openInNewTab(url: string) {
     // active: false opens the new tab in the background so the popup retains
@@ -16,17 +35,44 @@
     chrome.tabs.create({ url, active: false });
   }
 
-  function onWindowClick(event: MouseEvent) {
-    if (!(event.target instanceof Element)) return;
-    if (!event.target.closest('[data-history-root]')) open = false;
+  // Arming swaps the button for the confirm, so focus follows the swap (the Settings drawer's
+  // Reset does the same) instead of falling to <body>.
+  async function armClear() {
+    clearArmed = true;
+    await tick();
+    confirmBtn?.focus();
+  }
+  async function disarmClear(refocus: boolean) {
+    clearArmed = false;
+    if (!refocus) return;
+    await tick();
+    clearBtn?.focus();
+  }
+  async function confirmClear() {
+    clearArmed = false;
+    clearHistory();
+    // Clear leaves with the list, so focus stays on the panel rather than dropping to <body>.
+    await tick();
+    panel?.focus();
+  }
+  function onConfirmKey(event: KeyboardEvent) {
+    if (event.key !== 'Escape') return;
+    // Cancels the confirm only; the panel stays open (a second Escape closes it).
+    event.preventDefault();
+    event.stopPropagation();
+    void disarmClear(true);
+  }
+  function onConfirmFocusOut(event: FocusEvent) {
+    const next = event.relatedTarget;
+    if (next instanceof Node && confirmGroup?.contains(next)) return;
+    clearArmed = false;
   }
 </script>
 
-<svelte:window on:click={onWindowClick} />
-
 <!-- Not `relative`: the menu anchors to the header's right-hand block (Extension.svelte). -->
-<div data-history-root>
+<div>
   <button
+    bind:this={trigger}
     type="button"
     aria-label="History"
     use:tooltip={'History'}
@@ -40,14 +86,30 @@
     </svg>
   </button>
   {#if open}
+    <!-- `use:popover`: focus lands on the first row (the panel itself when there is none), Escape
+         or a press outside closes, focus returns to the History button. -->
     <div
-      transition:fade={{ duration: 100 }}
-      class="absolute right-0 top-10 z-30 w-64 max-w-[calc(100vw-2.5rem)] overflow-hidden rounded-2xl border border-white/40 bg-white/90 shadow-xl backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/90"
+      bind:this={panel}
+      use:popover={{ trigger, onClose: close, initialFocus: '[data-history-row]' }}
+      transition:fade={{ duration: dur(100) }}
+      role="dialog"
+      aria-labelledby={TITLE_ID}
+      tabindex="-1"
+      class="absolute right-0 top-10 z-30 w-64 max-w-[calc(100vw-2.5rem)] overflow-hidden rounded-2xl border border-white/40 bg-white shadow-xl focus:outline-none dark:border-white/10 dark:bg-popover"
     >
       <header class="flex items-center justify-between border-b border-white/40 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:border-white/10 dark:text-slate-400">
-        <span>Recent scrapes</span>
+        <span id={TITLE_ID}>Recent scrapes</span>
         {#if $history.length > 0}
-          <button type="button" on:click={clearHistory} class="text-rose-500 hover:underline dark:text-rose-400">Clear</button>
+          {#if clearArmed}
+            <span bind:this={confirmGroup} role="group" aria-label="Confirm clear history" class="inline-flex items-center gap-1.5 text-[11px] normal-case tracking-normal text-rose-600 dark:text-rose-300">
+              Clear all?
+              <button bind:this={confirmBtn} type="button" on:click={confirmClear} on:keydown={onConfirmKey} on:focusout={onConfirmFocusOut} class={CONFIRM_CLASS}>Yes</button>
+              <span aria-hidden="true">/</span>
+              <button type="button" on:click={() => disarmClear(true)} on:keydown={onConfirmKey} on:focusout={onConfirmFocusOut} class={CONFIRM_CLASS}>No</button>
+            </span>
+          {:else}
+            <button bind:this={clearBtn} type="button" on:click={armClear} class="rounded px-1 text-[11px] normal-case tracking-normal text-rose-600 hover:underline dark:text-rose-300 {FOCUS_RING}">Clear</button>
+          {/if}
         {/if}
       </header>
       {#if $history.length > 0}
@@ -67,9 +129,10 @@
             <li class="border-b border-white/40 last:border-b-0 dark:border-white/5">
               <button
                 type="button"
+                data-history-row
                 use:tooltip={'Open in new tab'}
                 on:click={() => openInNewTab(entry.url)}
-                class="group/row flex w-full items-center gap-2 px-3 py-2 text-left transition hover:bg-white/60 dark:hover:bg-white/5"
+                class="group/row flex w-full items-center gap-2 px-3 py-2 text-left transition hover:bg-white/60 dark:hover:bg-white/5 {FOCUS_RING_INSET}"
               >
                 <SiteIcon src={entry.icon ?? null} hostname={entry.hostname} size={16} />
                 <span class="min-w-0 flex-1">

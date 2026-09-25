@@ -6,8 +6,11 @@ import { arrow, autoUpdate, computePosition, flip, offset, shift } from '@floati
  *
  * One shared `role="tooltip"` element (`.ms-tooltip`, see `src/routes/app.css`) is appended to the
  * document body on first use and reused by every trigger, so at most one tooltip is ever on screen.
- * Hover shows it after `delay` ms, keyboard focus shows it at once; leaving, blurring, Escape or
- * pressing the trigger hides it. While it is visible the trigger's `aria-describedby` points at it.
+ * Hover shows it after `delay` ms, keyboard focus shows it at once. Leaving the trigger (or blurring
+ * it) hides it after `HIDE_GRACE_MS`, long enough to move the pointer onto the bubble, which holds it
+ * (WCAG 1.4.13 hoverable); leaving the bubble hides it after the same grace. Escape, pressing the
+ * trigger, or another trigger taking over hide it at once. While it is visible the trigger's
+ * `aria-describedby` points at it and the bubble carries `is-open` (which turns pointer events on).
  */
 
 export type TooltipPlacement = 'top' | 'bottom' | 'left' | 'right';
@@ -26,6 +29,9 @@ export interface ResolvedTooltipOptions {
 
 export const TOOLTIP_ID = 'ms-tooltip';
 export const TOOLTIP_DELAY = 350;
+/** How long the bubble stays after the pointer leaves the trigger or the bubble, so it can be reached. */
+export const HIDE_GRACE_MS = 120;
+const OPEN_CLASS = 'is-open';
 
 const PLACEMENTS: readonly TooltipPlacement[] = ['top', 'bottom', 'left', 'right'];
 
@@ -63,6 +69,23 @@ let owner: HTMLElement | null = null;
 let stopAutoUpdate: (() => void) | null = null;
 /** The one hover delay in flight. A nested trigger (History chip inside its row) cancels its parent's. */
 let cancelPending: (() => void) | null = null;
+/** The one grace-period hide in flight; entering the bubble or re-entering the owner cancels it. */
+let hideTimer: ReturnType<typeof setTimeout> | null = null;
+
+function cancelHide(): void {
+  if (hideTimer !== null) clearTimeout(hideTimer);
+  hideTimer = null;
+}
+
+/** Hides the owner's tooltip after the grace unless the bubble or the trigger is entered first. */
+function scheduleHide(node: HTMLElement): void {
+  if (owner !== node) return;
+  cancelHide();
+  hideTimer = setTimeout(() => {
+    hideTimer = null;
+    hide(node);
+  }, HIDE_GRACE_MS);
+}
 
 function ensureTip(): Tip | null {
   if (typeof document === 'undefined' || !document.body) return null;
@@ -75,6 +98,11 @@ function ensureTip(): Tip | null {
   const arrowEl = document.createElement('div');
   arrowEl.className = 'ms-tooltip-arrow';
   root.append(label, arrowEl);
+  // The bubble is a hover bridge: while the pointer is on it the tooltip stays (1.4.13).
+  root.addEventListener('pointerenter', cancelHide);
+  root.addEventListener('pointerleave', () => {
+    if (owner) scheduleHide(owner);
+  });
   document.body.appendChild(root);
   tip = { root, label, arrow: arrowEl };
   return tip;
@@ -107,7 +135,7 @@ function position(node: HTMLElement, t: Tip, placement: TooltipPlacement): void 
 
 function onWindowKey(event: KeyboardEvent): void {
   // Hide only: no preventDefault / stopPropagation, so Escape still reaches the Settings drawer,
-  // the History dropdown and every other Escape handler behind the tooltip.
+  // the popovers and every other Escape handler behind the tooltip.
   if (event.key === 'Escape' && owner) hide(owner);
 }
 
@@ -116,9 +144,11 @@ function show(node: HTMLElement, o: ResolvedTooltipOptions): void {
   const t = ensureTip();
   if (!t) return;
   if (owner && owner !== node) hide(owner);
+  cancelHide();
   stopAutoUpdate?.();
   owner = node;
   t.label.textContent = o.text;
+  t.root.classList.add(OPEN_CLASS);
   // Text that repeats the accessible name would be read twice ("History, button, History").
   if (!repeatsName(node, o.text)) {
     node.setAttribute('aria-describedby', withDescribedBy(node.getAttribute('aria-describedby'), TOOLTIP_ID, true) ?? TOOLTIP_ID);
@@ -129,10 +159,12 @@ function show(node: HTMLElement, o: ResolvedTooltipOptions): void {
 
 function hide(node: HTMLElement): void {
   if (owner !== node) return;
+  cancelHide();
   owner = null;
   stopAutoUpdate?.();
   stopAutoUpdate = null;
   tip?.root.removeAttribute('data-show');
+  tip?.root.classList.remove(OPEN_CLASS);
   const next = withDescribedBy(node.getAttribute('aria-describedby'), TOOLTIP_ID, false);
   if (next === null) node.removeAttribute('aria-describedby');
   else node.setAttribute('aria-describedby', next);
@@ -160,6 +192,11 @@ export function tooltip(node: HTMLElement, opts: string | TooltipOptions) {
   const onEnter = (event: Event) => {
     // A tap sends pointerenter too; a tooltip left behind by a finger has no leave to close it.
     if ((event as PointerEvent).pointerType === 'touch' || o.text === '') return;
+    // Back from the bubble (or already shown by focus): keep it, no new delay, no re-anchor.
+    if (owner === node) {
+      cancelHide();
+      return;
+    }
     clear();
     cancelPending?.();
     cancelPending = clear;
@@ -169,7 +206,13 @@ export function tooltip(node: HTMLElement, opts: string | TooltipOptions) {
       show(node, o);
     }, o.delay);
   };
+  /** pointerleave / blur: a pending show is dropped, a visible bubble gets the grace period. */
   const onLeave = () => {
+    clear();
+    scheduleHide(node);
+  };
+  /** pointerdown / Escape / emptied text / destroy: gone at once. */
+  const hideNow = () => {
     clear();
     hide(node);
   };
@@ -179,7 +222,7 @@ export function tooltip(node: HTMLElement, opts: string | TooltipOptions) {
     show(node, o);
   };
   const onKey = (event: Event) => {
-    if ((event as KeyboardEvent).key === 'Escape') onLeave();
+    if ((event as KeyboardEvent).key === 'Escape') hideNow();
   };
 
   node.addEventListener('pointerenter', onEnter);
@@ -187,28 +230,27 @@ export function tooltip(node: HTMLElement, opts: string | TooltipOptions) {
   node.addEventListener('focus', onFocus);
   node.addEventListener('blur', onLeave);
   node.addEventListener('keydown', onKey);
-  node.addEventListener('pointerdown', onLeave);
+  node.addEventListener('pointerdown', hideNow);
 
   return {
     update(next: string | TooltipOptions) {
       o = normalizeTooltipOptions(next);
       if (owner !== node) return;
       if (o.text === '') {
-        onLeave();
+        hideNow();
         return;
       }
       // Visible right now (e.g. the theme button's label flipped): swap the text and re-anchor.
       show(node, o);
     },
     destroy() {
-      clear();
-      hide(node);
+      hideNow();
       node.removeEventListener('pointerenter', onEnter);
       node.removeEventListener('pointerleave', onLeave);
       node.removeEventListener('focus', onFocus);
       node.removeEventListener('blur', onLeave);
       node.removeEventListener('keydown', onKey);
-      node.removeEventListener('pointerdown', onLeave);
+      node.removeEventListener('pointerdown', hideNow);
     },
   };
 }

@@ -3,6 +3,7 @@
   import type { PageMeta } from '../../scrapers/PageMeta';
   import { bandClasses, bandFor, scoreLabel } from '../../audit/band';
   import { tooltip } from '../../actions/tooltip';
+  import { FOCUS_RING } from '../toolbar';
   import { compareChangedHref } from '../../cloud/compare-link';
   import type { UploadResult } from '../../cloud/sync';
   import { timeAgo } from '../../util/time-ago';
@@ -101,7 +102,7 @@
       <span class="min-w-0 truncate text-xs text-slate-600 dark:text-slate-400">{lastScan}</span>
       <button
         type="button"
-        class="inline-flex h-8 shrink-0 items-center rounded-md px-1.5 text-xs font-medium text-indigo-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 dark:text-indigo-300"
+        class="inline-flex h-8 shrink-0 items-center rounded-md px-1.5 text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-300 {FOCUS_RING}"
         aria-label="Open what changed since the previous scan in the Metaspry web app"
         use:tooltip={'Opens the diff between this scan and the previous one in the Metaspry web app'}
         on:click={openChanged}

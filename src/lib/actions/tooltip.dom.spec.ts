@@ -15,9 +15,13 @@ vi.mock('@floating-ui/dom', () => ({
   arrow: vi.fn(() => ({})),
 }));
 
-const { tooltip, TOOLTIP_ID } = await import('./tooltip');
+const { tooltip, TOOLTIP_ID, HIDE_GRACE_MS } = await import('./tooltip');
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
+/** Real-timer wait past the hide grace (for the tests that also await floating-ui's promise). */
+const grace = () => new Promise((r) => setTimeout(r, HIDE_GRACE_MS + 10));
+const hover = (el: Element) => el.dispatchEvent(new PointerEvent('pointerenter', { pointerType: 'mouse' }));
+const leave = (el: Element) => el.dispatchEvent(new PointerEvent('pointerleave', { pointerType: 'mouse' }));
 const tip = () => document.getElementById(TOOLTIP_ID);
 
 function button(label?: string): HTMLButtonElement {
@@ -51,7 +55,11 @@ describe('tooltip action (DOM)', () => {
     expect(el?.style.left).toBe('10px');
     expect(b.getAttribute('aria-describedby')).toBe(TOOLTIP_ID);
     b.dispatchEvent(new Event('blur'));
+    // Blur schedules the hide (the same grace as pointerleave), so a pointer already on the bubble holds it.
+    expect(el?.hasAttribute('data-show')).toBe(true);
+    await grace();
     expect(el?.hasAttribute('data-show')).toBe(false);
+    expect(el?.classList.contains('is-open')).toBe(false);
     expect(b.hasAttribute('aria-describedby')).toBe(false);
     expect(stopAutoUpdate).toHaveBeenCalled();
     a.destroy();
@@ -83,6 +91,7 @@ describe('tooltip action (DOM)', () => {
     b.dispatchEvent(new Event('focus'));
     expect(b.getAttribute('aria-describedby')).toBe(`err-1 ${TOOLTIP_ID}`);
     b.dispatchEvent(new Event('blur'));
+    await grace();
     expect(b.getAttribute('aria-describedby')).toBe('err-1');
   });
 
@@ -160,5 +169,98 @@ describe('tooltip action (DOM)', () => {
     a.destroy();
     expect(tip()?.hasAttribute('data-show')).toBe(false);
     expect(b.hasAttribute('aria-describedby')).toBe(false);
+  });
+
+  it('is hoverable: leaving the trigger keeps it for the grace, the bubble holds it, leaving the bubble hides it', async () => {
+    vi.useFakeTimers();
+    const b = button();
+    tooltip(b, 'Settings');
+    hover(b);
+    await vi.advanceTimersByTimeAsync(350);
+    const el = tip()!;
+    expect(el.hasAttribute('data-show')).toBe(true);
+    expect(el.classList.contains('is-open')).toBe(true);
+    leave(b);
+    await vi.advanceTimersByTimeAsync(HIDE_GRACE_MS - 1);
+    expect(el.hasAttribute('data-show')).toBe(true);
+    hover(el);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(el.hasAttribute('data-show')).toBe(true);
+    expect(b.getAttribute('aria-describedby')).toBe(TOOLTIP_ID);
+    leave(el);
+    await vi.advanceTimersByTimeAsync(HIDE_GRACE_MS - 1);
+    expect(el.hasAttribute('data-show')).toBe(true);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(el.hasAttribute('data-show')).toBe(false);
+    expect(el.classList.contains('is-open')).toBe(false);
+    expect(b.hasAttribute('aria-describedby')).toBe(false);
+  });
+
+  it('leaving the trigger without reaching the bubble hides after the grace', async () => {
+    vi.useFakeTimers();
+    const b = button();
+    tooltip(b, 'Settings');
+    hover(b);
+    await vi.advanceTimersByTimeAsync(350);
+    leave(b);
+    await vi.advanceTimersByTimeAsync(HIDE_GRACE_MS);
+    expect(tip()?.hasAttribute('data-show')).toBe(false);
+  });
+
+  it('coming back from the bubble to the trigger keeps it, with no new delay', async () => {
+    vi.useFakeTimers();
+    const b = button();
+    tooltip(b, 'Settings');
+    hover(b);
+    await vi.advanceTimersByTimeAsync(350);
+    const el = tip()!;
+    leave(b);
+    hover(el);
+    leave(el);
+    hover(b);
+    // Past the grace, before a fresh 350 ms delay could have re-shown it: it must never have hidden.
+    await vi.advanceTimersByTimeAsync(HIDE_GRACE_MS + 1);
+    expect(el.hasAttribute('data-show')).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+    expect(el.textContent).toBe('Settings');
+  });
+
+  it('Escape hides at once, even inside the grace period', async () => {
+    vi.useFakeTimers();
+    const b = button();
+    tooltip(b, 'Settings');
+    hover(b);
+    await vi.advanceTimersByTimeAsync(350);
+    leave(b);
+    b.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(tip()?.hasAttribute('data-show')).toBe(false);
+    expect(b.hasAttribute('aria-describedby')).toBe(false);
+    await vi.advanceTimersByTimeAsync(HIDE_GRACE_MS);
+    expect(tip()?.hasAttribute('data-show')).toBe(false);
+  });
+
+  it('nested hand-off: the chip takes over the row, and the row leaving does not hide the chip', async () => {
+    vi.useFakeTimers();
+    const row = button();
+    const chip = document.createElement('span');
+    row.appendChild(chip);
+    tooltip(row, 'Open in new tab');
+    tooltip(chip, 'Score 64 of 100, needs work');
+    hover(row);
+    await vi.advanceTimersByTimeAsync(350);
+    expect(tip()?.textContent).toBe('Open in new tab');
+    hover(chip);
+    await vi.advanceTimersByTimeAsync(350);
+    expect(tip()?.textContent).toBe('Score 64 of 100, needs work');
+    expect(tip()?.hasAttribute('data-show')).toBe(true);
+    expect(row.hasAttribute('aria-describedby')).toBe(false);
+    expect(chip.getAttribute('aria-describedby')).toBe(TOOLTIP_ID);
+    leave(row);
+    await vi.advanceTimersByTimeAsync(HIDE_GRACE_MS);
+    expect(tip()?.hasAttribute('data-show')).toBe(true);
+    leave(chip);
+    await vi.advanceTimersByTimeAsync(HIDE_GRACE_MS);
+    expect(tip()?.hasAttribute('data-show')).toBe(false);
+    expect(chip.hasAttribute('aria-describedby')).toBe(false);
   });
 });

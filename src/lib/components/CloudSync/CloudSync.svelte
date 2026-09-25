@@ -11,6 +11,8 @@
   import { initCloudPlan, APP_URL } from "../../cloud/plan";
   import { initialsFor } from "../../cloud/initials";
   import { tooltip } from "../../actions/tooltip";
+  import { popover } from "../../actions/popover";
+  import { FOCUS_RING } from "../toolbar";
   import {
     initCloudWorkspaces,
     workspaces,
@@ -20,6 +22,7 @@
   } from "../../cloud/workspaces";
 
   let open = false;
+  let trigger: HTMLButtonElement | null = null;
   let email = "";
   let password = "";
   let busy = false;
@@ -65,6 +68,10 @@
     open = false;
   }
 
+  function close() {
+    open = false;
+  }
+
   function pickPersonal() {
     setSyncScope({ kind: "personal" });
     open = false;
@@ -94,12 +101,13 @@
        it shows who and where scans go, and opens the account dropdown. -->
   {#if $cloudUser}
     <button
+      bind:this={trigger}
       type="button"
       on:click={() => (open = !open)}
       aria-label="Account and sync target"
       aria-expanded={open}
       use:tooltip={`Signed in as ${$cloudUser.email} - saving scans to ${targetLabel}`}
-      class="flex h-9 max-w-[170px] items-center gap-1.5 rounded-xl border border-slate-200/70 bg-white/70 py-0.5 pl-0.5 pr-2 text-xs font-medium text-slate-700 backdrop-blur-md transition hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
+      class="flex h-9 max-w-[170px] items-center gap-1.5 rounded-xl border border-slate-200/70 bg-white/70 py-0.5 pl-0.5 pr-2 text-xs font-medium text-slate-700 backdrop-blur-md transition hover:bg-white dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 {FOCUS_RING}"
     >
       <span class="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500 text-[10px] font-bold text-white" aria-hidden="true">
         {initials}
@@ -110,25 +118,23 @@
     </button>
   {:else}
     <button
+      bind:this={trigger}
       type="button"
       on:click={() => (open = !open)}
       aria-expanded={open}
       use:tooltip={"Sign in to sync scans to your account"}
-      class="flex h-9 shrink-0 items-center rounded-xl bg-indigo-600 px-3 text-xs font-semibold text-white shadow-sm shadow-indigo-500/30 transition hover:bg-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-1"
+      class="flex h-9 shrink-0 items-center rounded-xl bg-indigo-600 px-3 text-xs font-semibold text-white shadow-sm shadow-indigo-500/30 transition hover:bg-indigo-500 {FOCUS_RING}"
     >Sign in</button>
   {/if}
 
   {#if open}
-    <!-- click-away backdrop -->
-    <button
-      type="button"
-      class="fixed inset-0 z-40 cursor-default"
-      aria-label="Close"
-      on:click={() => (open = false)}
-    ></button>
-
+    <!-- `use:popover`: focus lands on the email field (signed out) or the first item (signed in),
+         Escape or a press outside closes, focus returns to the account control. -->
     <div
-      class="absolute right-0 z-50 mt-2 flex w-64 max-w-[calc(100vw-2.5rem)] flex-col gap-2 rounded-xl border border-white/40 bg-white/95 p-3 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/95"
+      use:popover={{ trigger, onClose: close, initialFocus: 'input[type="email"]' }}
+      role="dialog"
+      aria-label={$cloudUser ? "Account and sync target" : "Sign in"}
+      class="absolute right-0 z-50 mt-2 flex w-64 max-w-[calc(100vw-2.5rem)] flex-col gap-2 rounded-xl border border-white/40 bg-white p-3 shadow-2xl dark:border-white/10 dark:bg-popover"
     >
       {#if $cloudUser}
         <div class="flex items-center gap-2">
@@ -142,7 +148,7 @@
         <button
           type="button"
           on:click={openApp}
-          class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-slate-800 transition hover:bg-white/70 dark:text-slate-100 dark:hover:bg-white/10"
+          class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-slate-800 transition hover:bg-white/70 dark:text-slate-100 dark:hover:bg-white/10 {FOCUS_RING}"
         >
           <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-indigo-500/20 text-indigo-600 dark:text-indigo-300">
             <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><path d="M15 3h6v6" /><path d="M10 14 21 3" /></svg>
@@ -158,7 +164,7 @@
           <button
             type="button"
             on:click={pickPersonal}
-            class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm transition hover:bg-white/70 dark:hover:bg-white/10 {isPersonal
+            class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm transition hover:bg-white/70 dark:hover:bg-white/10 {FOCUS_RING} {isPersonal
               ? 'bg-white/70 dark:bg-white/10'
               : ''}"
           >
@@ -173,7 +179,7 @@
             <button
               type="button"
               on:click={() => pickWorkspace(w)}
-              class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm transition hover:bg-white/70 dark:hover:bg-white/10 {$syncScope.kind ===
+              class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm transition hover:bg-white/70 dark:hover:bg-white/10 {FOCUS_RING} {$syncScope.kind ===
                 'workspace' && $syncScope.wsId === w.id
                 ? 'bg-white/70 dark:bg-white/10'
                 : ''}"
@@ -189,12 +195,23 @@
           <button
             type="button"
             on:click={out}
-            class="w-full rounded-full border border-white/40 bg-white/40 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-white/70 dark:border-white/10 dark:bg-white/5 dark:text-slate-200"
+            class="w-full rounded-full border border-white/40 bg-white/40 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-white/70 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 {FOCUS_RING}"
             >Sign out</button
           >
         </div>
       {:else}
-        <p class="text-sm font-medium text-slate-800 dark:text-slate-100">Sync scans to the cloud</p>
+        <div class="flex items-start justify-between gap-2">
+          <p class="text-sm font-medium text-slate-800 dark:text-slate-100">Sync scans to the cloud</p>
+          <button
+            type="button"
+            aria-label="Close"
+            use:tooltip={"Close (Esc)"}
+            on:click={close}
+            class="-mr-1 -mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-white/70 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-slate-50 {FOCUS_RING}"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
+          </button>
+        </div>
         <p class="text-xs text-slate-500 dark:text-slate-400">
           Sign in to save every scan to your history at app.metaspry.com.
         </p>
@@ -218,14 +235,14 @@
           type="button"
           on:click={submit}
           disabled={busy || !email.trim() || !password}
-          class="rounded-full bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-500 disabled:opacity-60"
+          class="rounded-full bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-500 disabled:opacity-60 {FOCUS_RING}"
           >{busy ? "Signing in…" : "Sign in"}</button
         >
         <button
           type="button"
           on:click={google}
           disabled={busy}
-          class="rounded-full border border-white/40 bg-white/60 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-white/80 disabled:opacity-60 dark:border-white/10 dark:bg-white/5 dark:text-slate-200"
+          class="rounded-full border border-white/40 bg-white/60 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-white/80 disabled:opacity-60 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 {FOCUS_RING}"
           >Continue with Google</button
         >
         <p class="text-[11px] text-slate-400 dark:text-slate-500">Same login as the web app.</p>

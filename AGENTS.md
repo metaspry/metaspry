@@ -2,7 +2,7 @@
 
 Feature map for AI coding agents working in this repo. It describes only what `main` does.
 
-Verified against `origin/main` at `a00ff8f` (extension `1.0.24`) on 2026-09-15. If this file and the code disagree, the code wins: fix this file in the same PR (section 6).
+Verified against `origin/main` at `b5797fb` (extension `1.0.25`) plus the `fix/ext-qa-2026-09-25` changes on 2026-09-25. If this file and the code disagree, the code wins: fix this file in the same PR (section 6).
 
 ---
 
@@ -487,20 +487,22 @@ indexed, and "a canonical tag is present" passed it.
 
 ### 3.10 History
 
-**Purpose and flow.** The History button in the header toolbar (3.17; `aria-expanded` while open) opens "Recent scrapes": the last 10 scans, each row left to right: site favicon (`SiteIcon`, 16 px; letter tile when missing or broken), title (or hostname) over hostname, relative time, then the score chip last (`bandClasses(...).chip` from `src/lib/audit/band.ts`, `role="img"` with the "Score N of 100, band" label and the same text as a hover tooltip). Each row button has the tooltip "Open in new tab" (hover and keyboard focus). Clicking an entry opens its URL in a background tab (`active: false`, so a popup stays open). "Clear" empties the list.
+**Purpose and flow.** The History button in the header toolbar (3.17; `aria-expanded` while open) opens "Recent scrapes", a non-modal `role="dialog"` panel run by `use:popover` (3.17): focus lands on the first row (on the panel itself when there is none), Escape or a press outside closes it, and focus returns to the History button. Rows are the last 10 scans, each left to right: site favicon (`SiteIcon`, 16 px; letter tile when missing or broken), title (or hostname) over hostname, relative time, then the score chip last (`bandClasses(...).chip` from `src/lib/audit/band.ts`, `role="img"` with the "Score N of 100, band" label and the same text as a hover tooltip). Each row button has the tooltip "Open in new tab" (hover and keyboard focus) and an inset focus ring (`FOCUS_RING_INSET`). Clicking an entry opens its URL in a background tab (`active: false`, so a popup stays open). "Clear" is two steps: the first press swaps the button for "Clear all? Yes / No" (11 px, `rose-600` / `dark:rose-300`, focus on Yes); only Yes empties the list; No, Escape (which cancels without closing the panel) or focus leaving the pair cancels. After a clear, focus stays on the panel.
 
-**Key files.** `src/lib/components/History/HistoryDropdown.svelte`, `src/lib/storage/history.ts`, `src/lib/components/SiteIcon/SiteIcon.svelte`.
+**Key files.** `src/lib/components/History/HistoryDropdown.svelte`, `src/lib/storage/history.ts`, `src/lib/components/SiteIcon/SiteIcon.svelte`, `src/lib/actions/popover.ts`.
 
 **Data.** `history`: `{ url, hostname, title, score, timestamp, icon? }`, one entry per URL, max 10. `icon` is the resolved favicon (3.4); entries written before it existed have none and render the tile.
 
 **Permissions.** `storage`.
 
-**Tests.** None.
+**Tests.** None for the component; the panel behaviour is the popover action's (`actions/popover.spec.ts`, `popover.dom.spec.ts`, 3.18).
 
 **Gotchas.**
 - Local only and unrelated to cloud history.
 - An entry is added after the async audit finishes, so a scan abandoned mid-audit is not recorded.
 - The list is keyed by `timestamp`.
+- The panel is opaque in both themes (`bg-white` / `dark:bg-popover`, no `backdrop-blur`, 3.17): at `white/90` and `popover/95` the landing heading still ghosted through it at 320 px (the old `slate-900/90` was worse).
+- A press outside closes the panel and still reaches what was pressed (there is no click-eating backdrop), the same as the account popover.
 
 ### 3.11 AI tab (AEO checks)
 
@@ -557,7 +559,7 @@ Checks in `src/lib/audit/aeo.ts`:
 
 ### 3.13 Cloud sign-in
 
-**Purpose and flow.** The header's account control (`CloudSync.svelte`) is a primary "Sign in" button when signed out, and, when signed in, an initials circle (`initialsFor(email)`, `src/lib/cloud/initials.ts`) with a green dot, the sync target's name (hidden below 460 px) and a chevron; both expose `aria-expanded`. Its dropdown (and History's) is positioned against the header's right-hand block in `Extension.svelte`, not against its own button, so it stays inside a narrow side panel. Signed out, its dropdown offers an email and password form ("Same login as the web app") and "Continue with Google". Signed in, it shows the email, "Open Metaspry web app" (new tab, `app.metaspry.com/dashboard`), the sync target picker (3.14) and "Sign out".
+**Purpose and flow.** The header's account control (`CloudSync.svelte`) is a primary "Sign in" button when signed out, and, when signed in, an initials circle (`initialsFor(email)`, `src/lib/cloud/initials.ts`) with a green dot, the sync target's name (hidden below 460 px) and a chevron; both expose `aria-expanded`. Its dropdown (and History's) is positioned against the header's right-hand block in `Extension.svelte`, not against its own button, so it stays inside a narrow side panel. The dropdown is one `role="dialog"` panel run by `use:popover` (3.17): focus lands on the email field (signed out) or the first item (signed in), Escape or a press outside closes it (there is no click-away backdrop button any more), and focus returns to the account control. Signed out, it offers an email and password form ("Same login as the web app"), "Continue with Google" and a visible Close (x) button beside the title. Signed in, it shows the email, "Open Metaspry web app" (new tab, `app.metaspry.com/dashboard`), the sync target picker (3.14) and "Sign out". Every button in it carries `FOCUS_RING` (3.17).
 
 - `cloud/firebase.ts` initialises Firebase from the public web config (project `metaspry`). Firestore uses `ignoreUndefinedProperties: true`.
 - Email and password: `signInWithEmailAndPassword`.
@@ -615,13 +617,16 @@ Checks in `src/lib/audit/aeo.ts`:
 
 **Purpose and flow.** The sun/moon button toggles light and dark. On start the theme is the stored choice, or the OS preference if there is none.
 
-**Key files.** `src/lib/theme.ts`, `tailwind.config.js` (`darkMode: 'class'`).
+**Motion.** `src/lib/motion.ts`: `reducedMotion()` reads `matchMedia('(prefers-reduced-motion: reduce)')` (false when `matchMedia` is missing) and `dur(ms)` returns 0 when it is set. Every `fly` / `fade` / `scale` in the shell (Settings drawer and its overlay, History panel, shortcuts help and its overlay, toasts) passes `duration: dur(…)`, so a reduced-motion user sees no transition; the tooltip's CSS transition is gated in `app.css`.
 
-**Data.** `theme`. **Permissions.** `storage`. **Tests.** None.
+**Key files.** `src/lib/theme.ts`, `src/lib/motion.ts`, `tailwind.config.js` (`darkMode: 'class'`, the `popover` colour of 3.17).
+
+**Data.** `theme`. **Permissions.** `storage`. **Tests.** `src/lib/motion.spec.ts` (no window, no `matchMedia`, both query results); the theme itself has none.
 
 **Gotchas.**
 - After the first toggle there is no way back to following the OS.
 - Components use `dark:` variants throughout; new UI needs them too.
+- `dur()` is read when the transition starts (each open), not once at load, so a changed OS setting applies to the next open.
 
 ### 3.16 Keyboard shortcuts
 
@@ -629,28 +634,32 @@ Checks in `src/lib/audit/aeo.ts`:
 - `/` focuses the tag search (switching to Tags).
 - `?` toggles the help modal.
 - `r` re-scrapes.
-- `1` to `5` select tabs by position: Tags, Previews, Audit, Site, AI. Compare (sixth) has no key.
+- `1` to `6` select tabs by position: Tags, Previews, Audit, Site, AI, Compare.
 
-In the tab strip, Arrow Left/Right, Home and End move between tabs. `Esc` closes the Settings drawer and the help modal (not the History or Cloud sync dropdowns). `Esc` also hides a visible tooltip (3.17); the tooltip's handler never calls `preventDefault` / `stopPropagation`, so one press both hides it and closes the drawer. While the Settings drawer is open, Tab and Shift+Tab cycle inside it (3.8).
+In the tab strip, Arrow Left/Right, Home and End move between tabs. `Esc` closes every open layer: the Settings drawer, the help modal, the History panel and the account popover (the last three through `use:popover`, 3.17), each returning focus to the control that opened it. `Esc` also hides a visible tooltip (3.17); neither the tooltip's handler nor the popover action calls `stopPropagation`, so one press hides the tooltip and closes whatever is open behind it. While the Settings drawer or the help modal is open, Tab and Shift+Tab cycle inside it (`cycleTab` in `src/lib/actions/popover.ts`; 3.8).
 
-**Key files.** `src/lib/components/Shortcuts/keyboard.ts`, `src/lib/components/Shortcuts/ShortcutsHelp.svelte`, `src/lib/components/Tabs/Tabs.svelte`, `src/lib/views/Extension.svelte` (`registerShortcuts`).
+The help modal (`ShortcutsHelp.svelte`) is `role="dialog" aria-modal="true"`, labelled by its heading: opening moves focus to its Close button, Tab cycles inside, Escape, Close or a press on the overlay closes it, and focus returns to the `?` button (or to wherever focus was when the `?` key was pressed).
 
-**Data.** None. **Permissions.** None. **Tests.** None.
+**Key files.** `src/lib/components/Shortcuts/keyboard.ts`, `src/lib/components/Shortcuts/ShortcutsHelp.svelte`, `src/lib/components/Tabs/Tabs.svelte`, `src/lib/views/Extension.svelte` (`registerShortcuts`), `src/lib/actions/popover.ts`.
+
+**Data.** None. **Permissions.** None. **Tests.** None for the key handler; the modal behaviour is the popover action's (3.18).
 
 **Gotchas.**
-- The help modal still says "1 / 2 / 3 / 4: Switch to Tags / Previews / Audit / Compare", which no longer matches the key handler.
 - The `?` button is always visible in the header toolbar (3.17) and reports `aria-expanded` while the sheet is open.
 - The marketing site documents shortcuts in `docs/keyboard-shortcuts`.
 
 ### 3.17 UI shell and shared components
 
 - `+page.svelte`: gradient background and two blurred decorative orbs (`data-bg-orb`, hidden in popup mode).
-- Header, left to right, one line at every width from 320 px: logo (wordmark hidden below 400 px); the account control (3.13); one `role="toolbar"` group styled by `src/lib/components/toolbar.ts` (`toolbarButtonClass(active)`, `TOOLBAR_GROUP`) holding History, Settings, theme toggle (`aria-pressed` in dark mode) and shortcuts `?`. Every button has a `use:tooltip` equal to its `aria-label` (theme: "Switch to light/dark theme", following the state); the account control's tooltip is "Sign in to sync scans to your account" or "Signed in as <email> - saving scans to <target>". Arrow Left/Right, Home and End move focus inside the toolbar. The surface toggle lives in Settings (3.2).
+- Header, left to right, one line at every width from 320 px: logo (wordmark hidden below 400 px); the account control (3.13); one `role="toolbar"` group styled by `src/lib/components/toolbar.ts` (`toolbarButtonClass(active)`, `TOOLBAR_GROUP`; the file also exports the shell's focus rings, below) holding History, Settings, theme toggle (`aria-pressed` in dark mode) and shortcuts `?`. Every button has a `use:tooltip` equal to its `aria-label` (theme: "Switch to light/dark theme", following the state); the account control's tooltip is "Sign in to sync scans to your account" or "Signed in as <email> - saving scans to <target>". Arrow Left/Right, Home and End move focus inside the toolbar. The surface toggle lives in Settings (3.2).
 - Both header menus anchor to the header's right-hand block (`relative` in `Extension.svelte`). Nothing between that block and a menu may carry `backdrop-blur`, `filter` or `transform`: that element would become the menu's containing block and stacking context, re-anchoring it and painting it under later glass cards (this bit the toolbar group once).
-- Views: `landing` (Grid card "Get Meta Tags"), `loading` (`Skeleton`), `error` (`ErrorState`: "Couldn't scrape this page", Retry, links to docs and GitHub issues), `empty` (`EmptyState`: "No meta tags found", Try again, docs link), `results` (`Tabs` with Tags, Previews, Audit, Site, AI, Compare).
+- Views: `landing` (Grid: the "Get Meta Tags" card is a `<button type="button">`, first in the tab order after the header, Enter / Space start the scan), `loading` (`Skeleton`), `error` (`ErrorState`: "Couldn't scrape this page", Retry, links to docs and GitHub issues), `empty` (`EmptyState`: "No meta tags found", Try again, docs link), `results` (`Tabs` with Tags, Previews, Audit, Site, AI, Compare).
 - `Screen`: glass card wrapper. `Grid`: landing action cards (`GridProps` in `Grid.ts`).
-- Toasts: `toast(message, variant)`; at most 3 visible, 1.5 s each.
-- Tooltips: `use:tooltip={text | { text, placement?, delay? }}` (`src/lib/actions/tooltip.ts`, same API and behaviour as the web app's action). One shared body-level element (`role="tooltip"`, `id="ms-tooltip"`, class `.ms-tooltip` + `.ms-tooltip-arrow` in `src/routes/app.css`, `fixed z-[60]` so it clears the drawer and dropdowns; dark-aware; `invisible` while idle so it stays out of the accessibility tree; no transition under `prefers-reduced-motion`). Shows after `delay` (350 ms) on `pointerenter` (not touch), at once on keyboard focus (`:focus-visible` only, so a mouse click never pops it), hides on `pointerleave`, `blur`, `pointerdown`, `Escape`; `aria-describedby="ms-tooltip"` is on the trigger only while visible, and not at all when the text repeats its `aria-label` (so it is announced once). A newer hover cancels any pending one (the History chip inside its row). Tooltip text wraps (`break-words`), so long URLs stay in the box. floating-ui `computePosition` (`strategy: 'fixed'`, `offset(8)`, `flip()`, `shift({ padding: 8 })`, `arrow`) + `autoUpdate` keep it inside a 320 px side panel. Empty text never shows. Used by: header toolbar, account control, History rows and score chip, Audit ring, Compare URL and scores, `PinButton`, `TagCard` copy, `ExportBar`, Site cards' "Not an http(s) URL" spans (hover-only, so each also carries an `sr-only` " (not an http(s) URL)"), Settings drawer buttons. Controls use the action, never a native `title` (a title beside it doubles up); the one remaining `title` is the truncated href text in `Audit/HreflangSection.svelte`.
+- Toasts: `toast(message, variant)`; at most 3 visible, 1.5 s each; the default variant is `dark:bg-popover/90` with a `white/10` border (success and error keep emerald / rose).
+- Popovers and dialogs: `use:popover={{ onClose, trigger?, initialFocus?, modal? }}` (`src/lib/actions/popover.ts`) on the panel element inside `{#if open}`. On mount it focuses `initialFocus`, else the first focusable, else the panel itself (given `tabindex="-1"`); Escape (with `preventDefault`, no `stopPropagation`) and a `pointerdown` whose `composedPath()` contains neither the panel nor the trigger call `onClose`; on destroy focus returns to `trigger` (default: the element focused at mount, never `<body>`: opened by the `?` key with nothing focused there is no trigger, so every press outside closes and no focus is returned) when it was inside the panel or fell to `<body>`, never when the user already moved it. There is no click-eating backdrop: the press that closes a panel also reaches whatever was pressed. `modal: true` adds Tab cycling (`cycleTab`, also used by the Settings drawer; `focusables` / `FOCUSABLE` are the shared selector). Users: History panel (3.10), account popover (3.13), shortcuts help (3.16, modal). The Settings drawer keeps its own open/close and calls `cycleTab` from its key handler.
+- Dark floating tint: the `popover` colour (`#2a2159`, `tailwind.config.js`; mirrors the web app's `--color-popover-dark`) is the dark background of everything that floats: History `dark:bg-popover`, account popover `dark:bg-popover`, Settings drawer `dark:bg-popover`, help `dark:bg-popover/95` (it sits on a dimmed, blurred overlay, so nothing bleeds through), default toast `dark:bg-popover/90`. The two header panels are opaque in both themes on purpose (`bg-white` / `dark:bg-popover`, no `backdrop-blur`): at `white/90` and `popover/95` the landing heading still showed through them at 320 px. Never `slate-900` for a floating surface.
+- Focus rings: `FOCUS_RING` (`toolbar.ts`) is `focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent dark:focus-visible:ring-indigo-300`, on every button and link in the shell (toolbar, landing card, account control and its popover, History Clear / confirm, help Close, every drawer button and link including the footer links, the Audit "what changed" button); `FOCUS_RING_INSET` is the same ring drawn inside for the full-bleed History rows. The old `ring-indigo-500/40` blended to about 1.7:1; the solid ring measures about 6.3:1 on white and 7.2:1 / 9.0:1 on `popover` / `slate-900` (WCAG 2.4.13 needs 3:1). Inputs keep their `focus:border-*` + faint `focus:ring` style. The Surface radio labels use the same colours with `focus-within:`.
+- Tooltips: `use:tooltip={text | { text, placement?, delay? }}` (`src/lib/actions/tooltip.ts`, same API and behaviour as the web app's action). One shared body-level element (`role="tooltip"`, `id="ms-tooltip"`, class `.ms-tooltip` + `.ms-tooltip-arrow` in `src/routes/app.css`, `fixed z-[60]` so it clears the drawer and dropdowns; dark-aware; `invisible` while idle so it stays out of the accessibility tree; no transition under `prefers-reduced-motion`). Shows after `delay` (350 ms) on `pointerenter` (not touch), at once on keyboard focus (`:focus-visible` only, so a mouse click never pops it). Hoverable (WCAG 1.4.13): `pointerleave` and `blur` hide it after `HIDE_GRACE_MS` (120 ms); while visible the element carries `is-open`, which is the only time it takes pointer events (`.ms-tooltip.is-open { pointer-events: auto }`), so moving onto the bubble cancels the hide, leaving the bubble starts the same grace, and re-entering the trigger from the bubble keeps it with no new delay. `pointerdown`, `Escape`, emptied text and another trigger's show hide it at once. `aria-describedby="ms-tooltip"` is on the trigger only while visible, and not at all when the text repeats its `aria-label` (so it is announced once). A newer hover cancels any pending one (the History chip inside its row), and a parent's grace never hides a child's tooltip (owner check). Tooltip text wraps (`break-words`), so long URLs stay in the box. floating-ui `computePosition` (`strategy: 'fixed'`, `offset(8)`, `flip()`, `shift({ padding: 8 })`, `arrow`) + `autoUpdate` keep it inside a 320 px side panel. Empty text never shows. Used by: header toolbar, account control, History rows and score chip, Audit ring, Compare URL and scores, `PinButton`, `TagCard` copy, `ExportBar`, Site cards' "Not an http(s) URL" spans (hover-only, so each also carries an `sr-only` " (not an http(s) URL)"), Settings drawer buttons. Controls use the action, never a native `title` (a title beside it doubles up); the one remaining `title` is the truncated href text in `Audit/HreflangSection.svelte`.
 - Scores: `src/lib/audit/band.ts` (`bandFor`, `bandLabel`, `scoreLabel`, `bandClasses`) is the only place a score turns into a band, a label or colour classes; the History chip, the Audit ring, the Compare numbers and the cloud payload's `band` all use it. Placement rule shared with the web app: identity left, score last on the right. Tailwind 3 gotcha: `bg-*/15` compiles to nothing (no 15 in the opacity scale) - use `/20`.
 
 **Gotchas.**
@@ -665,7 +674,7 @@ In the tab strip, Arrow Left/Right, Home and End move between tabs. `Esc` closes
 | `npm run check` | `svelte-check` against `tsconfig.json`. |
 | `npm run build` | `vite build` + `removeInlineScript.cjs`. Does not type-check on its own. |
 
-- Covered by unit tests: `cloud/sync.ts` (`sync.spec.ts`, in-memory Firestore mock), `cloud/compare-link.ts`, `util/time-ago.ts`, `actions/tooltip.ts` (`tooltip.spec.ts`: options and listener wiring in node with a fake element; `tooltip.dom.spec.ts`: show/hide, owner hand-off, `aria-describedby`, Escape propagation, nested hover, update/destroy in happy-dom with floating-ui mocked), `audit/rules.ts`, `audit/asyncRules.ts`, `audit/url-match.ts`,
+- Covered by unit tests: `cloud/sync.ts` (`sync.spec.ts`, in-memory Firestore mock), `cloud/compare-link.ts`, `util/time-ago.ts`, `actions/tooltip.ts` (`tooltip.spec.ts`: options and listener wiring in node with a fake element; `tooltip.dom.spec.ts`: show/hide, owner hand-off, `aria-describedby`, Escape propagation, nested hover, the hover grace and the bubble bridge, `is-open`, update/destroy in happy-dom with floating-ui mocked), `actions/popover.ts` (`popover.spec.ts`: listener wiring, Escape, outside press, focus in / return, trigger swap, Tab cycling in node with a fake element and document; `popover.dom.spec.ts`: the same against real elements in happy-dom), `motion.ts` (`motion.spec.ts`), `audit/rules.ts`, `audit/asyncRules.ts`, `audit/url-match.ts`,
   `cloud/scan-identity.ts`, `cloud/settings.ts`, `scrapers/getHTML.ts`, `scrapers/getRobots.ts`,
   `scrapers/getHeaderRobots.ts`, `storage/watch.ts` and its key helper.
 - Manual verification is still required for anything that needs a real browser: `npm run build`, load

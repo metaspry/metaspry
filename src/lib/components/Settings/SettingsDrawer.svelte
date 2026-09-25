@@ -14,6 +14,9 @@
   import { mode, switchMode, type Mode } from '../../mode';
   import { toast } from '../Toast/toast';
   import { tooltip } from '../../actions/tooltip';
+  import { cycleTab, focusables } from '../../actions/popover';
+  import { FOCUS_RING } from '../toolbar';
+  import { dur } from '../../motion';
 
   const SURFACES: { value: Mode; label: string; hint: string }[] = [
     { value: 'sidepanel', label: 'Side panel', hint: 'Stays open beside the page while you browse.' },
@@ -108,7 +111,8 @@
   // and closes the window.
   async function focusIn() {
     await tick();
-    (drawerEl?.querySelector<HTMLElement>('input[type="number"]') ?? focusables()[0])?.focus();
+    if (!drawerEl) return;
+    (drawerEl.querySelector<HTMLElement>('input[type="number"]') ?? focusables(drawerEl)[0])?.focus();
   }
 
   function onClose() {
@@ -123,17 +127,8 @@
     dispatch('close');
   }
 
-  function focusables(): HTMLElement[] {
-    if (!drawerEl) return [];
-    return Array.from(
-      drawerEl.querySelectorAll<HTMLElement>(
-        'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])'
-      )
-    );
-  }
-
   // Esc closes; Tab and Shift+Tab stay inside the dialog (it is modal, but the popup has no inert
-  // support to lean on).
+  // support to lean on). `cycleTab` is shared with the shortcuts help (actions/popover.ts).
   function onKey(event: KeyboardEvent) {
     if (!open) return;
     if (event.key === 'Escape') {
@@ -141,22 +136,7 @@
       close();
       return;
     }
-    if (event.key !== 'Tab') return;
-    const list = focusables();
-    const first = list[0];
-    const last = list[list.length - 1];
-    if (!first || !last) return;
-    const active = document.activeElement;
-    if (!drawerEl?.contains(active)) {
-      event.preventDefault();
-      first.focus();
-    } else if (event.shiftKey && active === first) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && active === last) {
-      event.preventDefault();
-      first.focus();
-    }
+    if (drawerEl) cycleTab(event, drawerEl);
   }
 
   // A cleared box is NaN, which the validator reports; the old `setNum` ignored it and kept
@@ -217,17 +197,17 @@
     'w-full rounded-lg border bg-white px-2.5 py-1.5 text-sm tabular-nums text-slate-900 shadow-sm outline-none transition focus:ring-2 dark:bg-slate-800 dark:text-slate-100';
   const inputOk = 'border-slate-300 focus:border-indigo-500 focus:ring-indigo-500/30 dark:border-slate-600';
   const inputBad = 'border-rose-500 focus:border-rose-500 focus:ring-rose-500/30';
-  const linkClass = 'hover:text-indigo-600 hover:underline dark:hover:text-indigo-300';
+  const linkClass = `rounded hover:text-indigo-600 hover:underline dark:hover:text-indigo-300 ${FOCUS_RING}`;
 </script>
 
 <svelte:window on:keydown={onKey} />
 
 {#if open}
-  <div transition:fade={{ duration: 120 }} class="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm" on:click={close} role="presentation" />
+  <div transition:fade={{ duration: dur(120) }} class="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm" on:click={close} role="presentation" />
   <aside
     bind:this={drawerEl}
-    transition:fly={{ x: 360, duration: 220 }}
-    class="fixed inset-y-0 right-0 z-50 flex w-full max-w-[360px] flex-col gap-4 overflow-y-auto border-l border-slate-200 bg-white p-4 text-slate-900 shadow-2xl dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+    transition:fly={{ x: 360, duration: dur(220) }}
+    class="fixed inset-y-0 right-0 z-50 flex w-full max-w-[360px] flex-col gap-4 overflow-y-auto border-l border-slate-200 bg-white p-4 text-slate-900 shadow-2xl dark:border-slate-800 dark:bg-popover dark:text-slate-100"
     role="dialog"
     aria-modal="true"
     aria-labelledby={TITLE_ID}
@@ -242,7 +222,7 @@
         aria-label="Close settings"
         use:tooltip={'Close settings (Esc)'}
         on:click={close}
-        class="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-50"
+        class="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-50 {FOCUS_RING}"
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
       </button>
@@ -253,7 +233,7 @@
       <div role="radiogroup" aria-label="Surface" class="grid grid-cols-2 gap-2">
         {#each SURFACES as s (s.value)}
           <label
-            class="flex cursor-pointer flex-col gap-0.5 rounded-lg border px-3 py-2 transition focus-within:ring-2 focus-within:ring-indigo-500/40 {$mode === s.value
+            class="flex cursor-pointer flex-col gap-0.5 rounded-lg border px-3 py-2 transition focus-within:ring-2 focus-within:ring-indigo-600 focus-within:ring-offset-2 focus-within:ring-offset-transparent dark:focus-within:ring-indigo-300 {$mode === s.value
               ? 'border-indigo-500 bg-indigo-500/10'
               : 'border-slate-300 hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-800'}"
           >
@@ -283,7 +263,7 @@
           target="_blank"
           rel="noopener noreferrer"
           use:tooltip={'Edit these settings in the Metaspry web app (opens a new tab)'}
-          class="inline-flex items-center gap-1 font-medium text-indigo-600 hover:underline dark:text-indigo-300"
+          class="inline-flex items-center gap-1 rounded font-medium text-indigo-600 hover:underline dark:text-indigo-300 {FOCUS_RING}"
         >
           Open in web app
           <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8" /></svg>
@@ -374,7 +354,7 @@
           on:click={save}
           use:tooltip={'Save scoring rules'}
           disabled={!canSave}
-          class="rounded-full bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 disabled:cursor-not-allowed disabled:opacity-50"
+          class="rounded-full bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50 {FOCUS_RING}"
         >Save</button>
         {#if resetArmed}
           <span bind:this={confirmGroup} class="inline-flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-200" role="group" aria-label="Confirm reset">
@@ -383,12 +363,12 @@
               bind:this={confirmBtn}
               type="button"
               on:click={confirmReset}
-              class="rounded-full bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-rose-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/40"
+              class="rounded-full bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-rose-500 {FOCUS_RING}"
             >Yes, reset</button>
             <button
               type="button"
               on:click={() => disarmReset(true)}
-              class="rounded-full px-2 py-1.5 text-xs font-medium text-slate-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 dark:text-slate-300"
+              class="rounded-full px-2 py-1.5 text-xs font-medium text-slate-600 hover:underline dark:text-slate-300 {FOCUS_RING}"
             >Cancel</button>
           </span>
         {:else}
@@ -398,7 +378,7 @@
             on:click={armReset}
             use:tooltip={'Restore the default thresholds and weights'}
             disabled={isDefault && !dirty}
-            class="rounded-full border border-slate-300 px-3.5 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+            class="rounded-full border border-slate-300 px-3.5 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800 {FOCUS_RING}"
           >Reset to defaults</button>
         {/if}
         {#if dirty}
@@ -417,7 +397,7 @@
           href={`${APP_URL}/upgrade`}
           target="_blank"
           rel="noopener noreferrer"
-          class="rounded-full bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-500"
+          class="rounded-full bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-500 {FOCUS_RING}"
         >Go Pro</a>
       </section>
     {/if}
