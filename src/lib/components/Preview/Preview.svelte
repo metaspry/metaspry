@@ -7,6 +7,8 @@
 
   export let meta: PageMeta;
   export let pageUrl: string = '';
+  /** The page icon the browser shows (resolved with fallbacks); `meta.icon` is only the declared link. */
+  export let icon: string | null = null;
 
   function find(key: string): MetaTag | undefined {
     const lower = key.toLowerCase();
@@ -152,6 +154,6 @@
 
   <DiscordPreview title={ogTitle} description={ogDescription} image={ogImage} host={ogHost} />
   <SlackPreview title={ogTitle} description={ogDescription} image={ogImage} host={ogHost} />
-  <SerpPreview title={meta.title ?? ogTitle} description={val('description') ?? ogDescription} host={serpHost} canonical={serpCanonical} icon={meta.icon} />
+  <SerpPreview title={meta.title ?? ogTitle} description={val('description') ?? ogDescription} host={serpHost} canonical={serpCanonical} icon={icon ?? meta.icon} />
   <MessagingPreview title={ogTitle} description={ogDescription} image={ogImage} host={ogHost} />
 </div>

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import SiteIcon from '../SiteIcon/SiteIcon.svelte';
+
   export let title: string;
   export let description: string;
   export let host: string;
@@ -24,11 +26,7 @@
   </header>
   <div class="space-y-1 bg-white p-3 dark:bg-slate-900">
     <div class="flex items-center gap-2">
-      {#if icon}
-        <img src={icon} alt="" class="h-5 w-5 rounded-full object-cover" loading="lazy" />
-      {:else}
-        <div class="h-5 w-5 rounded-full bg-slate-300 dark:bg-slate-600" />
-      {/if}
+      <SiteIcon src={icon} hostname={host} size={20} />
       <div class="min-w-0 flex-1">
         <p class="truncate text-xs text-slate-700 dark:text-slate-300">{host}</p>
         <p class="truncate text-[10px] text-slate-500 dark:text-slate-400">{trimUrl(canonical)}</p>

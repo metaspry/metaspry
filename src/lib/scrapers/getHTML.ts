@@ -3,6 +3,8 @@ export interface PageHtml {
   url: string;
   /** Why there is no HTML, when the background script could say. */
   reason?: 'unscriptable' | 'no-tab';
+  /** `chrome.tabs.Tab.favIconUrl` for the scanned tab, when Chrome had resolved one. */
+  favIconUrl?: string;
 }
 
 /** Pages Chrome refuses to inject into, recognised from the URL alone. */
@@ -42,15 +44,17 @@ export async function getHTML(): Promise<PageHtml> {
       }
       const url = typeof response.url === 'string' ? response.url : '';
       const reason = response.reason === 'unscriptable' || response.reason === 'no-tab' ? response.reason : undefined;
+      // Spread-in only when present: `exactOptionalPropertyTypes` forbids an explicit undefined.
+      const icon = typeof response.favIconUrl === 'string' && response.favIconUrl ? { favIconUrl: response.favIconUrl } : {};
       if (response.html) {
         // DOMParser is guaranteed inert: subresources don't load, scripts
         // don't execute, even when the resulting document is later
         // appended. Safer than innerHTML on a disconnected <html> node
         // even though both are effectively safe with our current usage.
         const doc = new DOMParser().parseFromString(response.html, 'text/html');
-        resolve({ html: doc.documentElement, url });
+        resolve({ html: doc.documentElement, url, ...icon });
       } else {
-        resolve(reason ? { html: null, url, reason } : { html: null, url });
+        resolve(reason ? { html: null, url, reason, ...icon } : { html: null, url, ...icon });
       }
     });
   });
