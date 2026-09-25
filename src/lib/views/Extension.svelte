@@ -19,6 +19,7 @@
   import { getHTML, unscriptableMessage } from "../scrapers/getHTML";
   import { scanUrlFor } from "../cloud/scan-identity";
   import { getMetaTags } from "../scrapers/getMetaTags";
+  import { resolveIcon } from "../scrapers/icon";
   import type { PageMeta } from "../scrapers/PageMeta";
   import { audit } from "../audit/rules";
   import { needsAsyncResolution, resolveAsyncRules } from "../audit/asyncRules";
@@ -91,22 +92,26 @@
     view = "loading";
     errorMessage = "";
     try {
-      const { html, url: tabUrl, reason } = await getHTML();
+      const { html, url: tabUrl, reason, favIconUrl } = await getHTML();
       if (id !== scrapeId) return;
       if (!html) {
         view = "error";
         errorMessage = unscriptableMessage(tabUrl, reason);
         return;
       }
-      const meta = getMetaTags(html, tabUrl);
+      const scraped = getMetaTags(html, tabUrl);
       if (id !== scrapeId) return;
+      // The declared icon is what the page says; the resolved one is what the browser shows
+      // (declared -> Chrome's tab icon -> /favicon.ico). Emptiness is judged on the declared
+      // value: the fallback would otherwise make every http page "have" an icon.
+      const meta: PageMeta = { ...scraped, icon: resolveIcon(scraped.icon, favIconUrl, tabUrl) };
       pageMeta = meta;
       pageHtml = html;
       // Identity is the URL we actually scanned. og:url stays in the payload as metadata: a site
       // that hardcodes it (the very defect this product finds) would otherwise collapse every
       // article into one history row and one overwritten cloud document.
       pageUrl = scanUrlFor(tabUrl, meta.canonical);
-      if (isPageEmpty(meta)) {
+      if (isPageEmpty(scraped)) {
         view = "empty";
         return;
       }
@@ -121,6 +126,7 @@
         title: meta.title ?? "",
         score: finalResult.score,
         timestamp: Date.now(),
+        ...(meta.icon ? { icon: meta.icon } : {}),
       });
       // Cloud sync: if signed in, save this scan to the user's cloud history.
       const cu = get(cloudUser);

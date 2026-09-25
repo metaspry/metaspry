@@ -111,7 +111,7 @@ This is the complete inventory. There are no ports (`runtime.connect`), no conte
 
 | Channel | Direction | Payload | Code |
 |---|---|---|---|
-| `chrome.runtime.sendMessage` | page -> background | Request `{ message: 'getHTML' }`. Response `{ html: string \| null, url: string }` | `src/lib/scrapers/getHTML.ts`; listener in `background.js` returns `true` to answer asynchronously |
+| `chrome.runtime.sendMessage` | page -> background | Request `{ message: 'getHTML' }`. Response `{ html: string \| null, url: string, favIconUrl: string \| null, reason?: 'unscriptable' \| 'no-tab' }` (`favIconUrl` = `tab.favIconUrl`, Chrome's resolved favicon) | `src/lib/scrapers/getHTML.ts`; listener in `background.js` returns `true` to answer asynchronously |
 | `chrome.storage.onChanged` (`local`, key `mode`) | page -> background | `'sidepanel' \| 'popup'` | `src/lib/mode.ts` writes; `background.js` applies |
 | `chrome.contextMenus.onClicked` | Chrome -> background | menu id `metaspry-open` | `background.js` |
 | `chrome.runtime.onMessage` in the page | none | No-op listener `onRuntimeMessage` ("reserved for future cross-surface coordination") | `src/lib/views/Extension.svelte` |
@@ -133,7 +133,7 @@ This is the complete inventory. There are no ports (`runtime.connect`), no conte
 | `src/lib/cloud/` | `firebase.ts`, `auth.ts`, `plan.ts`, `settings.ts`, `sync.ts`, `workspaces.ts` |
 | `src/lib/categorize.ts` | Tag key -> category |
 | `src/lib/exporters/exporters.ts` | JSON and CSV serialisers, blob download |
-| `src/lib/components/` | One folder per UI feature: `Aeo`, `Audit`, `Card`, `Categories`, `CloudSync`, `Compare`, `EmptyState`, `ErrorState`, `Exporters`, `Grid`, `History`, `Preview`, `Previews`, `Screen`, `Settings`, `Shortcuts`, `Site`, `Skeleton`, `Tabs`, `Toast` |
+| `src/lib/components/` | One folder per UI feature: `Aeo`, `Audit`, `Card`, `Categories`, `CloudSync`, `Compare`, `EmptyState`, `ErrorState`, `Exporters`, `Grid`, `History`, `Preview`, `Previews`, `Screen`, `Settings`, `Shortcuts`, `Site`, `SiteIcon`, `Skeleton`, `Tabs`, `Toast` |
 | `src/lib/index.js` | Empty `$lib` barrel placeholder |
 | `removeInlineScript.cjs` | Post-build CSP fixer |
 | `scripts/` | Node asset generators |
@@ -154,7 +154,7 @@ This is the complete inventory. There are no ports (`runtime.connect`), no conte
 | `mode` | `'sidepanel' \| 'popup'` | `'sidepanel'` | `src/lib/mode.ts` | `background.js` (`get` and `onChanged`) |
 | `theme` | `'light' \| 'dark'` | OS preference until the first toggle | `src/lib/theme.ts` | - |
 | `settings` | `Settings` (6 thresholds + 3 weights) | `DEFAULT_SETTINGS`, merged over the stored value on read | `src/lib/storage/settings.ts` | `src/lib/cloud/settings.ts` (through the store) |
-| `history` | `HistoryEntry[]`, newest first, max 10 | `[]` | `src/lib/storage/history.ts` | - |
+| `history` | `HistoryEntry[]` (`{ url, hostname, title, score, timestamp, icon? }`), newest first, max 10 | `[]` | `src/lib/storage/history.ts` | - |
 | `pinnedKeys` | `string[]` of lower-cased tag keys | `[]` | `src/lib/storage/pinned.ts` | - |
 | `syncScope__<uid>` | `{ kind: 'personal' } \| { kind: 'workspace', wsId, name }` | personal | `src/lib/cloud/workspaces.ts` (`scopeKeyFor`) | - |
 | `popupHintDismissed` | `true` | unset | `src/lib/views/Extension.svelte` | - |
@@ -185,7 +185,7 @@ Each feature lists: purpose and user flow, key files, data and storage, permissi
 
 ### 3.1 Manifest and permissions
 
-**Purpose.** `static/manifest.json` declares the extension: MV3, name `Metaspry`, version `1.0.24`, `minimum_chrome_version: "114"`, `offline_enabled: true`.
+**Purpose.** `static/manifest.json` declares the extension: MV3, name `Metaspry`, version `1.0.25`, `minimum_chrome_version: "114"`, `offline_enabled: true`.
 
 - `background.service_worker`: `scripts/background.js` (classic script; no `"type": "module"`).
 - `side_panel.default_path`: `index.html`.
@@ -258,10 +258,11 @@ Each feature lists: purpose and user flow, key files, data and storage, permissi
 **Purpose and flow.** The landing view shows one card, "Get Meta Tags". Clicking it (or pressing `r`) runs `scrape()` in `Extension.svelte`:
 
 1. Sets the view to `loading` (skeleton). A second call while loading is ignored.
-2. `getHTML()` sends `getHTML`. The background queries `{ active: true, lastFocusedWindow: true }`, injects a function that returns `document.documentElement.outerHTML`, and replies with the HTML and tab URL. The page parses the string with `DOMParser` into an inert document.
+2. `getHTML()` sends `getHTML`. The background queries `{ active: true, lastFocusedWindow: true }`, injects a function that returns `document.documentElement.outerHTML`, and replies with the HTML, the tab URL and `tab.favIconUrl` (Chrome's resolved favicon, null until loaded). The page parses the string with `DOMParser` into an inert document.
 3. `getMetaTags(html, tabUrl)` builds `PageMeta`: `<title>`; canonical and icon (`rel=icon`, then `shortcut icon`, then `apple-touch-icon`), both resolved to absolute URLs; every `<meta>` with non-empty `content`, keyed by `property` (preferred) or `name` and categorised; plus `jsonLd`, `hreflang` (resolved) and meta `robots`.
+   Then `resolveIcon(declared, favIconUrl, tabUrl)` (`src/lib/scrapers/icon.ts`) replaces `icon` with the first http(s) URL of: the declared link, Chrome's tab icon, `/favicon.ico` at the page origin. `data:`/`chrome:`/`blob:` tab icons are skipped so no icon bytes ever enter a scan document. Every http(s) page therefore has an icon for the SERP preview, History and the cloud payload.
 4. `pageUrl` = the first `og:url` value, else the canonical, else the tab URL.
-5. No tags, title, canonical or icon -> `empty` view ("No meta tags found"). Any error -> `error` view with the message and Retry.
+5. No tags, title, canonical or **declared** icon -> `empty` view ("No meta tags found"); the resolved fallback icon does not count. Any error -> `error` view with the message and Retry.
 6. Otherwise the `results` view opens on the Tags tab. `runAudit()` shows the synchronous result at once and the async result when ready.
 7. After the final score: `pushHistory()` (3.10), then the cloud upload if signed in (3.14).
 
@@ -281,13 +282,13 @@ those articles into one history row and one overwritten cloud document. `normali
 fragment and a trailing slash so `/blog`, `/blog/` and `/blog#comments` are one scan; `og:url` stays
 in the payload as metadata.
 
-**Key files.** `src/lib/views/Extension.svelte`; `src/lib/scrapers/getHTML.ts`, `getMetaTags.ts`, `getJsonLd.ts`, `getHreflang.ts`, `getRobots.ts`, `PageMeta.ts`; `src/lib/categorize.ts`; `static/scripts/background.js`; components `Grid`, `Skeleton`, `EmptyState`, `ErrorState`, `Screen`.
+**Key files.** `src/lib/views/Extension.svelte`; `src/lib/scrapers/getHTML.ts`, `getMetaTags.ts`, `icon.ts`, `getJsonLd.ts`, `getHreflang.ts`, `getRobots.ts`, `PageMeta.ts`; `src/lib/categorize.ts`; `static/scripts/background.js`; components `Grid`, `Skeleton`, `EmptyState`, `ErrorState`, `Screen`.
 
 **Data.** In memory only (`pageMeta`, `pageHtml`, `auditResult`).
 
-**Permissions.** `tabs`, `activeTab`, `scripting`, host `*://*/*`.
+**Permissions.** `tabs`, `activeTab`, `scripting`, host `*://*/*`. `tab.favIconUrl` needs only the host permission.
 
-**Tests.** None.
+**Tests.** `src/lib/scrapers/icon.spec.ts` (resolution order, skipped schemes, non-http page); the scrapers listed in 3.18.
 
 **Gotchas.**
 - The captured HTML is the rendered DOM after the page's JavaScript ran, not the server HTML a crawler fetches. JavaScript-injected tags count here. Compare (3.12) fetches raw HTML instead.
@@ -343,9 +344,9 @@ Fallback chains (`Preview.svelte`):
 | Twitter image | `twitter:image` -> `og:image` |
 | Host label | hostname of `og:url` -> canonical -> `pageUrl`, upper-cased |
 | Google title, description | `<title>` -> social title; `description` -> social description |
-| Google URL line | canonical -> `pageUrl`, shown as `host › path › segments`, with the page icon |
+| Google URL line | canonical -> `pageUrl`, shown as `host › path › segments`, with the page icon (`SiteIcon`: the resolved favicon, or a hostname-letter tile when there is none or it fails to load - never a broken image) |
 
-**Key files.** `src/lib/components/Preview/Preview.svelte`; `src/lib/components/Previews/DiscordPreview.svelte`, `SlackPreview.svelte`, `SerpPreview.svelte`, `MessagingPreview.svelte`.
+**Key files.** `src/lib/components/Preview/Preview.svelte`; `src/lib/components/Previews/DiscordPreview.svelte`, `SlackPreview.svelte`, `SerpPreview.svelte`, `MessagingPreview.svelte`; `src/lib/components/SiteIcon/SiteIcon.svelte`.
 
 **Data.** None. **Permissions.** None (images load as `<img>`). **Tests.** None.
 
@@ -475,11 +476,11 @@ indexed, and "a canonical tag is present" passed it.
 
 ### 3.10 History
 
-**Purpose and flow.** The clock icon opens "Recent scrapes": the last 10 scans with a score badge, the title (or hostname) and a relative time. Clicking an entry opens its URL in a background tab (`active: false`, so a popup stays open). "Clear" empties the list.
+**Purpose and flow.** The clock icon opens "Recent scrapes": the last 10 scans with the site favicon (`SiteIcon`, 16 px; letter tile when missing or broken), a score badge, the title (or hostname) and a relative time. Clicking an entry opens its URL in a background tab (`active: false`, so a popup stays open). "Clear" empties the list.
 
-**Key files.** `src/lib/components/History/HistoryDropdown.svelte`, `src/lib/storage/history.ts`.
+**Key files.** `src/lib/components/History/HistoryDropdown.svelte`, `src/lib/storage/history.ts`, `src/lib/components/SiteIcon/SiteIcon.svelte`.
 
-**Data.** `history`: `{ url, hostname, title, score, timestamp }`, one entry per URL, max 10.
+**Data.** `history`: `{ url, hostname, title, score, timestamp, icon? }`, one entry per URL, max 10. `icon` is the resolved favicon (3.4); entries written before it existed have none and render the tile.
 
 **Permissions.** `storage`.
 
@@ -575,7 +576,7 @@ Checks in `src/lib/audit/aeo.ts`:
 
 **Purpose and flow.** When signed in, every successful scan uploads after its final audit. The dropdown sets where new scans go: "Personal history" or any workspace where the user's role is `owner` or `member`.
 
-- `toScanPayload(meta, auditResult, pageUrl, siteFiles)` builds the web app's scan document: `schemaVersion: 1`, `url`, `hostname`, `scannedAt`, `title`, `source: 'extension'`, `starred: false`, `workspaceId`, `score`, `band`, `pageMeta` (`title`, `description`, `canonical`, `ogImage` from `og:image` then `twitter:image`, `favicon`, `tagCount`, `tags`), `audit` (`score`, `band`, and `rules` of `{ id, label, status, severity, message, meta }`), and an optional `siteFiles` summary.
+- `toScanPayload(meta, auditResult, pageUrl, siteFiles)` builds the web app's scan document: `schemaVersion: 1`, `url`, `hostname`, `scannedAt`, `title`, `source: 'extension'`, `starred: false`, `workspaceId`, `score`, `band`, `pageMeta` (`title`, `description`, `canonical`, `ogImage` from `og:image` then `twitter:image`, `favicon` = the resolved icon from 3.4 so it is set for every http(s) page, `tagCount`, `tags`), `audit` (`score`, `band`, and `rules` of `{ id, label, status, severity, message, meta }`), and an optional `siteFiles` summary.
 - Site-files summary caps: 8 robots groups (counts only), 10 sitemap directives, 20 sitemap children, 10 sample URLs, 15 llms sections with 15 links each. No raw file text.
 - Document ID: `'s'` + a djb2 hash of the URL in base 36, so scanning the same URL again overwrites its document.
 - Target: `users/{uid}/scans/{id}` or `workspaces/{wsId}/scans/{id}`, with `workspaceId` set to match and `createdAt: serverTimestamp()`.
@@ -673,7 +674,7 @@ In the tab strip, Arrow Left/Right, Home and End move between tabs. `Esc` closes
 
 ### 4.2 Versioning
 
-- The version lives in two files that must match: `version` in `static/manifest.json` and in `package.json` (both `1.0.24` on `main`). No script syncs them.
+- The version lives in two files that must match: `version` in `static/manifest.json` and in `package.json` (both `1.0.25` on `main`, which is what the store serves; `main` carries unreleased fixes for v1.0.26). No script syncs them.
 - Convention from the git history: each shipped change bumps the patch version and gets a new zip (commit messages like "v1.0.22 + zip").
 - The repo has no git tags, although the README checklist ends with "tag the commit `vX.Y.Z`".
 

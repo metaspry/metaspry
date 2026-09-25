@@ -7,6 +7,8 @@ export interface HistoryEntry {
   title: string;
   score: number;
   timestamp: number;
+  /** Resolved favicon URL (see `scrapers/icon.ts`). Absent on entries written before it existed. */
+  icon?: string;
 }
 
 const STORAGE_KEY = 'history';

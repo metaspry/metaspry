@@ -95,6 +95,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       let [tab] = tabs;
       if (tab && tab.id != null) {
         const tabUrl = tab.url || '';
+        // Chrome's own resolution of the page's favicon (covers the implicit /favicon.ico that
+        // `getMetaTags` cannot see). Readable through the host permission; null until loaded.
+        const favIconUrl = typeof tab.favIconUrl === 'string' && tab.favIconUrl ? tab.favIconUrl : null;
         try {
           chrome.scripting.executeScript({
             target: { tabId: tab.id },
@@ -113,9 +116,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             void chrome.runtime.lastError;
             const htmlContent = Array.isArray(result) ? result[0]?.result : undefined;
             if (htmlContent) {
-              sendResponse({ html: htmlContent, url: tabUrl });
+              sendResponse({ html: htmlContent, url: tabUrl, favIconUrl });
             } else {
-              sendResponse({ html: null, url: tabUrl, reason: 'unscriptable' });
+              sendResponse({ html: null, url: tabUrl, favIconUrl, reason: 'unscriptable' });
             }
           });
         } catch (err) {
@@ -123,10 +126,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           // sendResponse never ran, the port closed, and the popup showed the very message E4
           // exists to remove: "No response from background script."
           console.warn('executeScript failed', err);
-          sendResponse({ html: null, url: tabUrl, reason: 'unscriptable' });
+          sendResponse({ html: null, url: tabUrl, favIconUrl, reason: 'unscriptable' });
         }
       } else {
-        sendResponse({ html: null, url: tab?.url || '', reason: 'no-tab' });
+        sendResponse({ html: null, url: tab?.url || '', favIconUrl: null, reason: 'no-tab' });
       }
     });
     return true;
