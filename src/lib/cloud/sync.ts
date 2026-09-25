@@ -116,11 +116,22 @@ export function toScanPayload(
   };
 }
 
+/** What `uploadScan` wrote - the Audit tab's "Changed since" link needs the id and whether a
+ *  previous document existed (AGENTS 3.7 / 3.14). */
+export interface UploadResult {
+  /** The scan document id (`scanIdFor(url)` in the chosen scope). */
+  id: string;
+  /** A document existed at that path before this write, so the app may hold a previous version. */
+  hadPrevious: boolean;
+  /** That document's `scannedAt`, or null when there was none. */
+  previousScannedAt: number | null;
+}
+
 export async function uploadScan(
   uid: string,
   payload: ReturnType<typeof toScanPayload>,
   scope: SyncScope = { kind: 'personal' }
-): Promise<void> {
+): Promise<UploadResult> {
   const id = scanIdFor(payload.url);
   const ref =
     scope.kind === 'workspace'
@@ -141,4 +152,9 @@ export async function uploadScan(
     starred: prev?.starred ?? false,
     createdAt: prev?.createdAt ?? serverTimestamp(),
   });
+  return {
+    id,
+    hadPrevious: existing.exists(),
+    previousScannedAt: typeof prev?.scannedAt === 'number' ? prev.scannedAt : null,
+  };
 }

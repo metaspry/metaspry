@@ -13,6 +13,9 @@
   export let leftUrl: string;
   export let leftScore: number = 0;
 
+  /** Every fetch in this tab is bounded; a host that never answers used to hang it forever. */
+  const FETCH_TIMEOUT_MS = 6000;
+
   // Pre-fill with the audited page's own URL so first-success is one click
   // away — user typically wants to compare against a previous version or a
   // sibling URL, both of which are easier to derive by editing this than
@@ -47,7 +50,7 @@
     const controller = new AbortController();
     // Every other fetch in the extension is bounded; this one was not, so a slow host hung Compare
     // indefinitely — and this change added a second such request per comparison.
-    const timer = setTimeout(() => controller.abort(), 6000);
+    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     try {
       const res = await fetch(target, {
         credentials: 'omit',
@@ -69,6 +72,30 @@
     }
   }
 
+  /** GET as served HTML, bounded by `FETCH_TIMEOUT_MS` (the body read included). */
+  async function fetchServedHtml(target: string): Promise<{ res: Response; text: string }> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+    try {
+      const res = await fetch(target, { credentials: 'omit', redirect: 'follow', signal: controller.signal });
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status} ${res.statusText}`);
+      }
+      const ct = res.headers.get('content-type') ?? '';
+      if (!ct.toLowerCase().includes('text/html')) {
+        throw new Error(`Not an HTML page (content-type: ${ct || 'unknown'}).`);
+      }
+      return { res, text: await res.text() };
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        throw new Error(`Timed out after ${FETCH_TIMEOUT_MS / 1000} s - the site did not answer.`);
+      }
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   async function compare() {
     const target = normalizeUrl(url);
     if (!target) {
@@ -81,15 +108,7 @@
     rightMeta = null;
     rows = [];
     try {
-      const res = await fetch(target, { credentials: 'omit', redirect: 'follow' });
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status} ${res.statusText}`);
-      }
-      const ct = res.headers.get('content-type') ?? '';
-      if (!ct.toLowerCase().includes('text/html')) {
-        throw new Error(`Not an HTML page (content-type: ${ct || 'unknown'}).`);
-      }
-      const text = await res.text();
+      const { res, text } = await fetchServedHtml(target);
       const finalUrl = res.url || target;
       const doc = new DOMParser().parseFromString(text, 'text/html');
       const meta = getMetaTags(doc.documentElement, finalUrl);

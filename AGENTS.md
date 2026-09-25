@@ -360,6 +360,8 @@ Fallback chains (`Preview.svelte`):
 
 **Purpose and flow.** A header card with "SEO Health" and its caption on the left and the score ring (0-100, coloured through `src/lib/audit/band.ts`, `role="img"` "Score 92 of 100, healthy") on the right - identity left, verdict right, the same rule as every list in the web app - then the rules grouped Required / Recommended / Best Practice with pass, warn, fail or spinning pending icons and a length bar for length rules. Below: JSON-LD entities, the hreflang list and duplicate keys.
 
+**"Changed since" row (signed in).** Under the header card, only when the upload of this scan (3.14) reported `hadPrevious: true`: "Changed since {time ago}" on the left (from the previous document's `scannedAt`, or "your last scan" when it had none) and a link-styled button "Open what changed ↗" on the right (`aria-label` names the destination, `use:tooltip`, no `title`). It opens `compareChangedHref(id)` = `https://app.metaspry.com/compare?a=scan:<id>@prev&b=scan:<id>` in a new active tab (`chrome.tabs.create`; `window.open` on the dev page). The extension never diffs versions itself: the app's `onScanWritten` trigger stores the previous document, and `/compare` resolves `@prev` to the newest stored version. The row is absent when signed out, on the first scan of a URL, when the upload threw, and is cleared at the start of every scan and on sign-out (`cloudScan` in `Extension.svelte`). Same on popup and side panel.
+
 **Engine.** `audit(meta, settings)` runs every rule synchronously. `og:image-dimensions` returns `pending`; `resolveAsyncRules()` loads the image (`new Image()`, 5 s timeout, `referrerPolicy = 'no-referrer'`), replaces that rule's result and rescores with `rescoreAfterAsync()`.
 
 **The `noindex` rule returned a false PASS four ways, and all four are now covered.** It parses the
@@ -408,15 +410,16 @@ indexed, and "a canonical tag is present" passed it.
 
 **Scoring.** Per rule: `pass` earns the severity weight, `warn` and `pending` earn half, `fail` earns 0. `score = round(earned / possible * 100)`, where `possible` sums the weights of all 19 rules. Bands: 80 or more `success`, 50 or more `warning`, else `danger`. Default weights are required 10, recommended 5, best-practice 3, so `possible` is 111.
 
-**Key files.** `src/lib/audit/rules.ts`, `asyncRules.ts`, `AuditResult.ts`; `src/lib/components/Audit/Audit.svelte`, `CharBar.svelte`, `JsonLdSection.svelte`, `HreflangSection.svelte`, `DupTagsSection.svelte`.
+**Key files.** `src/lib/audit/rules.ts`, `asyncRules.ts`, `AuditResult.ts`; `src/lib/components/Audit/Audit.svelte`, `CharBar.svelte`, `JsonLdSection.svelte`, `HreflangSection.svelte`, `DupTagsSection.svelte`; the "Changed since" row uses `src/lib/cloud/compare-link.ts` and `src/lib/util/time-ago.ts`.
 
 **Data.** In memory. The score goes into history and the cloud payload.
 
 **Permissions.** None (the image loads as `<img>`).
 
-**Tests.** None.
+**Tests.** `src/lib/cloud/compare-link.spec.ts` (the exact link), `src/lib/util/time-ago.spec.ts`. The rules and the row markup: none.
 
 **Gotchas.**
+- The "Changed since" row trusts `hadPrevious` only. Documents written before 2026-09-25 have no stored versions, so the app answers `no-version` once; after the next content change the diff works. Unchanged re-scans store no version either, so `@prev` can point further back than the last scan.
 - Scoring must always use `$effectiveSettings` (3.8), never the raw `settings` store. `Extension.svelte` re-runs the audit whenever `effectiveSettings` changes.
 - Rules that do not apply (`article-og`, `hreflang-self`, `jsonld-parse`) count as passes. Rules score independently, so one missing tag can fail several rules (a missing `og:image` fails three).
 - `dup-tags` also warns on repeats the Open Graph protocol allows, such as several `og:image` tags.
@@ -549,6 +552,7 @@ Checks in `src/lib/audit/aeo.ts`:
 - The right score uses `$effectiveSettings` and waits for the async image rule.
 - `diffMeta` keeps the first value of each key.
 - `localhost` and other dotless hosts are rejected.
+- Both fetches abort after 6 s (`FETCH_TIMEOUT_MS`; `fetchServedHtml` for the compared URL, `fetchSourceMeta` for the current page). The compared-URL timeout reads "Timed out after 6 s - the site did not answer."; the current-page one falls back to the rendered DOM with the mixed-sources warning.
 
 ### 3.13 Cloud sign-in
 
@@ -589,6 +593,7 @@ Checks in `src/lib/audit/aeo.ts`:
 - Target: `users/{uid}/scans/{id}` or `workspaces/{wsId}/scans/{id}`, with `workspaceId` set to match and `createdAt: serverTimestamp()`.
 - Workspaces: `workspaces` where `memberUids` array-contains the uid, filtered to role `owner` or `member`. If the saved workspace is no longer in that list, the target falls back to personal. Signing out resets it to personal.
 - Upload errors are swallowed (a DEV-only console warning).
+- `uploadScan` resolves to `UploadResult` `{ id, hadPrevious, previousScannedAt }` from the `getDoc` it already does before writing (no extra read). `Extension.svelte` keeps it as `cloudScan` (null at the start of every scan, on sign-out, and when the upload threw) for the Audit tab's "Changed since" row (3.7).
 
 **Key files.** `src/lib/cloud/sync.ts`, `src/lib/cloud/workspaces.ts`, `src/lib/components/CloudSync/CloudSync.svelte`, `src/lib/views/Extension.svelte` (the upload call).
 
@@ -596,7 +601,7 @@ Checks in `src/lib/audit/aeo.ts`:
 
 **Permissions.** `storage`; host `*://*/*` (site files).
 
-**Tests.** None. Manually scan while signed in and confirm the scan appears in the app's history for the chosen target.
+**Tests.** `src/lib/cloud/sync.spec.ts` (`uploadScan`: first scan vs re-scan, `starred`/`createdAt` carry-over, workspace path, non-numeric `scannedAt`). Manually scan while signed in and confirm the scan appears in the app's history for the chosen target.
 
 **Gotchas.**
 - The payload must stay compatible with the app's `ScanPayload` (`app/src/lib/scan/types.ts`) and `app/firestore.rules`. Change `SCAN_SCHEMA_VERSION` only together with the app.
@@ -659,7 +664,7 @@ In the tab strip, Arrow Left/Right, Home and End move between tabs. `Esc` closes
 | `npm run check` | `svelte-check` against `tsconfig.json`. |
 | `npm run build` | `vite build` + `removeInlineScript.cjs`. Does not type-check on its own. |
 
-- Covered by unit tests: `actions/tooltip.ts` (`tooltip.spec.ts`: options and listener wiring in node with a fake element; `tooltip.dom.spec.ts`: show/hide, owner hand-off, `aria-describedby`, Escape propagation, nested hover, update/destroy in happy-dom with floating-ui mocked), `audit/rules.ts`, `audit/asyncRules.ts`, `audit/url-match.ts`,
+- Covered by unit tests: `cloud/sync.ts` (`sync.spec.ts`, in-memory Firestore mock), `cloud/compare-link.ts`, `util/time-ago.ts`, `actions/tooltip.ts` (`tooltip.spec.ts`: options and listener wiring in node with a fake element; `tooltip.dom.spec.ts`: show/hide, owner hand-off, `aria-describedby`, Escape propagation, nested hover, update/destroy in happy-dom with floating-ui mocked), `audit/rules.ts`, `audit/asyncRules.ts`, `audit/url-match.ts`,
   `cloud/scan-identity.ts`, `cloud/settings.ts`, `scrapers/getHTML.ts`, `scrapers/getRobots.ts`,
   `scrapers/getHeaderRobots.ts`, `storage/watch.ts` and its key helper.
 - Manual verification is still required for anything that needs a real browser: `npm run build`, load

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { timeAgo } from '../../util/time-ago';
   import { fade } from 'svelte/transition';
   import { history, clearHistory } from '../../storage/history';
   import SiteIcon from '../SiteIcon/SiteIcon.svelte';
@@ -7,17 +8,6 @@
   import { tooltip } from '../../actions/tooltip';
 
   let open = false;
-
-  function rel(ts: number): string {
-    const sec = Math.floor((Date.now() - ts) / 1000);
-    if (sec < 60) return `${sec}s ago`;
-    const min = Math.floor(sec / 60);
-    if (min < 60) return `${min}m ago`;
-    const h = Math.floor(min / 60);
-    if (h < 24) return `${h}h ago`;
-    const d = Math.floor(h / 24);
-    return `${d}d ago`;
-  }
 
   function openInNewTab(url: string) {
     // active: false opens the new tab in the background so the popup retains
@@ -101,7 +91,7 @@
                   </span>
                   <span class="block truncate text-[10px] text-slate-500 dark:text-slate-400">{entry.hostname}</span>
                 </span>
-                <span class="shrink-0 text-[10px] text-slate-400 dark:text-slate-500">{rel(entry.timestamp)}</span>
+                <span class="shrink-0 text-[10px] text-slate-400 dark:text-slate-500">{timeAgo(entry.timestamp)}</span>
                 <!-- Verdict last, on the right: the same rule as every list in the web app. -->
                 <span
                   role="img"

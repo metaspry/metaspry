@@ -3,6 +3,9 @@
   import type { PageMeta } from '../../scrapers/PageMeta';
   import { bandClasses, bandFor, scoreLabel } from '../../audit/band';
   import { tooltip } from '../../actions/tooltip';
+  import { compareChangedHref } from '../../cloud/compare-link';
+  import type { UploadResult } from '../../cloud/sync';
+  import { timeAgo } from '../../util/time-ago';
   import CharBar from './CharBar.svelte';
   import JsonLdSection from './JsonLdSection.svelte';
   import HreflangSection from './HreflangSection.svelte';
@@ -10,6 +13,25 @@
 
   export let result: AuditResult;
   export let meta: PageMeta;
+  /** The cloud document this scan wrote (AGENTS 3.14); null when signed out or before the upload resolves. */
+  export let cloudScan: UploadResult | null = null;
+
+  $: changedSince =
+    cloudScan?.hadPrevious && cloudScan.previousScannedAt !== null
+      ? timeAgo(cloudScan.previousScannedAt)
+      : 'your last scan';
+
+  function openChanged() {
+    if (!cloudScan) return;
+    const url = compareChangedHref(cloudScan.id);
+    // Guarded like every other chrome.* entry point: `npm run dev` renders this in a plain tab.
+    if (typeof chrome === 'undefined' || !chrome.tabs) {
+      window.open(url, '_blank', 'noopener');
+      return;
+    }
+    // `active: true`: the user is deliberately leaving for the web app.
+    chrome.tabs.create({ url, active: true });
+  }
 
   const RADIUS = 32;
   const CIRC = 2 * Math.PI * RADIUS;
@@ -70,6 +92,22 @@
       </div>
     </div>
   </header>
+
+  {#if cloudScan?.hadPrevious}
+    <!-- The diff itself lives in the web app (versions are written server-side); one click away. -->
+    <div class="flex items-center justify-between gap-3 rounded-xl border border-white/40 bg-white/40 px-3 py-2 backdrop-blur-md dark:border-white/10 dark:bg-white/5">
+      <span class="min-w-0 truncate text-xs text-slate-600 dark:text-slate-400">Changed since {changedSince}</span>
+      <button
+        type="button"
+        class="inline-flex min-h-8 shrink-0 items-center rounded-md px-1.5 text-xs font-medium text-indigo-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 dark:text-indigo-300"
+        aria-label="Open what changed since the previous scan in the Metaspry web app"
+        use:tooltip={'Opens the diff between this scan and the previous one in the Metaspry web app'}
+        on:click={openChanged}
+      >
+        Open what changed ↗
+      </button>
+    </div>
+  {/if}
 
   {#each groups as group}
     {#if group.rules.length > 0}
