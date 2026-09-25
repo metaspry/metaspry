@@ -9,7 +9,7 @@
   aria-label="Messaging preview (iMessage / WhatsApp)"
   class="overflow-hidden rounded-2xl border border-white/40 bg-white/60 shadow-md shadow-indigo-500/5 backdrop-blur-md dark:border-white/10 dark:bg-white/5"
 >
-  <header class="border-b border-white/40 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:border-white/10 dark:text-slate-400">
+  <header class="border-b border-white/40 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider ms-muted dark:border-white/10">
     iMessage / WhatsApp
   </header>
   <div class="bg-emerald-50 p-3 dark:bg-emerald-950/30">

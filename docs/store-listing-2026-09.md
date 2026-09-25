@@ -53,18 +53,22 @@ low — but it buries our own name, and with 21 installs brand recall is not som
 **Proposed:**
 
 ```
-Find out why your link looks wrong when it's shared — before you publish. Free, no account, nothing leaves your browser.
+Find out why your link looks wrong when it's shared — before you publish. Free, and no account needed.
 ```
 
-120 characters. Leads with the problem the user actually has. Repeats nothing from the name, names no
-platform, and every claim in it is literally true of the shipped extension.
+101 characters. Leads with the problem the user actually has. Repeats nothing from the name, names no
+platform, and every claim in it is literally true of the shipped extension. (An earlier draft
+ended "nothing leaves your browser"; that is false for a signed-in user, whose scans upload to
+their account, so it was cut on 2026-09-25.)
 
 ---
 
 ## Detailed description
 
-**Change the opening paragraph only. Keep everything from "Open any page" onward byte-identical to
-the version that passed review in May.**
+**Change the opening paragraph only.** Everything from "Open any page" onward is the v1.0.26 copy in
+`README.md` -> "Detailed description" (six tabs, 19 rules, honest cloud wording, no platform names);
+the May version it replaces described four tabs and "12+ rules" and said "No first-party servers",
+which stopped being true when optional sign-in shipped.
 
 Replace the current first line:
 
@@ -76,30 +80,8 @@ with:
 > You paste a link into a chat and the preview is blank, or shows last year's title. Metaspry tells
 > you why, in one click, before anyone else sees it - locally, with no account and no telemetry.
 
-Then, unchanged:
-
-> Open any page, click the toolbar icon, and the side panel shows:
->
-> • TAGS - every <meta> element on the page, categorized for quick scanning. Search, copy, and pin tags across pages.
->
-> • PREVIEWS - exact mockups of how your share card renders on the major social and search platforms. Rendered from the page's own tags, with documented fallback chains. Full platform list at metaspry.com/docs/previews.
->
-> • AUDIT - weighted 0-100 score across 12+ rules covering required, recommended, and best-practice meta-tag hygiene. Includes live image dimension checking.
->
-> • SITE - robots.txt, sitemap.xml (recursive sitemap-index expansion, 7 fallback paths), and llms.txt fetched and parsed from the page's host.
->
-> WHY METASPRY
->
-> - Free forever. No account, no signup, no card.
-> - Local-first. The audit, parsing, and previews all run inside your browser. The only network calls are reading the site files of the page you audit (robots, sitemap, llms.txt). No first-party servers.
-> - Privacy-respecting. No telemetry, no analytics, no tracking.
-> - Works offline once a page is cached.
-> - Open roadmap on metaspry.com.
->
-> Built for engineers, SEO specialists, content teams, and indie builders.
->
-> Docs and roadmap: https://metaspry.com
-> Bug reports: https://github.com/metaspry/metaspry/issues
+Then paste the rest of the description from `README.md` -> "Detailed description", starting at "Open any
+page, click the toolbar icon".
 
 **Note:** the PREVIEWS bullet links to `metaspry.com/docs/previews`. That page exists
 (`metaspry-website/src/pages/docs/previews.mdx`, verified 2026-09-21), so the link is not a broken

@@ -17,7 +17,7 @@
 
 {#if dupKeys.length > 0}
   <section class="flex flex-col gap-2">
-    <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Duplicate keys ({dupKeys.length})</h4>
+    <h4 class="text-xs font-semibold uppercase tracking-wider ms-muted">Duplicate keys ({dupKeys.length})</h4>
     <div class="flex flex-col gap-1">
       {#each dupKeys as [key, list]}
         <div class="rounded-xl border border-amber-300/60 bg-amber-50/60 px-3 py-1.5 text-xs dark:border-amber-500/30 dark:bg-amber-950/40">

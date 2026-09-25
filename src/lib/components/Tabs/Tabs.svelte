@@ -66,7 +66,7 @@
       on:click={() => select(tab.id)}
       class="flex h-8 flex-1 basis-16 items-center justify-center gap-1.5 rounded-xl px-2 transition {tab.id === active
         ? 'bg-white text-indigo-600 shadow-sm dark:bg-slate-900 dark:text-indigo-300'
-        : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100'}"
+        : 'ms-muted hover:text-slate-900 dark:hover:text-slate-100'}"
     >
       {#if tab.icon}
         {@html tab.icon}

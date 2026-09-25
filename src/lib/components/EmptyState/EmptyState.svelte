@@ -23,18 +23,18 @@
     <circle cx="92" cy="92" r="14" />
     <path d="M88 92 L96 92" />
   </svg>
-  <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">No meta tags found</h3>
-  <p class="max-w-xs text-sm text-slate-600 dark:text-slate-400">
+  <h2 class="text-base font-semibold text-slate-900 dark:text-slate-50">No meta tags found</h2>
+  <p class="max-w-xs text-sm ms-muted">
     This page has no Open Graph, Twitter, or standard meta tags to analyze.
   </p>
   <button
     type="button"
     on:click={() => dispatch('retry')}
-    class="mt-2 rounded-full bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white shadow-md shadow-indigo-500/30 transition hover:bg-indigo-500 active:scale-[0.98] dark:bg-indigo-500 dark:hover:bg-indigo-400"
+    class="mt-2 rounded-full bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white shadow-md shadow-indigo-500/30 transition hover:bg-indigo-500 active:scale-[0.98] dark:bg-indigo-600 dark:hover:bg-indigo-500"
   >
     Try again
   </button>
-  <p class="mt-3 text-xs text-slate-500 dark:text-slate-400">
+  <p class="mt-3 text-xs ms-muted">
     Need help?
     <a
       href="https://metaspry.com/docs/"

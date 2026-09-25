@@ -11,7 +11,9 @@
   } from '../../storage/settings';
   import { validateSettings, type SettingsField } from '../../storage/validate-settings';
   import { cloudIsPro, APP_URL } from '../../cloud/plan';
+  import { workspaceRules, hasEntitledWorkspace } from '../../cloud/workspace-scoring';
   import { mode, switchMode, type Mode } from '../../mode';
+  import { shortcutsEnabled, setShortcutsEnabled } from '../../storage/shortcuts';
   import { toast } from '../Toast/toast';
   import { tooltip } from '../../actions/tooltip';
   import { cycleTab, focusables } from '../../actions/popover';
@@ -195,9 +197,11 @@
 
   const inputClass =
     'w-full rounded-lg border bg-white px-2.5 py-1.5 text-sm tabular-nums text-slate-900 shadow-sm outline-none transition focus:ring-2 dark:bg-slate-800 dark:text-slate-100';
-  const inputOk = 'border-slate-300 focus:border-indigo-500 focus:ring-indigo-500/30 dark:border-slate-600';
+  // R-30: slate-500 edge 4.76:1 on white, slate-400 5.71:1 on slate-800 (slate-300 was 1.48:1).
+  const inputOk = 'border-slate-500 focus:border-indigo-600 focus:ring-indigo-500/30 dark:border-slate-400';
   const inputBad = 'border-rose-500 focus:border-rose-500 focus:ring-rose-500/30';
-  const linkClass = `rounded hover:text-indigo-600 hover:underline dark:hover:text-indigo-300 ${FOCUS_RING}`;
+  // >= 24 px tall with 8 px between targets (WCAG 2.5.8, R-48); they were 16.5 px, 13-15 px apart.
+  const linkClass = `inline-flex h-6 items-center rounded px-1 hover:text-indigo-600 hover:underline dark:hover:text-indigo-300 ${FOCUS_RING}`;
 </script>
 
 <svelte:window on:keydown={onKey} />
@@ -215,21 +219,21 @@
     <header class="flex items-center justify-between">
       <div class="flex flex-col">
         <h3 id={TITLE_ID} class="text-base font-semibold text-slate-900 dark:text-slate-50">Settings</h3>
-        <p class="text-xs text-slate-500 dark:text-slate-400">Preferences and scoring rules</p>
+        <p class="text-xs ms-muted">Preferences and scoring rules</p>
       </div>
       <button
         type="button"
         aria-label="Close settings"
         use:tooltip={'Close settings (Esc)'}
         on:click={close}
-        class="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-50 {FOCUS_RING}"
+        class="flex h-8 w-8 items-center justify-center rounded-lg ms-muted transition hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-50 {FOCUS_RING}"
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
       </button>
     </header>
 
     <fieldset class="flex flex-col gap-2">
-      <legend class="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Preferences</legend>
+      <legend class="mb-2 text-xs font-semibold uppercase tracking-wider ms-muted">Preferences</legend>
       <div role="radiogroup" aria-label="Surface" class="grid grid-cols-2 gap-2">
         {#each SURFACES as s (s.value)}
           <label
@@ -246,13 +250,57 @@
               class="sr-only"
             />
             <span class="text-xs font-semibold text-slate-800 dark:text-slate-100">{s.label}</span>
-            <span class="text-[11px] leading-snug text-slate-500 dark:text-slate-400">{s.hint}</span>
+            <span class="text-[11px] leading-snug ms-muted">{s.hint}</span>
           </label>
         {/each}
       </div>
+      <!-- WCAG 2.1.4: single-character shortcuts can be turned off. Off leaves ? and Esc. -->
+      <label class="mt-1 flex cursor-pointer items-start gap-2.5 rounded-lg border border-slate-300 px-3 py-2 transition hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-800">
+        <input
+          type="checkbox"
+          role="switch"
+          checked={$shortcutsEnabled}
+          on:change={(e) => setShortcutsEnabled(e.currentTarget.checked)}
+          aria-describedby="shortcuts-pref-hint"
+          class="mt-0.5 h-4 w-4 shrink-0 accent-indigo-600 {FOCUS_RING}"
+        />
+        <span class="flex flex-col gap-0.5">
+          <span class="text-xs font-semibold text-slate-800 dark:text-slate-100">Single-key shortcuts</span>
+          <span id="shortcuts-pref-hint" class="ms-muted text-[11px] leading-snug">/ search, r re-scan, 1-6 tabs. Off: only ? and Esc work.</span>
+        </span>
+      </label>
     </fieldset>
 
-    {#if $cloudIsPro}
+    {#if $workspaceRules}
+      <!-- R-39: a paid workspace licenses custom scoring for every member; no Pro upsell. -->
+      <section class="flex flex-col items-start gap-2 rounded-xl border border-indigo-400/30 bg-indigo-500/5 p-3">
+        <h4 class="text-sm font-semibold text-slate-900 dark:text-slate-50">Scoring rules from {$workspaceRules.name}</h4>
+        <p class="text-xs text-slate-600 dark:text-slate-300">
+          New scans save to this workspace, so they are scored with its rules. They are edited in the web app; your
+          personal rules apply when you save to Personal history.
+        </p>
+        <dl class="grid w-full grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+          {#each LENGTH_ROWS as row (row.min)}
+            <dt class="ms-muted">{row.label}</dt>
+            <dd class="tabular-nums text-slate-800 dark:text-slate-100">{$workspaceRules.settings[row.min]}-{$workspaceRules.settings[row.max]} characters</dd>
+          {/each}
+          <dt class="ms-muted">Weights</dt>
+          <dd class="tabular-nums text-slate-800 dark:text-slate-100">
+            {WEIGHT_FIELDS.map((w) => `${w.label} ${$workspaceRules?.settings.weights[w.key]}`).join(' · ')}
+          </dd>
+        </dl>
+        <a
+          href={`${APP_URL}/settings`}
+          target="_blank"
+          rel="noopener noreferrer"
+          use:tooltip={'Edit the workspace scoring rules in the Metaspry web app (opens a new tab)'}
+          class="inline-flex h-6 items-center gap-1 rounded px-1 text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-300 {FOCUS_RING}"
+        >
+          Edit in web app
+          <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8" /></svg>
+        </a>
+      </section>
+    {:else if $cloudIsPro}
       <p class="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-indigo-500/10 px-3 py-2 text-xs text-slate-700 dark:text-slate-200">
         <span class="inline-flex items-center gap-1.5">
           <span class="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
@@ -271,14 +319,14 @@
       </p>
 
       <fieldset class="flex flex-col gap-3">
-        <legend class="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Length thresholds (characters)</legend>
+        <legend class="mb-2 text-xs font-semibold uppercase tracking-wider ms-muted">Length thresholds (characters)</legend>
         {#each LENGTH_ROWS as row (row.min)}
           {@const minProblem = problemFor(row.min)}
           {@const maxProblem = problemFor(row.max)}
           <div class="flex flex-col gap-1">
             <span class="text-xs font-medium text-slate-700 dark:text-slate-200">{row.label}</span>
             <div class="flex items-center gap-2">
-              <label class="flex flex-1 items-center gap-1.5 text-[10px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              <label class="flex flex-1 items-center gap-1.5 text-[10px] uppercase tracking-wide ms-muted">
                 min
                 <input
                   type="number"
@@ -293,8 +341,8 @@
                   class="{inputClass} {minProblem ? inputBad : inputOk}"
                 />
               </label>
-              <span class="text-slate-400" aria-hidden="true">–</span>
-              <label class="flex flex-1 items-center gap-1.5 text-[10px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              <span class="ms-muted" aria-hidden="true">–</span>
+              <label class="flex flex-1 items-center gap-1.5 text-[10px] uppercase tracking-wide ms-muted">
                 max
                 <input
                   type="number"
@@ -321,7 +369,7 @@
       </fieldset>
 
       <fieldset class="flex flex-col gap-2">
-        <legend class="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Severity weights</legend>
+        <legend class="mb-2 text-xs font-semibold uppercase tracking-wider ms-muted">Severity weights</legend>
         <p class="text-xs text-slate-600 dark:text-slate-300">
           Each rule earns its weight on pass, half on warn, zero on fail. Score = earned / total × 100.
         </p>
@@ -385,6 +433,15 @@
           <span class="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Unsaved changes</span>
         {/if}
       </div>
+    {:else if $hasEntitledWorkspace}
+      <!-- A member of a paid workspace saving to Personal history: point at the workspace, never "Go Pro". -->
+      <section class="flex flex-col items-start gap-2 rounded-xl border border-indigo-400/30 bg-indigo-500/5 p-3">
+        <h4 class="text-sm font-semibold text-slate-900 dark:text-slate-50">Custom scoring comes with your workspace</h4>
+        <p class="text-xs text-slate-600 dark:text-slate-300">
+          Scans you save to your team workspace use its scoring rules. Choose it under "Save new scans to" in the account
+          menu. Scans saved to Personal history use the default rules.
+        </p>
+      </section>
     {:else}
       <section class="flex flex-col items-start gap-2 rounded-xl border border-indigo-400/30 bg-indigo-500/5 p-3">
         <span class="rounded-full bg-indigo-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">Pro</span>
@@ -402,9 +459,9 @@
       </section>
     {/if}
 
-    <footer class="mt-auto flex flex-col gap-1.5 border-t border-slate-200 pt-3 text-[11px] text-slate-500 dark:border-slate-800 dark:text-slate-400">
+    <footer class="mt-auto flex flex-col gap-1.5 border-t border-slate-200 pt-3 text-[11px] ms-muted dark:border-slate-800">
       <span>Metaspry v{version}</span>
-      <nav aria-label="About Metaspry" class="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+      <nav aria-label="About Metaspry" class="flex flex-wrap items-center gap-x-2 gap-y-2">
         {#each ABOUT_LINKS as link, i (link.href)}
           {#if i > 0}<span aria-hidden="true">·</span>{/if}
           <a href={link.href} target="_blank" rel="noopener noreferrer" class={linkClass}>{link.label}</a>

@@ -32,4 +32,14 @@ describe('band helper', () => {
       expect(c.stroke).toContain(hue);
     }
   });
+
+  it('uses -600 / -700 in light mode (never -500, which fails 3:1 on the light Screen)', () => {
+    for (const band of ['good', 'warn', 'fail'] as const) {
+      const c = bandClasses(band);
+      for (const cls of [c.text, c.stroke]) {
+        const light = cls.split(' ').filter((t) => !t.startsWith('dark:'));
+        expect(light.every((t) => /-(600|700)$/.test(t))).toBe(true);
+      }
+    }
+  });
 });

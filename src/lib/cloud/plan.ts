@@ -3,7 +3,9 @@
  * (same doc the web app + billing webhook use) and exposes a reactive `cloudIsPro` store.
  * Used to gate Pro-only extension features (custom scoring) + drive the upsell.
  *
- * Personal Pro only: `users/{uid}.plan` is 'free' | 'pro' (Team is workspace-scoped, not here).
+ * `cloudIsPro` is the personal plan only: `users/{uid}.plan` is 'free' | 'pro'. Workspace plans
+ * reach scoring through `workspaceRules` (workspace-scoring.ts): an entitled sync target scores with
+ * that workspace's rules, whatever the personal plan.
  */
 import { writable, derived } from "svelte/store";
 import { doc, onSnapshot } from "firebase/firestore";
@@ -11,6 +13,7 @@ import { fbDb } from "./firebase";
 import { cloudUser } from "./auth";
 import { settings, DEFAULT_SETTINGS } from "../storage/settings";
 import type { Settings } from "../storage/settings";
+import { workspaceRules, resolveEffectiveSettings } from "./workspace-scoring";
 
 /** Where the extension sends users to upgrade. */
 export const APP_URL = "https://app.metaspry.com";
@@ -18,14 +21,14 @@ export const APP_URL = "https://app.metaspry.com";
 export const cloudIsPro = writable(false);
 
 /**
- * Settings actually applied to scoring. Custom scoring is Pro-only: non-Pro users (and downgraded
- * users) always score with DEFAULT_SETTINGS regardless of any persisted custom thresholds/weights.
- * The custom settings are retained (not deleted) so they re-apply automatically once Pro returns.
+ * Settings actually applied to scoring: the sync target workspace's rules when that workspace is
+ * entitled (R-39), else the personal custom rules for a personal Pro, else DEFAULT_SETTINGS.
+ * Personal custom settings are retained (not deleted) so they re-apply once Pro returns.
  * ALL audit/score call sites MUST read this, never the raw `settings` store.
  */
-export const effectiveSettings = derived<[typeof settings, typeof cloudIsPro], Settings>(
-  [settings, cloudIsPro],
-  ([$settings, $isPro]) => ($isPro ? $settings : DEFAULT_SETTINGS),
+export const effectiveSettings = derived<[typeof settings, typeof cloudIsPro, typeof workspaceRules], Settings>(
+  [settings, cloudIsPro, workspaceRules],
+  ([$settings, $isPro, $ws]) => resolveEffectiveSettings($settings, $isPro, $ws),
 );
 
 let started = false;

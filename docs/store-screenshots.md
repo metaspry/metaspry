@@ -10,7 +10,7 @@ The five shots you ship (in order):
 4. **Site** tab - robots.txt + sitemap.xml panel
 5. **Compare** tab - coograph.com vs metaspry.com side-by-side
 
-If you ship fewer than 5, drop **Compare** first (it needs two scans).
+If you ship fewer than 5, drop **Compare** first.
 
 ---
 
@@ -51,7 +51,7 @@ Close DevTools.
 1. Navigate to `https://coograph.com` in the active tab.
 2. Wait for the page to fully load.
 3. Click the **Metaspry** toolbar icon → side panel opens on the right.
-4. In the side panel: click **Get Meta Tags**.
+4. In the side panel: click **Scan this page**.
 
 The side panel now shows the **Tags** tab with coograph's meta filled in. The audit has run in the background.
 
@@ -59,9 +59,9 @@ The side panel now shows the **Tags** tab with coograph's meta filled in. The au
 
 ## 4. Capture each tab
 
-For each of the five tabs, do this loop:
+The extension has six tabs (Tags, Previews, Audit, Site, AI, Compare); the five shots skip AI. For each shot, do this loop:
 
-1. Click the tab name in the side panel header (Tags / Previews / Audit / Site / Compare).
+1. Click the tab name in the tab strip (or press `1`-`6`).
 2. Make sure the side panel is scrolled to the top of the section.
 3. Press **`Win` + `Shift` + `S`** → choose **rectangular snip**.
 4. Drag from the top-left corner of the Chrome window to the bottom-right corner of its visible content area. Aim for ~1280 × 800 - exact size doesn't matter yet, the helper below fixes it.
@@ -98,8 +98,7 @@ For each of the five tabs, do this loop:
 - If coograph.com's sitemap-index expands recursively, all the better - that's a marquee feature.
 
 **05-compare.png** - optional but strong.
-- Before capturing, scan `https://metaspry.com` (open it in a new tab, click the extension, **Get Meta Tags**).
-- Open the **Compare** tab → side-by-side view of coograph vs metaspry.
+- With coograph.com scanned, open the **Compare** tab, type `metaspry.com` and press **Compare** → both scores and the tag-by-tag rows.
 - Capture both columns visible.
 
 ---

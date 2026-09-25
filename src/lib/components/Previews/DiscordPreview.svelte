@@ -9,12 +9,13 @@
   aria-label="Discord preview"
   class="overflow-hidden rounded-2xl border border-white/40 bg-white/60 shadow-md shadow-indigo-500/5 backdrop-blur-md dark:border-white/10 dark:bg-white/5"
 >
-  <header class="border-b border-white/40 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:border-white/10 dark:text-slate-400">
+  <header class="border-b border-white/40 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider ms-muted dark:border-white/10">
     Discord
   </header>
   <div class="flex gap-3 bg-[#2b2d31] p-3">
     <div class="w-1 flex-shrink-0 rounded bg-indigo-500" />
     <div class="min-w-0 flex-1 space-y-1">
+      <!-- Fixed dark mock surface in both themes: the raw light grey, not the theme-aware muted token. -->
       <p class="text-[11px] text-slate-400">{host}</p>
       <p class="line-clamp-1 text-sm font-semibold text-indigo-300">{title}</p>
       <p class="line-clamp-3 text-xs text-slate-300">{description}</p>

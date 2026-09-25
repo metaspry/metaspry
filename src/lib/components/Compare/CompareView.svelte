@@ -136,12 +136,13 @@
       required
       placeholder="example.com"
       bind:value={url}
-      class="flex-1 rounded-full border border-white/40 bg-white/40 px-4 py-2 text-sm text-slate-900 placeholder:text-slate-500 backdrop-blur-md focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/40 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:placeholder:text-slate-500"
+      aria-label="URL to compare"
+      class="flex-1 rounded-full border border-slate-500 bg-white/60 px-4 py-2 text-sm text-slate-900 placeholder:text-muted backdrop-blur-md focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-400/40 dark:border-white/40 dark:bg-white/5 dark:text-slate-100 dark:placeholder:text-muted-dark dark:focus:border-indigo-300"
     />
     <button
       type="submit"
       disabled={loading}
-      class="rounded-full bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-md shadow-indigo-500/30 transition hover:bg-indigo-500 disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-400"
+      class="rounded-full bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-md shadow-indigo-500/30 transition hover:bg-indigo-500 disabled:opacity-60 dark:bg-indigo-600 dark:hover:bg-indigo-500"
     >{loading ? '…' : 'Compare'}</button>
   </form>
 
@@ -159,7 +160,7 @@
         side is served HTML. On a JavaScript-rendered site some differences below may not be real.
       </p>
     {:else}
-      <p class="px-1 text-[11px] text-slate-500 dark:text-slate-400">
+      <p class="px-1 text-[11px] ms-muted">
         The rows below compare the served HTML of both pages, fetched without your cookies — tags
         added by JavaScript after load are not included on either side, and a page that varies by
         login or region may differ from what you see. The Current score is your rendered-page audit
@@ -171,7 +172,7 @@
       {#each [{ label: 'Current', url: leftUrl, score: leftScore }, { label: 'Compared', url: rightUrl, score: rightScore }] as card (card.label)}
         <div class="flex items-center justify-between gap-2 rounded-xl border border-white/40 bg-white/40 px-3 py-2 backdrop-blur-md dark:border-white/10 dark:bg-white/5">
           <div class="min-w-0 flex-1">
-            <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{card.label}</p>
+            <p class="text-[10px] font-semibold uppercase tracking-wider ms-muted">{card.label}</p>
             <p class="truncate text-xs text-slate-700 dark:text-slate-300" use:tooltip={card.url}>{card.url}</p>
           </div>
           <p

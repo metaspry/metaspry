@@ -25,13 +25,13 @@
           <li>
             <p class="font-medium text-slate-900 dark:text-slate-100">{section.heading}</p>
             {#if section.links.length > 0}
-              <ul class="ml-3 mt-1 list-disc space-y-0.5 text-[11px] marker:text-slate-400">
+              <ul class="ml-3 mt-1 list-disc space-y-0.5 text-[11px] marker:text-muted dark:marker:text-muted-dark">
                 {#each section.links as link, j (j)}
                   <li>
                     {#if safeHref(link.url)}
                       <a href={safeHref(link.url)} target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:underline dark:text-indigo-300">{link.label}</a>
                     {:else}
-                      <span class="text-slate-600 dark:text-slate-400" use:tooltip={'Not an http(s) URL'}>{link.label}<span class="sr-only"> (not an http(s) URL)</span></span>
+                      <span class="ms-muted" use:tooltip={'Not an http(s) URL'}>{link.label}<span class="sr-only"> (not an http(s) URL)</span></span>
                     {/if}
                   </li>
                 {/each}
@@ -49,7 +49,7 @@
         {/if}
       {/if}
     {:else}
-      <p class="text-slate-500 dark:text-slate-400">
+      <p class="ms-muted">
         {llms.error ?? 'No /llms.txt at this host.'} <a href="https://llmstxt.org" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:underline dark:text-indigo-300">What is llms.txt?</a>
       </p>
     {/if}
