@@ -532,7 +532,7 @@ Checks in `src/lib/audit/aeo.ts`:
 
 ### 3.12 Compare tab
 
-**Purpose and flow.** A URL field pre-filled with `pageUrl`. Input like `example.com` gets `https://` added, and the hostname must contain a dot. The tab fetches the URL, requires a `text/html` content type, parses it, then shows the Current and Compared cards (label and URL on the left, the coloured score on the right of the same line, `role="img"` labelled) and one row per key: same (green), different (amber) or present on one side only (grey). Priority keys come first (title, description, canonical, `og:title`, `og:description`, `og:image`, `og:url`, `og:type`, `twitter:card`, `twitter:title`, `twitter:description`, `twitter:image`), then the rest alphabetically.
+**Purpose and flow.** A URL field pre-filled with `pageUrl`. Input like `example.com` gets `https://` added, and the hostname must contain a dot. The tab re-fetches the current page and fetches the compared URL as served HTML (both sides without cookies; the rendered DOM is used for the left side only when that fetch fails, with a warning), requires a `text/html` content type, parses it, then shows the Current and Compared cards (label and URL on the left, the coloured score on the right of the same line, `role="img"` labelled) and one row per key: same (green), different (amber) or present on one side only (grey). Priority keys come first (title, description, canonical, `og:title`, `og:description`, `og:image`, `og:url`, `og:type`, `twitter:card`, `twitter:title`, `twitter:description`, `twitter:image`), then the rest alphabetically.
 
 **Key files.** `src/lib/components/Compare/CompareView.svelte`, `src/lib/components/Compare/diff.ts`.
 
