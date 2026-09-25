@@ -12,6 +12,8 @@ export interface CloudWorkspace {
   id: string;
   name: string;
   role: string;
+  /** Plan is not 'inactive' (the app's `workspaceEntitled`): custom scoring for every member. */
+  entitled: boolean;
 }
 
 export type SyncScope = { kind: 'personal' } | { kind: 'workspace'; wsId: string; name: string };
@@ -60,7 +62,12 @@ export async function fetchWorkspaces(uid: string): Promise<void> {
     const list = snap.docs
       .map((d) => {
         const data = d.data();
-        return { id: d.id, name: String(data.name ?? 'Workspace'), role: data.roles?.[uid] };
+        return {
+          id: d.id,
+          name: String(data.name ?? 'Workspace'),
+          role: data.roles?.[uid],
+          entitled: data.plan !== 'inactive',
+        };
       })
       .filter((w) => w.role === 'owner' || w.role === 'member');
     workspaces.set(list);

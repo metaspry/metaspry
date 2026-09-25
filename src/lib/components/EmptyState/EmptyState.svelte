@@ -24,7 +24,7 @@
     <path d="M88 92 L96 92" />
   </svg>
   <h2 class="text-base font-semibold text-slate-900 dark:text-slate-50">No meta tags found</h2>
- <p class="max-w-xs text-sm ms-muted">
+  <p class="max-w-xs text-sm ms-muted">
     This page has no Open Graph, Twitter, or standard meta tags to analyze.
   </p>
   <button
@@ -34,7 +34,7 @@
   >
     Try again
   </button>
- <p class="mt-3 text-xs ms-muted">
+  <p class="mt-3 text-xs ms-muted">
     Need help?
     <a
       href="https://metaspry.com/docs/"

@@ -16,7 +16,7 @@
   const rows: { key: string; label: string; single: boolean }[] = [
     { key: '/', label: 'Focus search', single: true },
     { key: '1 – 6', label: 'Switch to Tags / Previews / Audit / Site / AI / Compare', single: true },
-    { key: 'r', label: 'Re-scrape current page', single: true },
+    { key: 'r', label: 'Re-scan current page', single: true },
     { key: '?', label: 'Toggle this help', single: false },
     { key: 'Esc', label: 'Close drawers and modals', single: false },
   ];
@@ -36,7 +36,7 @@
     >
       <header class="mb-3 flex items-center justify-between">
         <h3 id={TITLE_ID} class="text-base font-semibold text-slate-900 dark:text-slate-50">Keyboard shortcuts</h3>
- <button type="button" on:click={close} aria-label="Close" class="flex h-7 w-7 items-center justify-center rounded-lg ms-muted hover:bg-white/60 dark:hover:bg-white/10 {FOCUS_RING}">
+        <button type="button" on:click={close} aria-label="Close" class="flex h-7 w-7 items-center justify-center rounded-lg ms-muted hover:bg-white/60 dark:hover:bg-white/10 {FOCUS_RING}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
         </button>
       </header>

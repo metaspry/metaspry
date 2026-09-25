@@ -60,7 +60,7 @@
   function statusColor(r: RuleResult): string {
     if (r.status === 'pass') return 'text-emerald-500 dark:text-emerald-400';
     if (r.status === 'warn') return 'text-amber-500 dark:text-amber-400';
- if (r.status === 'pending') return 'ms-muted';
+    if (r.status === 'pending') return 'ms-muted';
     return 'text-rose-500 dark:text-rose-400';
   }
 </script>
@@ -70,7 +70,7 @@
   <header class="flex items-center justify-between gap-4 rounded-2xl border border-white/40 bg-white/50 p-4 backdrop-blur-md dark:border-white/10 dark:bg-white/5">
     <div class="flex min-w-0 flex-1 flex-col">
       <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">SEO Health</h3>
- <p class="text-xs ms-muted">
+      <p class="text-xs ms-muted">
         {result.hasPending ? 'Resolving async checks…' : 'Score weighted by rule severity.'}
       </p>
     </div>
@@ -99,7 +99,7 @@
   {#if cloudScan?.hadPrevious}
     <!-- The diff itself lives in the web app (versions are written server-side); one click away. -->
     <div class="flex items-center justify-between gap-3 rounded-xl border border-white/40 bg-white/40 px-3 py-2 backdrop-blur-md dark:border-white/10 dark:bg-white/5">
- <span class="min-w-0 truncate text-xs ms-muted">{lastScan}</span>
+      <span class="min-w-0 truncate text-xs ms-muted">{lastScan}</span>
       <button
         type="button"
         class="inline-flex h-8 shrink-0 items-center rounded-md px-1.5 text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-300 {FOCUS_RING}"
@@ -115,7 +115,7 @@
   {#each groups as group}
     {#if group.rules.length > 0}
       <section class="flex flex-col gap-2">
- <h4 class="text-xs font-semibold uppercase tracking-wider ms-muted">{group.label}</h4>
+        <h4 class="text-xs font-semibold uppercase tracking-wider ms-muted">{group.label}</h4>
         <div class="flex flex-col gap-1.5">
           {#each group.rules as rule (rule.id)}
             <div class="flex items-start gap-3 rounded-xl border border-white/40 bg-white/40 px-3 py-2 backdrop-blur-md dark:border-white/10 dark:bg-white/5">
@@ -141,7 +141,7 @@
               </div>
               <div class="min-w-0 flex-1">
                 <p class="text-sm font-medium text-slate-900 dark:text-slate-50">{rule.title}</p>
- <p class="break-all text-xs ms-muted">{rule.detail}</p>
+                <p class="break-all text-xs ms-muted">{rule.detail}</p>
                 {#if rule.meta?.length !== undefined && rule.meta.min !== undefined && rule.meta.max !== undefined}
                   <div class="mt-1.5">
                     <CharBar length={rule.meta.length} min={rule.meta.min} max={rule.meta.max} />

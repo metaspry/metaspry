@@ -190,7 +190,7 @@
 
   const items: GridProps[] = [
     {
-      text: "Get Meta Tags",
+      text: "Scan this page",
       onClick: () => void scrape(),
     },
   ];
@@ -394,8 +394,9 @@
     <main class="flex min-h-0 flex-1 flex-col gap-4">
     {#if view === "landing"}
       <div class="flex flex-col gap-1">
-        <h2 class="text-base font-semibold text-slate-900 dark:text-slate-50">What would you like to do?</h2>
- <p class="text-xs ms-muted">Select an option below to get started.</p>
+        <!-- Says what the extension does before asking for a click (R-38). -->
+        <h2 class="text-base font-semibold text-slate-900 dark:text-slate-50">Scan this page's meta tags</h2>
+        <p class="text-xs ms-muted">Titles, descriptions, Open Graph, Twitter cards, robots and structured data - scored in seconds.</p>
       </div>
       <Grid {items} />
     {:else if view === "loading"}
@@ -430,13 +431,13 @@
         on:click={retry}
         class="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-indigo-500/30 transition hover:bg-indigo-500 active:scale-[0.99] dark:bg-indigo-500 dark:hover:bg-indigo-400"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true">
           <path d="M3 12a9 9 0 0 1 15.5-6.4L21 8" />
           <path d="M21 3v5h-5" />
           <path d="M21 12a9 9 0 0 1-15.5 6.4L3 16" />
           <path d="M3 21v-5h5" />
         </svg>
-        Re-scrape this page
+        Re-scan this page
       </button>
     {/if}
     </main>

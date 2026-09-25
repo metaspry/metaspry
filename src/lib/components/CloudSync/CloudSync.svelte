@@ -21,6 +21,7 @@
     setSyncScope,
     type CloudWorkspace,
   } from "../../cloud/workspaces";
+  import { initWorkspaceScoring } from "../../cloud/workspace-scoring";
 
   let open = false;
   let trigger: HTMLButtonElement | null = null;
@@ -34,6 +35,7 @@
     initCloudSettingsSync();
     initCloudPlan();
     initCloudWorkspaces();
+    initWorkspaceScoring();
   });
 
   async function submit() {

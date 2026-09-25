@@ -160,7 +160,7 @@
         side is served HTML. On a JavaScript-rendered site some differences below may not be real.
       </p>
     {:else}
- <p class="px-1 text-[11px] ms-muted">
+      <p class="px-1 text-[11px] ms-muted">
         The rows below compare the served HTML of both pages, fetched without your cookies — tags
         added by JavaScript after load are not included on either side, and a page that varies by
         login or region may differ from what you see. The Current score is your rendered-page audit
@@ -172,7 +172,7 @@
       {#each [{ label: 'Current', url: leftUrl, score: leftScore }, { label: 'Compared', url: rightUrl, score: rightScore }] as card (card.label)}
         <div class="flex items-center justify-between gap-2 rounded-xl border border-white/40 bg-white/40 px-3 py-2 backdrop-blur-md dark:border-white/10 dark:bg-white/5">
           <div class="min-w-0 flex-1">
- <p class="text-[10px] font-semibold uppercase tracking-wider ms-muted">{card.label}</p>
+            <p class="text-[10px] font-semibold uppercase tracking-wider ms-muted">{card.label}</p>
             <p class="truncate text-xs text-slate-700 dark:text-slate-300" use:tooltip={card.url}>{card.url}</p>
           </div>
           <p
