@@ -13,6 +13,9 @@
   export let leftUrl: string;
   export let leftScore: number = 0;
 
+  /** Every fetch in this tab is bounded; a host that never answers used to hang it forever. */
+  const FETCH_TIMEOUT_MS = 6000;
+
   // Pre-fill with the audited page's own URL so first-success is one click
   // away — user typically wants to compare against a previous version or a
   // sibling URL, both of which are easier to derive by editing this than
@@ -44,26 +47,37 @@
   /** Parse the served HTML of a URL, or null when it cannot be fetched like-for-like. */
   async function fetchSourceMeta(target: string): Promise<PageMeta | null> {
     if (!target) return null;
-    const controller = new AbortController();
-    // Every other fetch in the extension is bounded; this one was not, so a slow host hung Compare
-    // indefinitely — and this change added a second such request per comparison.
-    const timer = setTimeout(() => controller.abort(), 6000);
     try {
-      const res = await fetch(target, {
-        credentials: 'omit',
-        redirect: 'follow',
-        signal: controller.signal,
-      });
-      if (!res.ok) return null;
+      const { res, text } = await fetchServedHtml(target);
       // No cookies are sent, so an auth-gated page answers with its logged-out or login document.
       // Diffing that against what the user is looking at would be a confident lie.
       if (res.url && !sameUrl(res.url, target)) return null;
-      const ct = res.headers.get('content-type') ?? '';
-      if (!ct.toLowerCase().includes('text/html')) return null;
-      const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+      const doc = new DOMParser().parseFromString(text, 'text/html');
       return getMetaTags(doc.documentElement, res.url || target);
     } catch {
       return null;
+    }
+  }
+
+  /** GET as served HTML, bounded by `FETCH_TIMEOUT_MS` (the body read included). */
+  async function fetchServedHtml(target: string): Promise<{ res: Response; text: string }> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+    try {
+      const res = await fetch(target, { credentials: 'omit', redirect: 'follow', signal: controller.signal });
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status} ${res.statusText}`);
+      }
+      const ct = res.headers.get('content-type') ?? '';
+      if (!ct.toLowerCase().includes('text/html')) {
+        throw new Error(`Not an HTML page (content-type: ${ct || 'unknown'}).`);
+      }
+      return { res, text: await res.text() };
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        throw new Error(`Timed out after ${FETCH_TIMEOUT_MS / 1000} s - the site did not answer.`);
+      }
+      throw err;
     } finally {
       clearTimeout(timer);
     }
@@ -81,15 +95,7 @@
     rightMeta = null;
     rows = [];
     try {
-      const res = await fetch(target, { credentials: 'omit', redirect: 'follow' });
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status} ${res.statusText}`);
-      }
-      const ct = res.headers.get('content-type') ?? '';
-      if (!ct.toLowerCase().includes('text/html')) {
-        throw new Error(`Not an HTML page (content-type: ${ct || 'unknown'}).`);
-      }
-      const text = await res.text();
+      const { res, text } = await fetchServedHtml(target);
       const finalUrl = res.url || target;
       const doc = new DOMParser().parseFromString(text, 'text/html');
       const meta = getMetaTags(doc.documentElement, finalUrl);

@@ -36,7 +36,7 @@
   import { tooltip } from "../actions/tooltip";
   import { cloudUser } from "../cloud/auth";
   import { syncScope } from "../cloud/workspaces";
-  import { toScanPayload, uploadScan } from "../cloud/sync";
+  import { toScanPayload, uploadScan, type UploadResult } from "../cloud/sync";
   import { fetchSiteFiles } from "../scrapers/getSiteFiles";
   import { get } from "svelte/store";
 
@@ -52,6 +52,10 @@
   let pageUrl = "";
   /** What the browser shows as this page's favicon (declared link -> tab icon -> /favicon.ico). */
   let pageIcon: string | null = null;
+  // The cloud document this scan wrote: null until the upload resolves, when signed out, or when
+  // the upload failed. Drives the Audit tab's "Changed since" row (AGENTS 3.7).
+  let cloudScan: UploadResult | null = null;
+  $: if (!$cloudUser) cloudScan = null;
   let settingsOpen = false;
 
   const tabs: TabDef[] = [
@@ -95,6 +99,7 @@
     const id = ++scrapeId;
     view = "loading";
     errorMessage = "";
+    cloudScan = null;
     try {
       const { html, url: tabUrl, reason, favIconUrl } = await getHTML();
       if (id !== scrapeId) return;
@@ -144,7 +149,9 @@
             siteFiles = undefined;
           }
           const payloadMeta: PageMeta = { ...meta, icon: pageIcon ?? meta.icon };
-          await uploadScan(cu.uid, toScanPayload(payloadMeta, finalResult, pageUrl, siteFiles), get(syncScope));
+          const uploaded = await uploadScan(cu.uid, toScanPayload(payloadMeta, finalResult, pageUrl, siteFiles), get(syncScope));
+          // Also dropped when the user signed out (or switched account) while the write was in flight.
+          if (id === scrapeId && get(cloudUser)?.uid === cu.uid) cloudScan = uploaded;
         } catch (err) {
           if (import.meta.env.DEV) console.warn("cloud sync failed", err);
         }
@@ -374,7 +381,7 @@
         {:else if activeTab === "previews"}
           <Preview meta={pageMeta} {pageUrl} icon={pageIcon} />
         {:else if activeTab === "audit"}
-          <Audit result={auditResult} meta={pageMeta} />
+          <Audit result={auditResult} meta={pageMeta} {cloudScan} />
         {:else if activeTab === "site"}
           {#key pageUrl}
             <SiteView baseUrl={pageUrl} />
