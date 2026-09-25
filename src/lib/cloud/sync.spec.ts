@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // In-memory Firestore: enough of `doc/getDoc/setDoc` for the write path `uploadScan` uses.
 const store = new Map<string, Record<string, unknown>>();
+// The options `setDoc` was last called with: the write must stay a plain replace (no `merge`).
+let lastSetOptions: unknown = 'never-called';
 
 vi.mock('./firebase', () => ({ fbDb: () => ({}) }));
 vi.mock('firebase/firestore', () => ({
@@ -10,8 +12,9 @@ vi.mock('firebase/firestore', () => ({
     const data = store.get(ref.path);
     return { exists: () => data !== undefined, data: () => data };
   },
-  setDoc: async (ref: { path: string }, data: Record<string, unknown>) => {
+  setDoc: async (ref: { path: string }, data: Record<string, unknown>, options?: unknown) => {
     store.set(ref.path, data);
+    lastSetOptions = options;
   },
   serverTimestamp: () => 'server-time',
 }));
@@ -32,6 +35,7 @@ describe('uploadScan', () => {
     const written = store.get(`users/u1/scans/${r.id}`);
     expect(written).toMatchObject({ url: 'https://acme.com/', workspaceId: null, starred: false });
     expect(written?.createdAt).toBe('server-time');
+    expect(lastSetOptions).toBeUndefined(); // no `{ merge: true }`: undefined fields must drop
   });
 
   it('re-scan: reports the previous scannedAt and carries starred + createdAt forward', async () => {

@@ -131,7 +131,8 @@ This is the complete inventory. There are no ports (`runtime.connect`), no conte
 | `src/lib/audit/` | `rules.ts` (sync rules + scoring), `asyncRules.ts` (og:image dimensions), `AuditResult.ts` (types), `aeo.ts` (AI readiness) |
 | `src/lib/storage/` | `settings.ts`, `history.ts`, `pinned.ts`: Svelte stores persisted to `chrome.storage.local` |
 | `src/lib/mode.ts`, `src/lib/theme.ts` | Surface mode and theme stores |
-| `src/lib/cloud/` | `firebase.ts`, `auth.ts`, `plan.ts`, `settings.ts`, `sync.ts`, `workspaces.ts` |
+| `src/lib/cloud/` | `firebase.ts`, `auth.ts`, `plan.ts`, `settings.ts`, `sync.ts`, `workspaces.ts`, `compare-link.ts` (deep link into the app's `/compare`) |
+| `src/lib/util/` | `time-ago.ts` (relative time shared by History and the Audit "Last scan" row), `safe-href.ts` |
 | `src/lib/actions/` | Svelte actions: `tooltip.ts` (`use:tooltip`, 3.17) |
 | `src/lib/categorize.ts` | Tag key -> category |
 | `src/lib/exporters/exporters.ts` | JSON and CSV serialisers, blob download |
@@ -360,7 +361,7 @@ Fallback chains (`Preview.svelte`):
 
 **Purpose and flow.** A header card with "SEO Health" and its caption on the left and the score ring (0-100, coloured through `src/lib/audit/band.ts`, `role="img"` "Score 92 of 100, healthy") on the right - identity left, verdict right, the same rule as every list in the web app - then the rules grouped Required / Recommended / Best Practice with pass, warn, fail or spinning pending icons and a length bar for length rules. Below: JSON-LD entities, the hreflang list and duplicate keys.
 
-**"Changed since" row (signed in).** Under the header card, only when the upload of this scan (3.14) reported `hadPrevious: true`: "Changed since {time ago}" on the left (from the previous document's `scannedAt`, or "your last scan" when it had none) and a link-styled button "Open what changed ↗" on the right (`aria-label` names the destination, `use:tooltip`, no `title`). It opens `compareChangedHref(id)` = `https://app.metaspry.com/compare?a=scan:<id>@prev&b=scan:<id>` in a new active tab (`chrome.tabs.create`; `window.open` on the dev page). The extension never diffs versions itself: the app's `onScanWritten` trigger stores the previous document, and `/compare` resolves `@prev` to the newest stored version. The row is absent when signed out, on the first scan of a URL, when the upload threw, and is cleared at the start of every scan and on sign-out (`cloudScan` in `Extension.svelte`). Same on popup and side panel.
+**"Last scan" row (signed in).** Under the header card, only when the upload of this scan (3.14) reported `hadPrevious: true`: "Last scan {time ago}" on the left (from the previous document's `scannedAt`; "Previous scan on file" when it had none - a fact the extension knows, not a claim about when the page changed) and a link-styled button "Open what changed ↗" on the right (`aria-label` names the destination, `use:tooltip`, no `title`). It opens `compareChangedHref(id)` = `https://app.metaspry.com/compare?a=scan:<id>@prev&b=scan:<id>` in a new active tab (`chrome.tabs.create`; `window.open` on the dev page). The extension never diffs versions itself: the app's `onScanWritten` / `onWorkspaceScanWritten` triggers store the previous document, and `/compare` resolves `@prev` to the newest stored version. The row is absent when signed out, on the first scan of a URL, when the upload threw, and is cleared at the start of every scan and on sign-out (`cloudScan` in `Extension.svelte`). Same on popup and side panel.
 
 **Engine.** `audit(meta, settings)` runs every rule synchronously. `og:image-dimensions` returns `pending`; `resolveAsyncRules()` loads the image (`new Image()`, 5 s timeout, `referrerPolicy = 'no-referrer'`), replaces that rule's result and rescores with `rescoreAfterAsync()`.
 
@@ -419,7 +420,7 @@ indexed, and "a canonical tag is present" passed it.
 **Tests.** `src/lib/cloud/compare-link.spec.ts` (the exact link), `src/lib/util/time-ago.spec.ts`. The rules and the row markup: none.
 
 **Gotchas.**
-- The "Changed since" row trusts `hadPrevious` only. Documents written before 2026-09-25 have no stored versions, so the app answers `no-version` once; after the next content change the diff works. Unchanged re-scans store no version either, so `@prev` can point further back than the last scan.
+- The "Last scan" row trusts `hadPrevious` only, and the version it links to is written by the app trigger only after the write lands (seconds when warm, longer when cold): a click inside that window gets the app's `no-version` message once; a reload shows the diff (app follow-up: retry `@prev` while the scan is seconds old). Documents written before 2026-09-25 have no stored versions, so the app answers `no-version` once; after the next content change the diff works. Unchanged re-scans store no version either, so `@prev` can point further back than the last scan.
 - Scoring must always use `$effectiveSettings` (3.8), never the raw `settings` store. `Extension.svelte` re-runs the audit whenever `effectiveSettings` changes.
 - Rules that do not apply (`article-og`, `hreflang-self`, `jsonld-parse`) count as passes. Rules score independently, so one missing tag can fail several rules (a missing `og:image` fails three).
 - `dup-tags` also warns on repeats the Open Graph protocol allows, such as several `og:image` tags.

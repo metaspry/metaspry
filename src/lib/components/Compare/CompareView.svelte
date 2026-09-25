@@ -47,28 +47,15 @@
   /** Parse the served HTML of a URL, or null when it cannot be fetched like-for-like. */
   async function fetchSourceMeta(target: string): Promise<PageMeta | null> {
     if (!target) return null;
-    const controller = new AbortController();
-    // Every other fetch in the extension is bounded; this one was not, so a slow host hung Compare
-    // indefinitely — and this change added a second such request per comparison.
-    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     try {
-      const res = await fetch(target, {
-        credentials: 'omit',
-        redirect: 'follow',
-        signal: controller.signal,
-      });
-      if (!res.ok) return null;
+      const { res, text } = await fetchServedHtml(target);
       // No cookies are sent, so an auth-gated page answers with its logged-out or login document.
       // Diffing that against what the user is looking at would be a confident lie.
       if (res.url && !sameUrl(res.url, target)) return null;
-      const ct = res.headers.get('content-type') ?? '';
-      if (!ct.toLowerCase().includes('text/html')) return null;
-      const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+      const doc = new DOMParser().parseFromString(text, 'text/html');
       return getMetaTags(doc.documentElement, res.url || target);
     } catch {
       return null;
-    } finally {
-      clearTimeout(timer);
     }
   }
 

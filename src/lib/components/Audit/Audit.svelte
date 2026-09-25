@@ -16,10 +16,12 @@
   /** The cloud document this scan wrote (AGENTS 3.14); null when signed out or before the upload resolves. */
   export let cloudScan: UploadResult | null = null;
 
-  $: changedSince =
+  // A fact the extension knows (when the previous document was written), not a claim about when
+  // the page changed: the app's `@prev` is the newest stored version, which can be older than that.
+  $: lastScan =
     cloudScan?.hadPrevious && cloudScan.previousScannedAt !== null
-      ? timeAgo(cloudScan.previousScannedAt)
-      : 'your last scan';
+      ? `Last scan ${timeAgo(cloudScan.previousScannedAt)}`
+      : 'Previous scan on file';
 
   function openChanged() {
     if (!cloudScan) return;
@@ -96,10 +98,10 @@
   {#if cloudScan?.hadPrevious}
     <!-- The diff itself lives in the web app (versions are written server-side); one click away. -->
     <div class="flex items-center justify-between gap-3 rounded-xl border border-white/40 bg-white/40 px-3 py-2 backdrop-blur-md dark:border-white/10 dark:bg-white/5">
-      <span class="min-w-0 truncate text-xs text-slate-600 dark:text-slate-400">Changed since {changedSince}</span>
+      <span class="min-w-0 truncate text-xs text-slate-600 dark:text-slate-400">{lastScan}</span>
       <button
         type="button"
-        class="inline-flex min-h-8 shrink-0 items-center rounded-md px-1.5 text-xs font-medium text-indigo-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 dark:text-indigo-300"
+        class="inline-flex h-8 shrink-0 items-center rounded-md px-1.5 text-xs font-medium text-indigo-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 dark:text-indigo-300"
         aria-label="Open what changed since the previous scan in the Metaspry web app"
         use:tooltip={'Opens the diff between this scan and the previous one in the Metaspry web app'}
         on:click={openChanged}

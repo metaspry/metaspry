@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { timeAgo } from '../../util/time-ago';
   import { fade } from 'svelte/transition';
   import { history, clearHistory } from '../../storage/history';
   import SiteIcon from '../SiteIcon/SiteIcon.svelte';
   import { toolbarButtonClass } from '../toolbar';
   import { bandClasses, bandFor, scoreLabel } from '../../audit/band';
   import { tooltip } from '../../actions/tooltip';
+  import { timeAgo } from '../../util/time-ago';
 
   let open = false;
 

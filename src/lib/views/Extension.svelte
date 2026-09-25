@@ -36,8 +36,7 @@
   import { tooltip } from "../actions/tooltip";
   import { cloudUser } from "../cloud/auth";
   import { syncScope } from "../cloud/workspaces";
-  import { toScanPayload, uploadScan } from "../cloud/sync";
-  import type { UploadResult } from "../cloud/sync";
+  import { toScanPayload, uploadScan, type UploadResult } from "../cloud/sync";
   import { fetchSiteFiles } from "../scrapers/getSiteFiles";
   import { get } from "svelte/store";
 
@@ -151,7 +150,8 @@
           }
           const payloadMeta: PageMeta = { ...meta, icon: pageIcon ?? meta.icon };
           const uploaded = await uploadScan(cu.uid, toScanPayload(payloadMeta, finalResult, pageUrl, siteFiles), get(syncScope));
-          if (id === scrapeId) cloudScan = uploaded;
+          // Also dropped when the user signed out (or switched account) while the write was in flight.
+          if (id === scrapeId && get(cloudUser)?.uid === cu.uid) cloudScan = uploaded;
         } catch (err) {
           if (import.meta.env.DEV) console.warn("cloud sync failed", err);
         }
