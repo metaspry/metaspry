@@ -1,4 +1,4 @@
-import { writable } from 'svelte/store';
+import { get, writable } from 'svelte/store';
 import { watchKey } from './storage/watch';
 
 export type Mode = 'sidepanel' | 'popup';
@@ -48,4 +48,50 @@ export function setMode(next: Mode): void {
     writeStorage(next);
     return next;
   });
+}
+
+/**
+ * Switch surfaces from a click handler (Settings -> Preferences, and the popup note). Lives here,
+ * not in a component, so more than one control can offer it.
+ *
+ * The click that fired this is a valid user gesture. `chrome.action.openPopup` is called
+ * synchronously inside it, as it must be ("must be called in response to a user gesture").
+ * The side-panel branch first awaits `chrome.windows.getCurrent()`; Chrome has honoured the
+ * gesture across that one hop in practice, and the mode is saved either way (AGENTS 3.2 gotcha).
+ */
+export function switchMode(next: Mode): void {
+  if (next === get(mode)) return;
+
+  if (typeof chrome !== 'undefined' && chrome.action) {
+    try {
+      if (next === 'popup') {
+        chrome.action.openPopup().catch((err) => {
+          if (import.meta.env.DEV) console.warn('openPopup:', err);
+        });
+      } else {
+        chrome.windows.getCurrent().then((win) => {
+          if (win?.id != null) {
+            chrome.sidePanel.open({ windowId: win.id }).catch((err) => {
+              if (import.meta.env.DEV) console.warn('sidePanel.open:', err);
+            });
+          }
+        });
+      }
+    } catch (err) {
+      if (import.meta.env.DEV) console.warn('switchMode open failed:', err);
+    }
+  }
+
+  // Persist the new mode so the background script updates the action behaviour.
+  setMode(next);
+
+  // Close the surface we were in. window.close() works for the popup; the side panel does not
+  // always honour it, but it is safe to call.
+  setTimeout(() => {
+    try {
+      window.close();
+    } catch {
+      /* ignore */
+    }
+  }, 50);
 }

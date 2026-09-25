@@ -215,13 +215,13 @@ Each feature lists: purpose and user flow, key files, data and storage, permissi
 
 ### 3.2 Surfaces: side panel and popup
 
-**Purpose and flow.** Clicking the toolbar icon opens the side panel (default) or a popup. The header radio group "Side panel / Popup" switches between them. In popup mode an amber note ("Popup closes when you switch tabs. Use side panel") shows until it is dismissed.
+**Purpose and flow.** Clicking the toolbar icon opens the side panel (default) or a popup. Settings -> **Preferences** -> `Surface` (a two-option radio group, "Side panel" / "Popup", shown to everyone, 3.8) switches between them; the popup note's "Use side panel" link does the same. In popup mode an amber note ("Popup closes when you switch tabs. Use side panel") shows until it is dismissed.
 
 - `setMode()` writes `mode`. `background.js` `applyMode()` then calls `chrome.action.setPopup({ popup: 'index.html' })` or `({ popup: '' })` and `chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick })`.
 - `switchMode()` opens the other surface inside the click handler (`chrome.action.openPopup()`, or `chrome.windows.getCurrent().then(...)` -> `chrome.sidePanel.open`), saves the mode, then calls `window.close()` after 50 ms.
 - `mode.ts` sets `document.documentElement.dataset.mode`; `app.css` gives the popup a 720px width and 600px minimum height and hides the background orbs.
 
-**Key files.** `src/lib/mode.ts`, `static/scripts/background.js`, `src/lib/views/Extension.svelte` (`switchMode`, popup note), `src/routes/app.css`.
+**Key files.** `src/lib/mode.ts` (`switchMode`), `static/scripts/background.js`, `src/lib/components/Settings/SettingsDrawer.svelte` (Surface radio group), `src/lib/views/Extension.svelte` (popup note), `src/routes/app.css`.
 
 **Data.** `mode`, `popupHintDismissed`.
 
@@ -424,26 +424,31 @@ indexed, and "a canonical tag is present" passed it.
 
 ### 3.8 Scoring settings, Pro gating and settings sync
 
-**Purpose and flow.** The gear icon opens the Settings drawer (Esc or the backdrop closes it). Pro users see six length thresholds, three rule weights and "Restore defaults". Everyone else sees a "Custom scoring is a Pro feature" card whose "Go Pro" link opens `https://app.metaspry.com/upgrade`. The drawer's About list links to metaspry.com, Docs, Roadmap, Blog and "Report a bug".
+**Purpose and flow.** The gear icon opens the Settings drawer, a modal dialog (`aria-modal`, focus moves to the first threshold input on open - or to the close button for non-Pro users; never the Surface radio, where one keypress would switch surface - Tab/Shift+Tab cycle inside, Esc / the close button / the backdrop close it and focus returns to the gear). Everyone first sees a **Preferences** fieldset holding the `Surface` radio group (Side panel / Popup, calling `switchMode`, 3.2); the subtitle reads "Preferences and scoring rules". Pro users then see a sync line ("Synced with your account", "Open in web app" -> `https://app.metaspry.com/settings`), the **Length thresholds (characters)** fieldset (Title, Description, og:description, each a min-max pair), the **Severity weights** fieldset (Required / Recommended / Best practice under the explainer "Each rule earns its weight on pass, half on warn, zero on fail. Score = earned / total × 100."), then **Save**, **Reset to defaults** and an "Unsaved changes" chip. Everyone else sees a "Custom scoring is a Pro feature" card whose "Go Pro" link opens `https://app.metaspry.com/upgrade`. The footer shows "Metaspry v<manifest version>" ("dev" outside the extension) and the links metaspry.com, Docs, Roadmap, Blog, "Report a bug".
+
+- **The form edits a draft; nothing persists until Save.** Save calls `updateSettings(draft)` once (one `chrome.storage` write, one cloud push) and toasts "Scoring rules saved"; it is disabled while the draft equals the stored value or has a validation problem. Closing with unsaved edits discards them. A cloud pull or the other surface refreshes an untouched form only.
+- **Validation** (`src/lib/storage/validate-settings.ts`, modelled on the app's `validateAuditSettings` but requiring whole numbers everywhere): every threshold an integer >= 0 ("Enter a whole number of 0 or more."), each max >= its min ("Title max must be at least the min."), weights integers >= 0 ("Weights must be whole numbers of 0 or more."), not all zero ("At least one weight must be above 0, or nothing can score."). A cleared box is NaN and is reported, not ignored. Invalid inputs get `aria-invalid` and `aria-describedby` pointing at the message under the row.
+- **Reset** is two-step and inline ("Reset? Yes, reset / Cancel", auto-cancels after 5 s); focus follows the swap (to "Yes, reset" on arming, back to Reset on cancel or timeout when it was still on the confirm controls, to the first input after confirming). Confirming calls `resetSettings()` and toasts "Scoring rules reset to defaults". Disabled when the stored value is already the defaults and the form is untouched.
+- The open/close reset of the draft lives inside the `$:` statement that watches `open`, not in a helper: Svelte 4 orders reactive statements by the assignments it can see, and a reset hidden in a function ran after `dirty`/`problems` were computed, so a reopen after a dirty close showed stale state.
 
 - `DEFAULT_SETTINGS`: title 30-60, description 70-160, og:description 50-200, weights 10 / 5 / 3. These equal the web app's `DEFAULT_AUDIT_SETTINGS`.
 - `effectiveSettings` (`cloud/plan.ts`) is `settings` when `cloudIsPro`, otherwise `DEFAULT_SETTINGS`. Custom values are kept while not Pro and apply again when Pro returns.
 - `cloudIsPro` is a live `onSnapshot` of `users/{uid}`: `plan === 'pro'`. It resets to `false` on every auth change.
 - Settings sync (`cloud/settings.ts`): on sign-in it reads `users/{uid}/settings/audit` and overwrites the local settings (cloud wins). After that, every local change is written back with `merge: true`. Writes are blocked until the read for the current user finishes (`pulledUid`), and a `suppress` flag stops the pulled value from being written straight back.
 
-**Key files.** `src/lib/components/Settings/SettingsDrawer.svelte`, `src/lib/storage/settings.ts`, `src/lib/cloud/plan.ts`, `src/lib/cloud/settings.ts`.
+**Key files.** `src/lib/components/Settings/SettingsDrawer.svelte`, `src/lib/storage/settings.ts`, `src/lib/storage/validate-settings.ts`, `src/lib/cloud/plan.ts`, `src/lib/cloud/settings.ts`.
 
 **Data.** `settings` (local). Firestore `users/{uid}` (read) and `users/{uid}/settings/audit` (read and write).
 
 **Permissions.** `storage`.
 
-**Tests.** None. Manually check that a free account scores with defaults and a Pro account with custom values.
+**Tests.** `src/lib/storage/validate-settings.spec.ts` (every rule and message), `src/lib/cloud/settings.spec.ts` (sync). Manually check that a free account scores with defaults and a Pro account with custom values.
 
 **Gotchas.**
 - Only a personal `plan: 'pro'` unlocks custom scoring. Team workspace plans do not (stated in `plan.ts`).
-- The extension always syncs the personal settings document, even when scans upload to a workspace. The app keeps separate `workspaces/{wsId}/settings/audit` documents.
-- Inputs accept any finite number of 0 or more. There is no min <= max check, and setting every weight to 0 makes `possible` 0 and the score `NaN`.
-- "Restore defaults" also writes the defaults to the cloud when signed in.
+- The extension always syncs the personal settings document, even when scans upload to a workspace. The app keeps separate `workspaces/{wsId}/settings/audit` documents, so the extension and the app agree only in the app's Personal scope.
+- The validator is stricter than both the store and the app: `storage/settings.ts` accepts any finite number >= 0 on read and the app's `validateAuditSettings` accepts decimals, so a decimal saved in the app (or stored earlier) opens the drawer already invalid with Save blocked until it is corrected.
+- "Reset to defaults" also writes the defaults to the cloud when signed in.
 - `initCloudSettingsSync` runs before `initSettings` (section 2, startup order). The `pulledUid` guard exists because an early local write once overwrote saved cloud settings (commit `42402d0`).
 
 ### 3.9 Site tab: robots.txt, sitemap.xml, llms.txt
@@ -476,7 +481,7 @@ indexed, and "a canonical tag is present" passed it.
 
 ### 3.10 History
 
-**Purpose and flow.** The clock icon opens "Recent scrapes": the last 10 scans with the site favicon (`SiteIcon`, 16 px; letter tile when missing or broken), a score badge, the title (or hostname) and a relative time. Clicking an entry opens its URL in a background tab (`active: false`, so a popup stays open). "Clear" empties the list.
+**Purpose and flow.** The History button in the header toolbar (3.17; `aria-expanded` while open) opens "Recent scrapes": the last 10 scans with the site favicon (`SiteIcon`, 16 px; letter tile when missing or broken), a score badge, the title (or hostname) and a relative time. Clicking an entry opens its URL in a background tab (`active: false`, so a popup stays open). "Clear" empties the list.
 
 **Key files.** `src/lib/components/History/HistoryDropdown.svelte`, `src/lib/storage/history.ts`, `src/lib/components/SiteIcon/SiteIcon.svelte`.
 
@@ -545,7 +550,7 @@ Checks in `src/lib/audit/aeo.ts`:
 
 ### 3.13 Cloud sign-in
 
-**Purpose and flow.** The header pill reads "Sync off" (grey dot) when signed out, or the sync target's name (green dot) when signed in. Signed out, its dropdown offers an email and password form ("Same login as the web app") and "Continue with Google". Signed in, it shows the email, the sync target picker (3.14) and "Sign out".
+**Purpose and flow.** The header's account control (`CloudSync.svelte`) is a primary "Sign in" button when signed out, and, when signed in, an initials circle (`initialsFor(email)`, `src/lib/cloud/initials.ts`) with a green dot, the sync target's name (hidden below 460 px) and a chevron; both expose `aria-expanded`. Its dropdown (and History's) is positioned against the header's right-hand block in `Extension.svelte`, not against its own button, so it stays inside a narrow side panel. Signed out, its dropdown offers an email and password form ("Same login as the web app") and "Continue with Google". Signed in, it shows the email, "Open Metaspry web app" (new tab, `app.metaspry.com/dashboard`), the sync target picker (3.14) and "Sign out".
 
 - `cloud/firebase.ts` initialises Firebase from the public web config (project `metaspry`). Firestore uses `ignoreUndefinedProperties: true`.
 - Email and password: `signInWithEmailAndPassword`.
@@ -553,13 +558,13 @@ Checks in `src/lib/audit/aeo.ts`:
 - `cloudUser` and `cloudReady` stores follow `onAuthStateChanged`.
 - There is no auth handoff between the web app and the extension. The user signs in separately in each, with the same account.
 
-**Key files.** `src/lib/cloud/firebase.ts`, `src/lib/cloud/auth.ts`, `src/lib/components/CloudSync/CloudSync.svelte`.
+**Key files.** `src/lib/cloud/firebase.ts`, `src/lib/cloud/auth.ts`, `src/lib/cloud/initials.ts`, `src/lib/components/CloudSync/CloudSync.svelte`.
 
 **Data.** Firebase Auth session in IndexedDB.
 
 **Permissions.** `identity`.
 
-**Tests.** None.
+**Tests.** `src/lib/cloud/initials.spec.ts` (initials from the email). Sign-in itself: none.
 
 **Gotchas.**
 - The redirect URI is `https://<extension-id>.chromiumapp.org/`, and it must be listed in that OAuth client's authorised redirect URIs. Unpacked builds have their own extension ID, so each needs its own entry. A "Chrome Extension" OAuth client type does not work here (comment in `auth.ts`; history in commits `77cd51f` to `9703b91`).
@@ -596,7 +601,7 @@ Checks in `src/lib/audit/aeo.ts`:
 - `setDoc` without `merge` replaces the whole document on a re-scan, including `createdAt` and any field another client added.
 - The upload waits for the image check (up to 5 s) and a fresh `fetchSiteFiles` (several 4 s timeouts are possible). Closing the popup before it finishes drops the upload without any message.
 - From reading the code (not tested at runtime): `initCloudWorkspaces()` subscribes to `cloudUser` while it is still `null`, which immediately calls `setSyncScope({ kind: 'personal' })` and stores `personal` over the saved choice. The earlier storage read still restores the workspace in memory for that session, but the stored value is now `personal`, so a workspace choice does not survive the next reopen.
-- `main` has no "open dashboard" link. The only link into the app is the Pro upsell (3.8).
+- Links into the app: "Open Metaspry web app" in the signed-in account dropdown (3.13), "Open in web app" on the Settings sync line and the Pro upsell (3.8).
 
 ### 3.15 Theme
 
@@ -618,7 +623,7 @@ Checks in `src/lib/audit/aeo.ts`:
 - `r` re-scrapes.
 - `1` to `5` select tabs by position: Tags, Previews, Audit, Site, AI. Compare (sixth) has no key.
 
-In the tab strip, Arrow Left/Right, Home and End move between tabs. `Esc` closes the Settings drawer and the help modal (not the History or Cloud sync dropdowns).
+In the tab strip, Arrow Left/Right, Home and End move between tabs. `Esc` closes the Settings drawer and the help modal (not the History or Cloud sync dropdowns). While the Settings drawer is open, Tab and Shift+Tab cycle inside it (3.8).
 
 **Key files.** `src/lib/components/Shortcuts/keyboard.ts`, `src/lib/components/Shortcuts/ShortcutsHelp.svelte`, `src/lib/components/Tabs/Tabs.svelte`, `src/lib/views/Extension.svelte` (`registerShortcuts`).
 
@@ -626,13 +631,14 @@ In the tab strip, Arrow Left/Right, Home and End move between tabs. `Esc` closes
 
 **Gotchas.**
 - The help modal still says "1 / 2 / 3 / 4: Switch to Tags / Previews / Audit / Compare", which no longer matches the key handler.
-- The `?` header button is hidden below 460px width.
+- The `?` button is always visible in the header toolbar (3.17) and reports `aria-expanded` while the sheet is open.
 - The marketing site documents shortcuts in `docs/keyboard-shortcuts`.
 
 ### 3.17 UI shell and shared components
 
 - `+page.svelte`: gradient background and two blurred decorative orbs (`data-bg-orb`, hidden in popup mode).
-- Header, left to right: logo, mode toggle, History, Settings, Cloud sync pill, theme toggle, shortcuts `?`.
+- Header, left to right, one line at every width from 320 px: logo (wordmark hidden below 400 px); the account control (3.13); one `role="toolbar"` group styled by `src/lib/components/toolbar.ts` (`toolbarButtonClass(active)`, `TOOLBAR_GROUP`) holding History, Settings, theme toggle (`aria-pressed` in dark mode) and shortcuts `?`. Every button has a `title` equal to its `aria-label`; Arrow Left/Right, Home and End move focus inside the toolbar. The surface toggle lives in Settings (3.2).
+- Both header menus anchor to the header's right-hand block (`relative` in `Extension.svelte`). Nothing between that block and a menu may carry `backdrop-blur`, `filter` or `transform`: that element would become the menu's containing block and stacking context, re-anchoring it and painting it under later glass cards (this bit the toolbar group once).
 - Views: `landing` (Grid card "Get Meta Tags"), `loading` (`Skeleton`), `error` (`ErrorState`: "Couldn't scrape this page", Retry, links to docs and GitHub issues), `empty` (`EmptyState`: "No meta tags found", Try again, docs link), `results` (`Tabs` with Tags, Previews, Audit, Site, AI, Compare).
 - `Screen`: glass card wrapper. `Grid`: landing action cards (`GridProps` in `Grid.ts`).
 - Toasts: `toast(message, variant)`; at most 3 visible, 1.5 s each.

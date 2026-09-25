@@ -8,7 +8,8 @@
     cloudSignOut,
   } from "../../cloud/auth";
   import { initCloudSettingsSync } from "../../cloud/settings";
-  import { initCloudPlan } from "../../cloud/plan";
+  import { initCloudPlan, APP_URL } from "../../cloud/plan";
+  import { initialsFor } from "../../cloud/initials";
   import {
     initCloudWorkspaces,
     workspaces,
@@ -72,29 +73,49 @@
     open = false;
   }
 
+  function openApp() {
+    // Guarded like every other chrome.* entry point: `npm run dev` renders this component in a
+    // plain browser, where `chrome` is undefined and the click would throw.
+    if (typeof chrome === "undefined" || !chrome.tabs) return;
+    // `active: true` on purpose, unlike History's background tab: the user is deliberately leaving
+    // for the web app, so letting the popup close is the wanted behaviour.
+    chrome.tabs.create({ url: `${APP_URL}/dashboard`, active: true });
+  }
+
   $: isPersonal = $syncScope.kind === "personal";
   $: targetLabel = $syncScope.kind === "workspace" ? $syncScope.name : "Personal";
+  $: initials = initialsFor($cloudUser?.email);
 </script>
 
-<div class="relative">
-  <!-- Always-visible trigger: shows the current sync target (or "Sync off") -->
-  <button
-    type="button"
-    on:click={() => (open = !open)}
-    class="flex h-8 max-w-[150px] items-center gap-1.5 rounded-full border border-white/40 bg-white/40 px-2.5 text-xs font-medium text-slate-700 backdrop-blur-md transition hover:bg-white/70 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
-    aria-label="Cloud sync"
-  >
-    <span
-      class="h-2 w-2 shrink-0 rounded-full {$cloudUser ? 'bg-emerald-500' : 'bg-slate-400'}"
-      aria-hidden="true"
-    ></span>
-    {#if $cloudUser}
-      <span class="truncate">{targetLabel}</span>
-      <span class="shrink-0 text-slate-400" aria-hidden="true">▾</span>
-    {:else}
-      Sync off
-    {/if}
-  </button>
+<!-- Not `relative`: the dropdown anchors to the header's right-hand block (Extension.svelte). -->
+<div>
+  <!-- Account control. Signed out it is the one "Sign in" call to action in the header; signed in
+       it shows who and where scans go, and opens the account dropdown. -->
+  {#if $cloudUser}
+    <button
+      type="button"
+      on:click={() => (open = !open)}
+      aria-label="Account and sync target"
+      aria-expanded={open}
+      title="Signed in as {$cloudUser.email} - saving scans to {targetLabel}"
+      class="flex h-9 max-w-[170px] items-center gap-1.5 rounded-xl border border-slate-200/70 bg-white/70 py-0.5 pl-0.5 pr-2 text-xs font-medium text-slate-700 backdrop-blur-md transition hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
+    >
+      <span class="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500 text-[10px] font-bold text-white" aria-hidden="true">
+        {initials}
+        <span class="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500 dark:border-slate-900"></span>
+      </span>
+      <span class="hidden min-w-0 truncate min-[460px]:inline">{targetLabel}</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-3 w-3 shrink-0 text-slate-400" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+    </button>
+  {:else}
+    <button
+      type="button"
+      on:click={() => (open = !open)}
+      aria-expanded={open}
+      title="Sign in to sync scans to your account"
+      class="flex h-9 shrink-0 items-center rounded-xl bg-indigo-600 px-3 text-xs font-semibold text-white shadow-sm shadow-indigo-500/30 transition hover:bg-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-1"
+    >Sign in</button>
+  {/if}
 
   {#if open}
     <!-- click-away backdrop -->
@@ -106,7 +127,7 @@
     ></button>
 
     <div
-      class="absolute right-0 z-50 mt-2 flex w-64 flex-col gap-2 rounded-xl border border-white/40 bg-white/95 p-3 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/95"
+      class="absolute right-0 z-50 mt-2 flex w-64 max-w-[calc(100vw-2.5rem)] flex-col gap-2 rounded-xl border border-white/40 bg-white/95 p-3 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/95"
     >
       {#if $cloudUser}
         <div class="flex items-center gap-2">
@@ -117,10 +138,22 @@
           </div>
         </div>
 
+        <button
+          type="button"
+          on:click={openApp}
+          class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-slate-800 transition hover:bg-white/70 dark:text-slate-100 dark:hover:bg-white/10"
+        >
+          <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-indigo-500/15 text-indigo-600 dark:text-indigo-300">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><path d="M15 3h6v6" /><path d="M10 14 21 3" /></svg>
+          </span>
+          <span class="min-w-0 flex-1 truncate">Open Metaspry web app</span>
+        </button>
+
         <p class="mt-1 px-0.5 text-[10px] font-semibold tracking-wider text-slate-400 uppercase dark:text-slate-500">
           Save new scans to
         </p>
-        <div class="flex flex-col gap-0.5">
+        <!-- Scrolls past ~6 workspaces instead of pushing Sign out below the fold. -->
+        <div class="flex max-h-56 flex-col gap-0.5 overflow-y-auto">
           <button
             type="button"
             on:click={pickPersonal}
