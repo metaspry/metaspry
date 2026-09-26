@@ -119,7 +119,7 @@
 
   $: isPersonal = $syncScope.kind === "personal";
   // Roving tabindex needs one item at 0: a stored workspace missing from the list (fetch failed,
-  // not loaded yet) checks nothing, so Personal history takes the Tab stop instead.
+  // not loaded yet) checks nothing, so Personal takes the Tab stop instead.
   $: noneChecked = !isPersonal && !$workspaces.some((w) => $syncScope.kind === "workspace" && $syncScope.wsId === w.id);
   $: targetLabel = $syncScope.kind === "workspace" ? $syncScope.name : "Personal";
   $: initials = initialsFor($cloudUser?.email);
@@ -164,7 +164,7 @@
       use:popover={{ trigger, onClose: close, initialFocus: 'input[type="email"]' }}
       role="dialog"
       aria-label={$cloudUser ? "Account and sync target" : "Sign in"}
-      class="absolute right-0 z-50 mt-2 flex w-64 max-w-[calc(100vw-2.5rem)] flex-col gap-2 rounded-xl border border-white/40 bg-white p-3 shadow-2xl dark:border-white/10 dark:bg-popover"
+      class="absolute right-0 top-full z-50 mt-2 flex w-64 max-w-[calc(100vw-2.5rem)] flex-col gap-2 rounded-xl border border-white/40 bg-white p-3 shadow-2xl dark:border-white/10 dark:bg-popover"
     >
       {#if $cloudUser}
         <div class="flex items-center gap-2">

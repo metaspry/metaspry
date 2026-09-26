@@ -32,7 +32,7 @@
   import { effectiveSettings } from "../cloud/plan";
   import { pushHistory } from "../storage/history";
   import { registerShortcuts, helpOpen } from "../components/Shortcuts/keyboard";
-  import { toolbarButtonClass, TOOLBAR_GROUP } from "../components/toolbar";
+  import { toolbarButtonClass, TOOLBAR_GROUP, FOCUS_RING } from "../components/toolbar";
   import CloudSync from "../components/CloudSync/CloudSync.svelte";
   import { tooltip } from "../actions/tooltip";
   import { cloudUser } from "../cloud/auth";
@@ -432,7 +432,7 @@
       <button
         type="button"
         on:click={retry}
-        class="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-indigo-500/30 transition hover:bg-indigo-700 motion-safe:active:scale-[0.99] dark:bg-indigo-600 dark:hover:bg-indigo-700"
+        class="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-indigo-500/30 transition hover:bg-indigo-700 motion-safe:active:scale-[0.99] dark:bg-indigo-600 dark:hover:bg-indigo-700 {FOCUS_RING}"
       >
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true">
           <path d="M3 12a9 9 0 0 1 15.5-6.4L21 8" />

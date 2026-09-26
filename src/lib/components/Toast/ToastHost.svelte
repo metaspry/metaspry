@@ -4,7 +4,7 @@
   import { dur } from '../../motion';
 
   // Same meaning as the web app's toasts (R2-27): a saturated fill that says what happened in both
-  // themes - emerald-700 success, rose-700 error, white text (5.36:1 / 6.03:1) - and slate-900 /
+  // themes - emerald-700 success, rose-700 error, white text (5.48:1 / 6.29:1) - and slate-900 /
   // slate-50 for a neutral note. The old dark toasts were all the popover tint (1.10:1 vs the page).
   function variantClass(v: ToastEntry['variant']): string {
     if (v === 'success') return 'bg-emerald-700 text-white';
