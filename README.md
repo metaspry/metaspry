@@ -128,7 +128,7 @@ Reference copy + asset checklist for the [Developer Dashboard](https://chrome.go
 
 ### Detailed description
 
-> Updated 2026-09-25 for v1.0.26: six tabs, 19 rules, honest cloud wording, "scan" vocabulary. Still names no platform.
+> Updated 2026-09-26 for v1.0.27 (1.0.26 was built but never submitted - its changes ship in 1.0.27): six tabs, 19 rules, honest cloud wording, "scan" vocabulary. Still names no platform.
 
 > The one-click meta-tag scanner for modern websites. See how your page renders across the major social and search platforms - locally, with no account and no telemetry.
 >
@@ -224,7 +224,7 @@ Chrome Web Store requires PNG only. JPEG / SVG / WebP are rejected.
 | Marquee promo tile | 1400 × 560 px, PNG | optional but boosts placement | `promo/promo-marquee-1400x560.png` |
 | Screenshots | 1280 × 800 px **or** 640 × 400 px, PNG, 1-5 images | ✔ (at least 1) | See list below |
 
-Suggested screenshots (in order). The v1.0.26 landing ("Scan this page's meta tags") changed the first frame, so refresh them with this release:
+Suggested screenshots (in order). The new landing (v1.0.26 + 1.0.27) ("Scan this page's meta tags") changed the first frame, so refresh them with this release:
 
 1. **Audit tab** - the 0-100 score with the rule list (and the "Last scan" row when signed in).
 2. **Previews tab** - share-card mockups.
