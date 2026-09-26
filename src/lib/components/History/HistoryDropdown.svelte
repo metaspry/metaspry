@@ -95,7 +95,7 @@
       role="dialog"
       aria-labelledby={TITLE_ID}
       tabindex="-1"
-      class="absolute right-0 top-10 z-30 w-64 max-w-[calc(100vw-2.5rem)] overflow-hidden rounded-2xl border border-white/40 bg-white shadow-xl focus:outline-none dark:border-white/10 dark:bg-popover"
+      class="absolute right-0 top-full z-30 mt-2 w-64 max-w-[calc(100vw-2.5rem)] overflow-hidden rounded-2xl border border-white/40 bg-white shadow-xl focus:outline-none dark:border-white/10 dark:bg-popover"
     >
       <header class="flex items-center justify-between border-b border-white/40 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider ms-muted dark:border-white/10">
         <span id={TITLE_ID}>Recent scans</span>
@@ -121,7 +121,15 @@
         </p>
       {/if}
       {#if $history.length === 0}
-        <p class="px-3 py-4 text-center text-xs ms-muted">No history yet.</p>
+        <!-- An empty state with a next step, not a bare line (P-19). -->
+        <div class="flex flex-col items-center gap-1.5 px-4 py-5 text-center">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6 text-indigo-600 dark:text-indigo-300" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 7v5l3 2" />
+          </svg>
+          <p class="text-xs font-medium text-slate-900 dark:text-slate-50">No scans yet</p>
+          <p class="text-xs ms-muted">Scan a page and it shows up here, newest first. The last 10 stay on this device.</p>
+        </div>
       {:else}
         <ul class="max-h-72 overflow-y-auto">
           {#each $history as entry (entry.timestamp)}

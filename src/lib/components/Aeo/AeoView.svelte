@@ -3,6 +3,7 @@
   import { fetchSiteFiles } from '../../scrapers/getSiteFiles';
   import type { SiteFiles } from '../../scrapers/SiteFiles';
   import { analyzeAeo, type AeoResult, type AeoState } from '../../audit/aeo';
+  import { bandClasses } from '../../audit/band';
 
   export let html: HTMLElement | null;
   export let baseUrl: string;
@@ -11,11 +12,13 @@
   let errorMessage = '';
   let result: AeoResult | null = null;
 
+  // Band tokens (R2-29; the -500 dots had no dark variant and were 1.9-2.25:1 in light). Info is not
+  // a verdict: a neutral slate.
   const dot: Record<AeoState, string> = {
-    pass: 'bg-emerald-500',
-    warn: 'bg-amber-500',
-    fail: 'bg-rose-500',
-    info: 'bg-slate-400',
+    pass: bandClasses('good').fill,
+    warn: bandClasses('warn').fill,
+    fail: bandClasses('fail').fill,
+    info: 'bg-slate-500 dark:bg-slate-400',
   };
   const stateLabel: Record<AeoState, string> = {
     pass: 'Pass',
@@ -56,7 +59,7 @@
 <div class="flex flex-col gap-3">
   {#if loading}
     <div class="flex items-center gap-2 rounded-2xl border border-white/40 bg-white/40 px-3 py-2 text-xs text-slate-600 backdrop-blur-md dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" class="h-4 w-4 animate-spin">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" class="h-4 w-4 motion-safe:animate-spin">
         <path d="M21 12a9 9 0 1 1-6.2-8.5" />
       </svg>
       Checking AI readiness…
@@ -66,9 +69,7 @@
   {:else if result}
     <div class="flex items-center gap-2">
       <span
-        class="rounded-full px-2.5 py-0.5 text-xs font-semibold {result.chip === 'ready'
-          ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
-          : 'bg-amber-500/20 text-amber-700 dark:text-amber-300'}"
+        class="rounded-full px-2.5 py-0.5 text-xs font-semibold {bandClasses(result.chip === 'ready' ? 'good' : 'warn').chip}"
       >
         {result.chip === 'ready' ? 'AI-ready' : 'Needs work'}
       </span>

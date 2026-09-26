@@ -35,7 +35,7 @@
 <div class="flex flex-col gap-3">
   {#if loading}
     <div class="flex items-center gap-2 rounded-2xl border border-white/40 bg-white/40 px-3 py-2 text-xs text-slate-600 backdrop-blur-md dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" class="h-4 w-4 animate-spin">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" class="h-4 w-4 motion-safe:animate-spin">
         <path d="M21 12a9 9 0 1 1-6.2-8.5" />
       </svg>
       Fetching robots.txt, sitemap.xml, llms.txt…

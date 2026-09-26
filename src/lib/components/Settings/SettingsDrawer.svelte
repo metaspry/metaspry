@@ -18,6 +18,7 @@
   import { tooltip } from '../../actions/tooltip';
   import { cycleTab, focusables } from '../../actions/popover';
   import { FOCUS_RING } from '../toolbar';
+  import { BUTTON_DANGER, BUTTON_PRIMARY, BUTTON_SECONDARY } from '../button';
   import { dur } from '../../motion';
 
   const SURFACES: { value: Mode; label: string; hint: string }[] = [
@@ -277,7 +278,7 @@
         <h4 class="text-sm font-semibold text-slate-900 dark:text-slate-50">Scoring rules from {$workspaceRules.name}</h4>
         <p class="text-xs text-slate-600 dark:text-slate-300">
           New scans save to this workspace, so they are scored with its rules. They are edited in the web app; your
-          personal rules apply when you save to Personal history.
+          personal rules apply when you save to Personal.
         </p>
         <dl class="grid w-full grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
           {#each LENGTH_ROWS as row (row.min)}
@@ -402,7 +403,7 @@
           on:click={save}
           use:tooltip={'Save scoring rules'}
           disabled={!canSave}
-          class="rounded-full bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50 {FOCUS_RING}"
+          class={BUTTON_PRIMARY}
         >Save</button>
         {#if resetArmed}
           <span bind:this={confirmGroup} class="inline-flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-200" role="group" aria-label="Confirm reset">
@@ -411,7 +412,7 @@
               bind:this={confirmBtn}
               type="button"
               on:click={confirmReset}
-              class="rounded-full bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-rose-500 {FOCUS_RING}"
+              class={BUTTON_DANGER}
             >Yes, reset</button>
             <button
               type="button"
@@ -426,7 +427,7 @@
             on:click={armReset}
             use:tooltip={'Restore the default thresholds and weights'}
             disabled={isDefault && !dirty}
-            class="rounded-full border border-slate-300 px-3.5 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800 {FOCUS_RING}"
+            class={BUTTON_SECONDARY}
           >Reset to defaults</button>
         {/if}
         {#if dirty}
@@ -439,7 +440,7 @@
         <h4 class="text-sm font-semibold text-slate-900 dark:text-slate-50">Custom scoring comes with your workspace</h4>
         <p class="text-xs text-slate-600 dark:text-slate-300">
           Scans you save to your team workspace use its scoring rules. Choose it under "Save new scans to" in the account
-          menu. Scans saved to Personal history use the default rules.
+          menu. Scans saved to Personal use the default rules.
         </p>
       </section>
     {:else}
@@ -454,16 +455,17 @@
           href={`${APP_URL}/upgrade`}
           target="_blank"
           rel="noopener noreferrer"
-          class="rounded-full bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-500 {FOCUS_RING}"
+          class={BUTTON_PRIMARY}
         >Go Pro</a>
       </section>
     {/if}
 
     <footer class="mt-auto flex flex-col gap-1.5 border-t border-slate-200 pt-3 text-[11px] ms-muted dark:border-slate-800">
       <span>Metaspry v{version}</span>
-      <nav aria-label="About Metaspry" class="flex flex-wrap items-center gap-x-2 gap-y-2">
-        {#each ABOUT_LINKS as link, i (link.href)}
-          {#if i > 0}<span aria-hidden="true">·</span>{/if}
+      <!-- No "·" separators: one could end a line on its own ("Blog ·", T-18). The gap separates the
+           links, and `-mx-1` cancels the links' own `px-1` so their text lines up with "Metaspry v…" (L-16). -->
+      <nav aria-label="About Metaspry" class="-mx-1 flex flex-wrap items-center gap-x-2 gap-y-2">
+        {#each ABOUT_LINKS as link (link.href)}
           <a href={link.href} target="_blank" rel="noopener noreferrer" class={linkClass}>{link.label}</a>
         {/each}
       </nav>

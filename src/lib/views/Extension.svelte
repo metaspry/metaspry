@@ -32,7 +32,7 @@
   import { effectiveSettings } from "../cloud/plan";
   import { pushHistory } from "../storage/history";
   import { registerShortcuts, helpOpen } from "../components/Shortcuts/keyboard";
-  import { toolbarButtonClass, TOOLBAR_GROUP } from "../components/toolbar";
+  import { toolbarButtonClass, TOOLBAR_GROUP, FOCUS_RING } from "../components/toolbar";
   import CloudSync from "../components/CloudSync/CloudSync.svelte";
   import { tooltip } from "../actions/tooltip";
   import { cloudUser } from "../cloud/auth";
@@ -292,19 +292,22 @@
 
 <div class="flex h-full w-full flex-col p-3">
   <Screen>
-    <header class="flex items-center justify-between gap-2">
+    <!-- Wraps instead of pushing controls off-screen (R2-16): one line at 100 % text from 320 px; at
+         200 % text the right-hand block drops below the logo (`ml-auto` keeps it right-aligned) and
+         the toolbar group wraps inside itself, so every control stays on screen. -->
+    <header class="flex flex-wrap items-center justify-between gap-2">
       <!-- The page's one h1 is the wordmark: visible from 400 px, screen-reader only below (R-35). -->
       <h1 class="flex min-w-0 items-center gap-2">
         <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500 text-xs font-bold text-white shadow-md shadow-indigo-500/30" aria-hidden="true">M</span>
         <span class="sr-only shrink-0 text-base font-semibold tracking-tight text-slate-900 min-[400px]:not-sr-only dark:text-slate-50">Metaspry</span>
       </h1>
 
-      <!-- One line at every width from 320 px: the account control, then one grouped toolbar.
+      <!-- The account control, then one grouped toolbar.
            `relative` here, not on the dropdown components: their menus anchor to this block's
            right edge, so a 256 px menu never runs off the left of a narrow side panel. Nothing
            between this block and the menus may add `backdrop-blur` / `filter` / `transform`
            (see toolbar.ts), or the menu re-anchors to that element and paints under later cards. -->
-      <div class="relative flex shrink-0 items-center gap-2">
+      <div class="relative ml-auto flex min-w-0 max-w-full flex-wrap items-center justify-end gap-2">
         <CloudSync />
 
         <div role="toolbar" aria-label="Extension controls" tabindex="-1" class={TOOLBAR_GROUP} on:keydown={onToolbarKey}>
@@ -333,7 +336,7 @@
             use:tooltip={"Dark theme"}
             aria-pressed={$theme === "dark"}
             on:click={toggleTheme}
-            class={toolbarButtonClass()}
+            class={toolbarButtonClass($theme === "dark")}
           >
             {#if $theme === "dark"}
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true">
@@ -429,7 +432,7 @@
       <button
         type="button"
         on:click={retry}
-        class="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-indigo-500/30 transition hover:bg-indigo-500 active:scale-[0.99] dark:bg-indigo-600 dark:hover:bg-indigo-500"
+        class="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-indigo-500/30 transition hover:bg-indigo-700 motion-safe:active:scale-[0.99] dark:bg-indigo-600 dark:hover:bg-indigo-700 {FOCUS_RING}"
       >
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true">
           <path d="M3 12a9 9 0 0 1 15.5-6.4L21 8" />

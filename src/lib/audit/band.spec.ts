@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { bandFor, bandLabel, bandClasses, scoreLabel } from './band';
+import { bandFor, bandForVerdict, bandLabel, bandClasses, scoreLabel } from './band';
 
 describe('band helper', () => {
   it('splits at 80 and 50, inclusive at the top', () => {
@@ -30,16 +30,31 @@ describe('band helper', () => {
       expect(c.text).toContain(hue);
       expect(c.chip).toContain(hue);
       expect(c.stroke).toContain(hue);
+      expect(c.fill).toContain(hue);
+      expect(c.ink).toContain(hue);
     }
   });
 
   it('uses -600 / -700 in light mode (never -500, which fails 3:1 on the light Screen)', () => {
     for (const band of ['good', 'warn', 'fail'] as const) {
       const c = bandClasses(band);
-      for (const cls of [c.text, c.stroke]) {
+      for (const cls of [c.text, c.stroke, c.fill]) {
         const light = cls.split(' ').filter((t) => !t.startsWith('dark:'));
         expect(light.every((t) => /-(600|700)$/.test(t))).toBe(true);
       }
     }
+  });
+
+  it('keeps small status text at -700 / -800 in light (4.5:1 on the light card)', () => {
+    for (const band of ['good', 'warn', 'fail'] as const) {
+      const light = bandClasses(band).ink.split(' ').filter((t) => !t.startsWith('dark:'));
+      expect(light.every((t) => /-(700|800)$/.test(t))).toBe(true);
+    }
+  });
+
+  it('maps a rule / check verdict to its band', () => {
+    expect(bandForVerdict('pass')).toBe('good');
+    expect(bandForVerdict('warn')).toBe('warn');
+    expect(bandForVerdict('fail')).toBe('fail');
   });
 });

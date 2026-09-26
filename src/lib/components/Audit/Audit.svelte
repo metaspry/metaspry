@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { AuditResult, RuleResult, RuleSeverity } from '../../audit/AuditResult';
   import type { PageMeta } from '../../scrapers/PageMeta';
-  import { bandClasses, bandFor, scoreLabel } from '../../audit/band';
+  import { bandClasses, bandFor, bandForVerdict, scoreLabel } from '../../audit/band';
   import { tooltip } from '../../actions/tooltip';
   import { FOCUS_RING } from '../toolbar';
   import { compareChangedHref } from '../../cloud/compare-link';
@@ -57,11 +57,10 @@
     rules: result.rules.filter((r) => r.severity === sev),
   }));
 
+  // The band tokens (R2-29): the -500 icons were 1.90-2.25:1 on the light card.
   function statusColor(r: RuleResult): string {
-    if (r.status === 'pass') return 'text-emerald-500 dark:text-emerald-400';
-    if (r.status === 'warn') return 'text-amber-500 dark:text-amber-400';
     if (r.status === 'pending') return 'ms-muted';
-    return 'text-rose-500 dark:text-rose-400';
+    return bandClasses(bandForVerdict(r.status)).stroke;
   }
 </script>
 
@@ -87,7 +86,7 @@
           stroke-linecap="round"
           stroke-dasharray={CIRC}
           stroke-dashoffset={dashOffset}
-          class="{ringStroke} transition-[stroke-dashoffset] duration-700 ease-out"
+          class="{ringStroke} motion-safe:transition-[stroke-dashoffset] motion-safe:duration-700 motion-safe:ease-out"
         />
       </svg>
       <div class="absolute inset-0 flex items-center justify-center" aria-hidden="true">
@@ -130,7 +129,7 @@
                     <path d="M10.3 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
                   </svg>
                 {:else if rule.status === 'pending'}
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" class="h-4 w-4 animate-spin">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" class="h-4 w-4 motion-safe:animate-spin">
                     <path d="M21 12a9 9 0 1 1-6.2-8.5" />
                   </svg>
                 {:else}

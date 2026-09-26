@@ -2,6 +2,11 @@
   import { pinned, togglePinned, isPinned } from '../../storage/pinned';
   import { toast } from '../Toast/toast';
   import { tooltip } from '../../actions/tooltip';
+  import { bandClasses } from '../../audit/band';
+
+  // The star keeps its amber, now the band token (amber-700 light, R2-29; amber-500 was ~1.9:1).
+  const PIN_HUE = bandClasses('warn').stroke;
+  const PIN_HOVER = 'hover:text-amber-700 dark:hover:text-amber-400';
 
   export let tagKey: string;
 
@@ -26,8 +31,8 @@
   use:tooltip={active ? 'Unpin from top' : 'Pin to top of list'}
   on:click={onClick}
   class="flex h-7 w-7 items-center justify-center rounded-lg transition {active
-    ? 'text-amber-500 hover:bg-amber-100/60 dark:text-amber-300 dark:hover:bg-amber-500/10'
-    : 'ms-muted hover:bg-white/60 hover:text-amber-500 dark:hover:bg-white/10 dark:hover:text-amber-300'}"
+    ? `${PIN_HUE} hover:bg-amber-100/60 dark:hover:bg-amber-500/10`
+    : `ms-muted hover:bg-white/60 dark:hover:bg-white/10 ${PIN_HOVER}`}"
 >
   {#if active}
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-4 w-4">

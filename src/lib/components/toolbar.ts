@@ -23,9 +23,12 @@ export const FOCUS_RING_INSET =
   'focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-600 dark:focus-visible:ring-indigo-300';
 
 const BASE = `flex h-8 w-8 items-center justify-center rounded-lg transition ${FOCUS_RING}`;
+// Hover and "open / on" must not look alike (V2-08): hover is a neutral wash with darker ink, the active
+// state is a brand tint with brand ink. They were the same classes, so a button still under the pointer
+// after its menu closed looked open.
 const IDLE =
-  'text-slate-600 hover:bg-slate-900/5 hover:text-indigo-600 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-indigo-300';
-const ACTIVE = 'bg-slate-900/5 text-indigo-600 dark:bg-white/10 dark:text-indigo-300';
+  'text-slate-600 hover:bg-slate-900/5 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white';
+const ACTIVE = 'bg-indigo-600/10 text-indigo-700 dark:bg-indigo-400/20 dark:text-indigo-200';
 
 /** @param active true while the button's dropdown or sheet is open (or the toggle is on). */
 export function toolbarButtonClass(active = false): string {
@@ -34,10 +37,12 @@ export function toolbarButtonClass(active = false): string {
 
 /**
  * The container that groups the buttons: one border for the whole row instead of one per button.
+ * It may wrap (R2-16): at 200 % text in a 320 px panel four 64 px buttons do not fit on one line, and
+ * a control pushed past the edge cannot be reached (nothing scrolls sideways).
  *
  * No `backdrop-blur` / `filter` / `transform` here: any of them makes this element the containing
  * block and a stacking context for the History menu inside it, so the menu anchors to the group
  * instead of the header block and is painted under later glass cards (the landing tile, Tabs).
  */
 export const TOOLBAR_GROUP =
-  'inline-flex shrink-0 items-center gap-0.5 rounded-xl border border-slate-200/70 bg-white/70 p-0.5 dark:border-white/10 dark:bg-white/5';
+  'inline-flex max-w-full flex-wrap items-center justify-end gap-0.5 rounded-xl border border-slate-200/70 bg-white/70 p-0.5 dark:border-white/10 dark:bg-white/5';

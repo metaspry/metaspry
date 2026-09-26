@@ -5,7 +5,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        // The one dark floating tint (History, account popover, Settings drawer, help, toast).
+        // The one dark floating tint (History, account popover, Settings drawer, help).
         // Mirrors the web app's `--color-popover-dark`.
         popover: '#2a2159',
         // Secondary text (captions, section labels, placeholders, idle icons). Light is slate-600
