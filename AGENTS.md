@@ -739,7 +739,8 @@ The README's "Version bump checklist": bump the version, build, load unpacked an
 Store item ID: `kibedpkbadcofhbcpfigjmjanmdkmaji`. Privacy policy URL: `https://metaspry.com/docs/privacy/`.
 
 **Before the next submission.**
-- The README's listing copy, permission justifications and privacy answers were reconciled with sign-in and upload for v1.0.26 (six tabs, 19 rules, `identity` row, "Authentication info: Yes, only when signed in", Free 10 / Pro 50 + 20 versions). Re-read `static/manifest.json` the day you submit. The v1.0.26 landing changed the store screenshots' first frame: refresh them with this release.
+- **1.0.26 is skipped (founder, 2026-09-26).** `metaspry-v1.0.26.zip` was built but never submitted; the next store submission is `metaspry-v1.0.27.zip` (1.0.25 -> 1.0.27), which carries every 1.0.26 change. Keep the 1.0.26 zip (never delete old zips).
+- The README's listing copy, permission justifications and privacy answers were reconciled with sign-in and upload for v1.0.26, carried into v1.0.27 (six tabs, 19 rules, `identity` row, "Authentication info: Yes, only when signed in", Free 10 / Pro 50 + 20 versions). Re-read `static/manifest.json` the day you submit. The v1.0.26 landing changed the store screenshots' first frame: refresh them with this release.
 - The shipped bundle contains the strings `https://apis.google.com/js/api.js` and `https://www.google.com/recaptcha/api.js`, which come from the default `firebase/auth` entry. Store review for MV3 checks for remotely hosted code, and these URLs are a commonly reported rejection trigger for extensions that use `firebase/auth`. The installed Firebase version also ships a `firebase/auth/web-extension` entry intended for extensions.
 - `docs/chrome-store-resubmit.md` is a record from the v1.0.5 era; its version numbers are historical.
 

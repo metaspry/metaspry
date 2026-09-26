@@ -65,7 +65,7 @@ their account, so it was cut on 2026-09-25.)
 
 ## Detailed description
 
-**Change the opening paragraph only.** Everything from "Open any page" onward is the v1.0.26 copy in
+**Change the opening paragraph only.** Everything from "Open any page" onward is the v1.0.27 copy in
 `README.md` -> "Detailed description" (six tabs, 19 rules, honest cloud wording, no platform names);
 the May version it replaces described four tabs and "12+ rules" and said "No first-party servers",
 which stopped being true when optional sign-in shipped.
