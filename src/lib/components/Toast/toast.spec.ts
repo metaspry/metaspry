@@ -4,9 +4,9 @@ import { dismissToast, toast, toastDuration, toasts } from './toast';
 
 describe('toastDuration', () => {
   it('keeps a short confirmation short and grows with the message', () => {
-    expect(toastDuration('Copied', 'success')).toBe(2000 + 45 * 6);
-    expect(toastDuration('Copied', 'default')).toBe(2000 + 45 * 6);
-    expect(toastDuration('x'.repeat(40), 'success')).toBe(2000 + 45 * 40);
+    expect(toastDuration('Copied', 'success')).toBe(3500 + 45 * 6);
+    expect(toastDuration('Copied', 'default')).toBe(3500 + 45 * 6);
+    expect(toastDuration('x'.repeat(40), 'success')).toBe(3500 + 45 * 40);
   });
 
   it('caps at 9 s', () => {

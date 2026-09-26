@@ -20,6 +20,7 @@
   import { FOCUS_RING } from '../toolbar';
   import { BUTTON_DANGER, BUTTON_PRIMARY, BUTTON_SECONDARY } from '../button';
   import { dur } from '../../motion';
+  import { bandClasses } from '../../audit/band';
 
   const SURFACES: { value: Mode; label: string; hint: string }[] = [
     { value: 'sidepanel', label: 'Side panel', hint: 'Stays open beside the page while you browse.' },
@@ -196,11 +197,10 @@
     void focusIn();
   }
 
-  const inputClass =
-    'w-full rounded-lg border bg-white px-2.5 py-1.5 text-sm tabular-nums text-slate-900 shadow-sm outline-none transition focus:ring-2 dark:bg-slate-800 dark:text-slate-100';
-  // R-30: slate-500 edge 4.76:1 on white, slate-400 5.71:1 on slate-800 (slate-300 was 1.48:1).
-  const inputOk = 'border-slate-500 focus:border-indigo-600 focus:ring-indigo-500/30 dark:border-slate-400';
-  const inputBad = 'border-rose-500 focus:border-rose-500 focus:ring-rose-500/30';
+  // The shared field (`.ms-input`, app.css: `field-edge` border, inset well in dark, R3-24). An
+  // invalid value swaps the edge and the mouse-focus ring for rose; the utilities beat the class.
+  const inputClass = 'ms-input tabular-nums';
+  const inputBad = 'border-rose-500 focus:border-rose-500 focus:ring-rose-500/30 focus-visible:ring-rose-600 dark:border-rose-400 dark:focus:border-rose-400 dark:focus-visible:ring-rose-300';
   // >= 24 px tall with 8 px between targets (WCAG 2.5.8, R-48); they were 16.5 px, 13-15 px apart.
   const linkClass = `inline-flex h-6 items-center rounded px-1 hover:text-indigo-600 hover:underline dark:hover:text-indigo-300 ${FOCUS_RING}`;
 </script>
@@ -251,7 +251,7 @@
               class="sr-only"
             />
             <span class="text-xs font-semibold text-slate-800 dark:text-slate-100">{s.label}</span>
-            <span class="text-[11px] leading-snug ms-muted">{s.hint}</span>
+            <span class="text-[0.6875rem] leading-snug ms-muted">{s.hint}</span>
           </label>
         {/each}
       </div>
@@ -267,7 +267,7 @@
         />
         <span class="flex flex-col gap-0.5">
           <span class="text-xs font-semibold text-slate-800 dark:text-slate-100">Single-key shortcuts</span>
-          <span id="shortcuts-pref-hint" class="ms-muted text-[11px] leading-snug">/ search, r re-scan, 1-6 tabs. Off: only ? and Esc work.</span>
+          <span id="shortcuts-pref-hint" class="ms-muted text-[0.6875rem] leading-snug">/ search, r re-scan, 1-6 tabs. Off: only ? and Esc work.</span>
         </span>
       </label>
     </fieldset>
@@ -304,7 +304,7 @@
     {:else if $cloudIsPro}
       <p class="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-indigo-500/10 px-3 py-2 text-xs text-slate-700 dark:text-slate-200">
         <span class="inline-flex items-center gap-1.5">
-          <span class="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
+          <span class="h-1.5 w-1.5 rounded-full bg-emerald-600 dark:bg-emerald-400" aria-hidden="true" />
           Synced with your account
         </span>
         <a
@@ -327,7 +327,7 @@
           <div class="flex flex-col gap-1">
             <span class="text-xs font-medium text-slate-700 dark:text-slate-200">{row.label}</span>
             <div class="flex items-center gap-2">
-              <label class="flex flex-1 items-center gap-1.5 text-[10px] uppercase tracking-wide ms-muted">
+              <label class="flex flex-1 items-center gap-1.5 text-[0.6875rem] uppercase tracking-wide ms-muted">
                 min
                 <input
                   type="number"
@@ -339,11 +339,11 @@
                   aria-describedby={minProblem ? `settings-problem-${row.min}` : undefined}
                   value={Number.isNaN(draft[row.min]) ? '' : draft[row.min]}
                   on:input={(e) => setLength(row.min, e)}
-                  class="{inputClass} {minProblem ? inputBad : inputOk}"
+                  class="{inputClass} {minProblem ? inputBad : ''}"
                 />
               </label>
               <span class="ms-muted" aria-hidden="true">–</span>
-              <label class="flex flex-1 items-center gap-1.5 text-[10px] uppercase tracking-wide ms-muted">
+              <label class="flex flex-1 items-center gap-1.5 text-[0.6875rem] uppercase tracking-wide ms-muted">
                 max
                 <input
                   type="number"
@@ -355,7 +355,7 @@
                   aria-describedby={maxProblem ? `settings-problem-${row.max}` : undefined}
                   value={Number.isNaN(draft[row.max]) ? '' : draft[row.max]}
                   on:input={(e) => setLength(row.max, e)}
-                  class="{inputClass} {maxProblem ? inputBad : inputOk}"
+                  class="{inputClass} {maxProblem ? inputBad : ''}"
                 />
               </label>
             </div>
@@ -387,7 +387,7 @@
                 aria-describedby={weightProblem ? 'settings-problem-weights' : undefined}
                 value={Number.isNaN(draft.weights[w.key]) ? '' : draft.weights[w.key]}
                 on:input={(e) => setWeight(w.key, e)}
-                class="{inputClass} {weightProblem ? inputBad : inputOk}"
+                class="{inputClass} {weightProblem ? inputBad : ''}"
               />
             </label>
           {/each}
@@ -431,7 +431,7 @@
           >Reset to defaults</button>
         {/if}
         {#if dirty}
-          <span class="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Unsaved changes</span>
+          <span class="rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-wide {bandClasses('warn').chip}">Unsaved changes</span>
         {/if}
       </div>
     {:else if $hasEntitledWorkspace}
@@ -445,7 +445,7 @@
       </section>
     {:else}
       <section class="flex flex-col items-start gap-2 rounded-xl border border-indigo-400/30 bg-indigo-500/5 p-3">
-        <span class="rounded-full bg-indigo-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">Pro</span>
+        <span class="rounded-full bg-indigo-500/20 px-2 py-0.5 text-[0.6875rem] font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">Pro</span>
         <h4 class="text-sm font-semibold text-slate-900 dark:text-slate-50">Custom scoring is a Pro feature</h4>
         <p class="text-xs text-slate-600 dark:text-slate-300">
           Free scans use Metaspry's default thresholds and rule weights. Upgrade to tune how the SEO/meta
@@ -460,7 +460,7 @@
       </section>
     {/if}
 
-    <footer class="mt-auto flex flex-col gap-1.5 border-t border-slate-200 pt-3 text-[11px] ms-muted dark:border-slate-800">
+    <footer class="mt-auto flex flex-col gap-1.5 border-t border-slate-200 pt-3 text-[0.6875rem] ms-muted dark:border-slate-800">
       <span>Metaspry v{version}</span>
       <!-- No "·" separators: one could end a line on its own ("Blog ·", T-18). The gap separates the
            links, and `-mx-1` cancels the links' own `px-1` so their text lines up with "Metaspry v…" (L-16). -->

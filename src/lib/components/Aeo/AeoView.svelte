@@ -59,7 +59,7 @@
 <div class="flex flex-col gap-3">
   {#if loading}
     <div class="flex items-center gap-2 rounded-2xl border border-white/40 bg-white/40 px-3 py-2 text-xs text-slate-600 backdrop-blur-md dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" class="h-4 w-4 motion-safe:animate-spin">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" class="h-4 w-4 animate-spin">
         <path d="M21 12a9 9 0 1 1-6.2-8.5" />
       </svg>
       Checking AI readiness…
@@ -73,22 +73,22 @@
       >
         {result.chip === 'ready' ? 'AI-ready' : 'Needs work'}
       </span>
-      <span class="text-[11px] ms-muted">Readiness for AI answer engines - not a guarantee of citations.</span>
+      <span class="text-[0.6875rem] ms-muted">Readiness for AI answer engines - not a guarantee of citations.</span>
     </div>
 
     {#each [{ title: 'Page', items: pageChecks }, { title: 'Site', items: siteChecks }] as group (group.title)}
       {#if group.items.length}
         <div class="flex flex-col gap-2">
-          <p class="text-[10px] font-semibold uppercase tracking-wider ms-muted">{group.title}</p>
+          <p class="text-[0.6875rem] font-semibold uppercase tracking-wider ms-muted">{group.title}</p>
           {#each group.items as c (c.id)}
             <div class="flex items-start gap-2.5 rounded-2xl border border-white/40 bg-white/40 px-3 py-2 backdrop-blur-md dark:border-white/10 dark:bg-white/5">
               <span class="mt-1 h-2 w-2 shrink-0 rounded-full {dot[c.state]}" aria-hidden="true"></span>
               <div class="min-w-0">
                 <div class="flex items-center gap-2">
                   <span class="text-xs font-medium text-slate-800 dark:text-slate-100">{c.label}</span>
-                  <span class="text-[9px] uppercase tracking-wide ms-muted">{stateLabel[c.state]}</span>
+                  <span class="text-[0.6875rem] uppercase tracking-wide ms-muted">{stateLabel[c.state]}</span>
                 </div>
-                <p class="text-[11px] ms-muted">{c.detail}</p>
+                <p class="text-[0.6875rem] ms-muted">{c.detail}</p>
               </div>
             </div>
           {/each}

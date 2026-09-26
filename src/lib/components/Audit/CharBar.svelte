@@ -21,5 +21,5 @@
       <span class="pointer-events-none absolute inset-y-0" style="left: {Math.min(100, (min / max) * 100)}%; width: 1px; background: rgba(0,0,0,0.2);" />
     {/if}
   </div>
-  <span class="tabular-nums text-[10px] ms-muted">{length}/{max}</span>
+  <span class="tabular-nums text-[0.6875rem] ms-muted">{length}/{max}</span>
 </div>

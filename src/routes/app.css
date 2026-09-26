@@ -8,6 +8,60 @@
   .ms-muted {
     @apply text-muted dark:text-muted-dark;
   }
+
+  /* The one field look (R3-24), the web app's `ms-input` in Tailwind 3 terms: every text, email,
+   * password, number and search input. Light: a faint indigo-100/80 fill, so the field reads as a
+   * surface on a white popover or card, with the `field-edge` border (>= 3:1 on fill, card and page).
+   * Dark: an inset slate-950/60 well, darker than the card or popover it sits on (the old white/5
+   * was a lighter slab). One shape, `rounded-xl` (sign-in was rounded-lg, search and Compare pills).
+   * Mouse focus: brand border + soft ring; keyboard focus: the shared ring (toolbar.ts FOCUS_RING),
+   * which `focus-visible:` orders after `focus:`. A state border (`border-rose-500`) is a utility, so
+   * it wins over the edge. */
+  .ms-input {
+    @apply w-full rounded-xl border border-field-edge bg-indigo-100/80 px-3 py-2 text-sm text-slate-900 transition placeholder:text-muted focus:border-indigo-500 focus:bg-white/90 focus:outline-none focus:ring-2 focus:ring-indigo-400/30 focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent disabled:opacity-60 dark:border-field-edge-dark dark:bg-slate-950/60 dark:text-slate-100 dark:placeholder:text-muted-dark dark:focus:border-indigo-300 dark:focus:bg-slate-950/70 dark:focus-visible:ring-indigo-300;
+  }
+
+  /* A menu that floats over the cards (History, the account popover): the web app's `ms-popover`.
+   * Light: opaque white with a slate-300 edge (the old white/40 edge on white measured 1.03). Dark:
+   * the raised `popover-raised` step with a white/35 edge (the old white/10 on `popover` measured
+   * 1.02) and a darker shadow. Callers add position, size, padding and z-index. */
+  .ms-popover {
+    @apply rounded-xl border border-slate-300 bg-white shadow-xl shadow-slate-900/[.15] dark:border-white/[.35] dark:bg-popover-raised dark:shadow-black/50;
+  }
+
+  /* An item in a popover: the web app's `ms-menu-item` hover strength (indigo-500/25 light, white/15
+   * dark: 1.39 / 1.55:1 against the list; the old white/70 on a white popover was 1.00). The picked
+   * one (`aria-checked`) adds a subtle tint and brand ink; hover and press still paint over it. */
+  .ms-menu-item {
+    @apply flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-slate-800 transition-colors hover:bg-indigo-500/25 active:bg-indigo-500/30 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-100 dark:hover:bg-white/[.15] dark:active:bg-white/20;
+  }
+  .ms-menu-item[aria-checked='true'] {
+    @apply bg-indigo-500/10 font-medium text-indigo-700 dark:bg-white/10 dark:text-indigo-200;
+  }
+  /* Declared after the picked tint, which has the same specificity, so the picked row still answers
+   * the pointer. */
+  .ms-menu-item[aria-checked='true']:hover {
+    @apply bg-indigo-500/25 dark:bg-white/[.15];
+  }
+  .ms-menu-item[aria-checked='true']:active {
+    @apply bg-indigo-500/30 dark:bg-white/20;
+  }
+
+  /* Muted text inside the raised dark popover: slate-400 on `popover-raised` is 4.22:1 (the web
+   * app's R3-11), so it steps up to slate-300 there. Its specificity beats `.dark .ms-muted`; a
+   * `dark:hover:` utility on the same element ties and wins by coming later. */
+  .dark .ms-popover .ms-muted {
+    color: #cbd5e1;
+  }
+}
+
+/* Native parts (number spinners, checkboxes, scrollbars of native controls) follow the class-based
+ * theme, not the OS (R3-24 / P3-02): without it dark Settings drew light spinners and checkboxes. */
+:root {
+  color-scheme: light;
+}
+:root.dark {
+  color-scheme: dark;
 }
 
 /* Forced colors (Windows contrast themes) drop box-shadow, so every Tailwind `ring` focus style
@@ -79,7 +133,7 @@ html[data-mode="popup"] [data-bg-orb] {
 }
 
 /* Reduced motion (P-18), the CSS half of `src/lib/motion.ts`: no CSS transition or keyframe animation
- * runs (the spinners and the skeleton pulse stand still; colour changes snap). Movement itself - the
+ * runs (the skeleton pulse stands still, colour changes snap; loading spinners slow down, below). Movement itself - the
  * landing tile's hover lift, the press scale, the score ring's sweep - is also `motion-safe:` at the
  * call site, so nothing jumps either. Svelte transitions take `dur(ms)`. */
 @media (prefers-reduced-motion: reduce) {
@@ -90,6 +144,13 @@ html[data-mode="popup"] [data-bg-orb] {
     animation-iteration-count: 1 !important;
     transition-duration: 0s !important;
     scroll-behavior: auto !important;
+  }
+  /* Loading spinners keep turning, slowly (P3-08): stopped dead after one 0 s turn they showed a
+   * static partial arc that reads as "stalled". Same 2.4 s as the web app's `.ms-spinner`. The class
+   * outranks `*`, and both are !important. Spinners use plain `animate-spin`, not `motion-safe:`. */
+  .animate-spin {
+    animation-duration: 2.4s !important;
+    animation-iteration-count: infinite !important;
   }
 }
 

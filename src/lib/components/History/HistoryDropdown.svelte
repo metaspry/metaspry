@@ -9,8 +9,11 @@
   import { popover } from '../../actions/popover';
   import { dur } from '../../motion';
   import { timeAgo } from '../../util/time-ago';
+  import { BUTTON_PRIMARY } from '../button';
 
-  const TITLE_ID = 'history-title';
+  /** Starts a scan of the open tab: the empty state's next step (I3-13). Omitted, no button. */
+  export let onScan: (() => void) | null = null;
+
   const CONFIRM_CLASS = `rounded px-1 underline-offset-2 hover:underline ${FOCUS_RING}`;
 
   let open = false;
@@ -26,6 +29,11 @@
 
   function close() {
     open = false;
+  }
+
+  function scanFromEmpty() {
+    close();
+    onScan?.();
   }
 
   function openInNewTab(url: string) {
@@ -87,33 +95,34 @@
   </button>
   {#if open}
     <!-- `use:popover`: focus lands on the first row (the panel itself when there is none), Escape
-         or a press outside closes, focus returns to the History button. -->
+         or a press outside closes, focus returns to the History button. Named in sentence case
+         (KB3-13): named by the CSS-uppercased header it read "RECENT SCANS". -->
     <div
       bind:this={panel}
       use:popover={{ trigger, onClose: close, initialFocus: '[data-history-row]' }}
       transition:fade={{ duration: dur(100) }}
       role="dialog"
-      aria-labelledby={TITLE_ID}
+      aria-label="Recent scans"
       tabindex="-1"
-      class="absolute right-0 top-full z-30 mt-2 w-64 max-w-[calc(100vw-2.5rem)] overflow-hidden rounded-2xl border border-white/40 bg-white shadow-xl focus:outline-none dark:border-white/10 dark:bg-popover"
+      class="ms-popover absolute right-0 top-full z-30 mt-2 w-64 max-w-[calc(100vw-2.5rem)] overflow-hidden focus:outline-none"
     >
-      <header class="flex items-center justify-between border-b border-white/40 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider ms-muted dark:border-white/10">
-        <span id={TITLE_ID}>Recent scans</span>
+      <header class="flex items-center justify-between border-b border-slate-200 px-3 py-2 text-[0.6875rem] font-semibold uppercase tracking-wider ms-muted dark:border-white/[.15]">
+        <span>Recent scans</span>
         {#if $history.length > 0}
           {#if clearArmed}
-            <span bind:this={confirmGroup} role="group" aria-label="Confirm clear history" class="inline-flex items-center gap-1.5 text-[11px] normal-case tracking-normal text-rose-600 dark:text-rose-300">
+            <span bind:this={confirmGroup} role="group" aria-label="Confirm clear history" class="inline-flex items-center gap-1.5 text-[0.6875rem] normal-case tracking-normal text-rose-600 dark:text-rose-300">
               Clear all?
               <button bind:this={confirmBtn} type="button" on:click={confirmClear} on:keydown={onConfirmKey} on:focusout={onConfirmFocusOut} class={CONFIRM_CLASS}>Yes</button>
               <span aria-hidden="true">/</span>
               <button type="button" on:click={() => disarmClear(true)} on:keydown={onConfirmKey} on:focusout={onConfirmFocusOut} class={CONFIRM_CLASS}>No</button>
             </span>
           {:else}
-            <button bind:this={clearBtn} type="button" on:click={armClear} class="rounded px-1 text-[11px] normal-case tracking-normal text-rose-600 hover:underline dark:text-rose-300 {FOCUS_RING}">Clear</button>
+            <button bind:this={clearBtn} type="button" on:click={armClear} class="rounded px-1 text-[0.6875rem] normal-case tracking-normal text-rose-600 hover:underline dark:text-rose-300 {FOCUS_RING}">Clear</button>
           {/if}
         {/if}
       </header>
       {#if $history.length > 0}
-        <p class="flex items-center gap-1 border-b border-white/40 px-3 py-1.5 text-[10px] ms-muted dark:border-white/10">
+        <p class="flex items-center gap-1 border-b border-slate-200 px-3 py-1.5 text-[0.6875rem] ms-muted dark:border-white/[.15]">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-3 w-3" aria-hidden="true">
             <path d="M7 17 17 7M8 7h9v9" />
           </svg>
@@ -129,18 +138,21 @@
           </svg>
           <p class="text-xs font-medium text-slate-900 dark:text-slate-50">No scans yet</p>
           <p class="text-xs ms-muted">Scan a page and it shows up here, newest first. The last 10 stay on this device.</p>
+          {#if onScan}
+            <button type="button" on:click={scanFromEmpty} class="{BUTTON_PRIMARY} mt-1.5">Scan this page</button>
+          {/if}
         </div>
       {:else}
         <ul class="max-h-72 overflow-y-auto">
           {#each $history as entry (entry.timestamp)}
             {@const label = scoreLabel(entry.score)}
-            <li class="border-b border-white/40 last:border-b-0 dark:border-white/5">
+            <li class="border-b border-slate-200 last:border-b-0 dark:border-white/10">
               <button
                 type="button"
                 data-history-row
                 use:tooltip={'Open in new tab'}
                 on:click={() => openInNewTab(entry.url)}
-                class="group/row flex w-full items-center gap-2 px-3 py-2 text-left transition hover:bg-white/60 dark:hover:bg-white/5 {FOCUS_RING_INSET}"
+                class="group/row flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-indigo-500/25 active:bg-indigo-500/30 dark:hover:bg-white/[.15] dark:active:bg-white/20 {FOCUS_RING_INSET}"
               >
                 <SiteIcon src={entry.icon ?? null} hostname={entry.hostname} size={16} />
                 <span class="min-w-0 flex-1">
@@ -160,15 +172,15 @@
                       <path d="M7 17 17 7M8 7h9v9" />
                     </svg>
                   </span>
-                  <span class="block truncate text-[10px] ms-muted">{entry.hostname}</span>
+                  <span class="block truncate text-[0.6875rem] ms-muted">{entry.hostname}</span>
                 </span>
-                <span class="shrink-0 text-[10px] ms-muted">{timeAgo(entry.timestamp)}</span>
+                <span class="shrink-0 text-[0.6875rem] ms-muted">{timeAgo(entry.timestamp)}</span>
                 <!-- Verdict last, on the right: the same rule as every list in the web app. -->
                 <span
                   role="img"
                   aria-label={label}
                   use:tooltip={label}
-                  class="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums {bandClasses(bandFor(entry.score)).chip}"
+                  class="shrink-0 rounded-full px-1.5 py-0.5 text-[0.6875rem] font-semibold tabular-nums {bandClasses(bandFor(entry.score)).chip}"
                 >{Math.round(entry.score)}</span>
               </button>
             </li>

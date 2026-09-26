@@ -15,8 +15,20 @@
  * measure well over the 3:1 WCAG 2.4.13 minimum (the old `ring-indigo-500/40` blended to ~1.7:1).
  * Mirrors the web app's `focus-visible:ring-2 … ring-offset-2 ring-offset-transparent`.
  */
-export const FOCUS_RING =
-  'focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent dark:focus-visible:ring-indigo-300';
+const RING =
+  'focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 dark:focus-visible:ring-indigo-300';
+
+export const FOCUS_RING = `${RING} focus-visible:ring-offset-transparent`;
+
+/**
+ * The ring for a control with a brand (or danger) FILL: "Scan this page", Re-scan, Retry, Compare,
+ * `BUTTON_PRIMARY` / `BUTTON_DANGER`, the category chips (the picked one is a fill). With a transparent offset the
+ * indigo-600 ring touched the indigo-600 fill and read as a 4 px bigger button (1.00:1, R3-22), so
+ * here the 2 px offset band is page-coloured - white in light, slate-950 in dark - and fill, gap and
+ * ring stay three shapes. Mirrors the web app's brand-fill rule (`ring-offset-white
+ * dark:ring-offset-slate-950`). Never combine it with `FOCUS_RING` on one element.
+ */
+export const FOCUS_RING_ON_FILL = `${RING} focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950`;
 
 /** The same ring drawn inside the edge, for full-bleed rows inside a clipped panel (History rows). */
 export const FOCUS_RING_INSET =

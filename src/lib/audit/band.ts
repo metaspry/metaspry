@@ -49,32 +49,38 @@ export function bandForVerdict(verdict: Verdict): Band {
 // amber-700 4.45, rose-600 4.16. Dark keeps -400 / -300. `text` is only used for the 18 px bold
 // Compare numbers (large text, 3:1). `stroke` / `fill` are the result views' marks (Audit rule icons,
 // CharBar, AI dots, the pin): the -500 steps they used measured 1.90-2.25:1 on the light card (R2-29).
-// `ink` is small text, so it takes the chip's -700 (-800 for amber: amber-700 is 4.45 on the card).
-// `/20`, not `/15`: this repo is on Tailwind 3, whose default opacity scale has no 15, so a
-// `bg-*/15` class silently compiles to nothing (the chips rendered with no pill in light mode).
+// `ink` is small text: -700 (-800 for amber: amber-700 is 4.45 on the card).
+// `chip` is the web app's `ms-badge-*` (R3-23): the band's own fill at 15 % with -800 text in light,
+// because 10-11 px -700 text on a -500/20 pill measured 4.09 / 3.88 / 4.33 on the light Screen.
+// Amber takes -900: -800 read 5.76 at rest but 4.30 on a hovered History row (indigo-500/25 under it).
+// `/[.15]`, never `/15`: Tailwind 3's default opacity scale has no 15, so `bg-*/15` silently
+// compiles to nothing (the chips once rendered with no pill in light mode).
 const CLASSES: Record<Band, BandClasses> = {
   good: {
     text: 'text-emerald-600 dark:text-emerald-400',
-    chip: 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300',
+    chip: 'bg-emerald-600/[.15] text-emerald-800 dark:bg-emerald-400/[.15] dark:text-emerald-300',
     stroke: 'text-emerald-600 dark:text-emerald-400',
     fill: 'bg-emerald-600 dark:bg-emerald-400',
     ink: 'text-emerald-700 dark:text-emerald-300',
   },
   warn: {
     text: 'text-amber-700 dark:text-amber-400',
-    chip: 'bg-amber-500/20 text-amber-700 dark:text-amber-300',
+    chip: 'bg-amber-700/[.15] text-amber-900 dark:bg-amber-400/[.15] dark:text-amber-300',
     stroke: 'text-amber-700 dark:text-amber-400',
     fill: 'bg-amber-700 dark:bg-amber-400',
     ink: 'text-amber-800 dark:text-amber-300',
   },
   fail: {
     text: 'text-rose-600 dark:text-rose-400',
-    chip: 'bg-rose-500/20 text-rose-700 dark:text-rose-300',
+    chip: 'bg-rose-600/[.15] text-rose-800 dark:bg-rose-400/[.15] dark:text-rose-300',
     stroke: 'text-rose-600 dark:text-rose-400',
     fill: 'bg-rose-600 dark:bg-rose-400',
     ink: 'text-rose-700 dark:text-rose-300',
   },
 };
+
+/** A chip with no verdict ("Not present"): the web app's `ms-badge-neutral`. */
+export const CHIP_NEUTRAL = 'bg-slate-500/10 text-slate-600 dark:bg-white/10 dark:text-slate-300';
 
 export function bandClasses(band: Band): BandClasses {
   return CLASSES[band];

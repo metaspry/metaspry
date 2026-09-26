@@ -52,7 +52,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="h-3 w-3 transition-transform group-open:rotate-90" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
         Details
       </summary>
-      <pre class="mt-2 whitespace-pre-wrap break-words rounded-lg border border-slate-300 bg-white/60 p-2 font-mono text-[11px] text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">{detail}</pre>
+      <pre class="mt-2 whitespace-pre-wrap break-words rounded-lg border border-slate-300 bg-white/60 p-2 font-mono text-[0.6875rem] text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">{detail}</pre>
     </details>
   {/if}
   <p class="ms-muted mt-3 text-xs">
