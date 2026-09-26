@@ -187,7 +187,7 @@ Each feature lists: purpose and user flow, key files, data and storage, permissi
 
 ### 3.1 Manifest and permissions
 
-**Purpose.** `static/manifest.json` declares the extension: MV3, name `Metaspry`, version `1.0.27`, `minimum_chrome_version: "114"`, `offline_enabled: true`.
+**Purpose.** `static/manifest.json` declares the extension: MV3, name `Metaspry`, version `1.0.28`, `minimum_chrome_version: "114"`, `offline_enabled: true`.
 
 - `background.service_worker`: `scripts/background.js` (classic script; no `"type": "module"`).
 - `side_panel.default_path`: `index.html`.
@@ -706,7 +706,7 @@ The help modal (`ShortcutsHelp.svelte`) is `role="dialog" aria-modal="true"`, la
 
 ### 4.2 Versioning
 
-- The version lives in two files that must match: `version` in `static/manifest.json` and in `package.json` (both `1.0.27` on this branch; the v1.0.26 and v1.0.27 zips are built, neither submitted yet, so the store serves `1.0.25`). No script syncs them.
+- The version lives in two files that must match: `version` in `static/manifest.json` and in `package.json` (both `1.0.28` on this branch; the v1.0.26, v1.0.27 and v1.0.28 zips are built, none submitted yet, so the store serves `1.0.25`). No script syncs them.
 - Convention from the git history: each shipped change bumps the patch version and gets a new zip (commit messages like "v1.0.22 + zip").
 - The repo has no git tags, although the README checklist ends with "tag the commit `vX.Y.Z`".
 
@@ -741,6 +741,7 @@ Store item ID: `kibedpkbadcofhbcpfigjmjanmdkmaji`. Privacy policy URL: `https://
 
 **Before the next submission.**
 - **1.0.26 is skipped (founder, 2026-09-26).** `metaspry-v1.0.26.zip` was built but never submitted; the next store submission is `metaspry-v1.0.27.zip` (1.0.25 -> 1.0.27), which carries every 1.0.26 change. Keep the 1.0.26 zip (never delete old zips).
+- **1.0.28 (round-3 batch 6) waits for 1.0.27 (A-1).** `metaspry-v1.0.28.zip` is built but must not be submitted until 1.0.27 is live in the store.
 - The README's listing copy, permission justifications and privacy answers were reconciled with sign-in and upload for v1.0.26, carried into v1.0.27 (six tabs, 19 rules, `identity` row, "Authentication info: Yes, only when signed in", Free 10 / Pro 50 + 20 versions). Re-read `static/manifest.json` the day you submit. The v1.0.26 landing changed the store screenshots' first frame: refresh them with this release.
 - The shipped bundle contains the strings `https://apis.google.com/js/api.js` and `https://www.google.com/recaptcha/api.js`, which come from the default `firebase/auth` entry. Store review for MV3 checks for remotely hosted code, and these URLs are a commonly reported rejection trigger for extensions that use `firebase/auth`. The installed Firebase version also ships a `firebase/auth/web-extension` entry intended for extensions.
 - `docs/chrome-store-resubmit.md` is a record from the v1.0.5 era; its version numbers are historical.
