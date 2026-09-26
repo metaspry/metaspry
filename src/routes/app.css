@@ -31,12 +31,20 @@
 
   /* An item in a popover: the web app's `ms-menu-item` hover strength (indigo-500/25 light, white/15
    * dark: 1.39 / 1.55:1 against the list; the old white/70 on a white popover was 1.00). The picked
-   * one (`aria-checked`) adds a subtle tint and brand ink under the hover. */
+   * one (`aria-checked`) adds a subtle tint and brand ink; hover and press still paint over it. */
   .ms-menu-item {
     @apply flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-slate-800 transition-colors hover:bg-indigo-500/25 active:bg-indigo-500/30 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-100 dark:hover:bg-white/[.15] dark:active:bg-white/20;
   }
   .ms-menu-item[aria-checked='true'] {
     @apply bg-indigo-500/10 font-medium text-indigo-700 dark:bg-white/10 dark:text-indigo-200;
+  }
+  /* Declared after the picked tint, which has the same specificity, so the picked row still answers
+   * the pointer. */
+  .ms-menu-item[aria-checked='true']:hover {
+    @apply bg-indigo-500/25 dark:bg-white/[.15];
+  }
+  .ms-menu-item[aria-checked='true']:active {
+    @apply bg-indigo-500/30 dark:bg-white/20;
   }
 
   /* Muted text inside the raised dark popover: slate-400 on `popover-raised` is 4.22:1 (the web

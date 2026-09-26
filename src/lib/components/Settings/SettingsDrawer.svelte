@@ -200,7 +200,7 @@
   // The shared field (`.ms-input`, app.css: `field-edge` border, inset well in dark, R3-24). An
   // invalid value swaps the edge and the mouse-focus ring for rose; the utilities beat the class.
   const inputClass = 'ms-input tabular-nums';
-  const inputBad = 'border-rose-500 focus:border-rose-500 focus:ring-rose-500/30 dark:border-rose-400 dark:focus:border-rose-400';
+  const inputBad = 'border-rose-500 focus:border-rose-500 focus:ring-rose-500/30 focus-visible:ring-rose-600 dark:border-rose-400 dark:focus:border-rose-400 dark:focus-visible:ring-rose-300';
   // >= 24 px tall with 8 px between targets (WCAG 2.5.8, R-48); they were 16.5 px, 13-15 px apart.
   const linkClass = `inline-flex h-6 items-center rounded px-1 hover:text-indigo-600 hover:underline dark:hover:text-indigo-300 ${FOCUS_RING}`;
 </script>
@@ -304,7 +304,7 @@
     {:else if $cloudIsPro}
       <p class="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-indigo-500/10 px-3 py-2 text-xs text-slate-700 dark:text-slate-200">
         <span class="inline-flex items-center gap-1.5">
-          <span class="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
+          <span class="h-1.5 w-1.5 rounded-full bg-emerald-600 dark:bg-emerald-400" aria-hidden="true" />
           Synced with your account
         </span>
         <a
