@@ -2,7 +2,7 @@
 
 Feature map for AI coding agents working in this repo. It describes only what `main` does.
 
-Verified against `origin/main` at `e9f0a0b` plus the `fix/ultra-ext-2026-09-25` changes (extension `1.0.26`) on 2026-09-25. If this file and the code disagree, the code wins: fix this file in the same PR (section 6).
+Verified against `origin/main` at `e9f0a0b` plus the `fix/ultra-ext-2026-09-25` changes (extension `1.0.26`) on 2026-09-25, and against the batch D changes (`fix/ultra2-ext`, extension `1.0.27`) on 2026-09-26. If this file and the code disagree, the code wins: fix this file in the same PR (section 6).
 
 ---
 
@@ -187,7 +187,7 @@ Each feature lists: purpose and user flow, key files, data and storage, permissi
 
 ### 3.1 Manifest and permissions
 
-**Purpose.** `static/manifest.json` declares the extension: MV3, name `Metaspry`, version `1.0.26`, `minimum_chrome_version: "114"`, `offline_enabled: true`.
+**Purpose.** `static/manifest.json` declares the extension: MV3, name `Metaspry`, version `1.0.27`, `minimum_chrome_version: "114"`, `offline_enabled: true`.
 
 - `background.service_worker`: `scripts/background.js` (classic script; no `"type": "module"`).
 - `side_panel.default_path`: `index.html`.
@@ -705,7 +705,7 @@ The help modal (`ShortcutsHelp.svelte`) is `role="dialog" aria-modal="true"`, la
 
 ### 4.2 Versioning
 
-- The version lives in two files that must match: `version` in `static/manifest.json` and in `package.json` (both `1.0.26` on `main`; the store serves `1.0.25` until the v1.0.26 zip is submitted). No script syncs them.
+- The version lives in two files that must match: `version` in `static/manifest.json` and in `package.json` (both `1.0.27` on this branch; the v1.0.26 and v1.0.27 zips are built, neither submitted yet, so the store serves `1.0.25`). No script syncs them.
 - Convention from the git history: each shipped change bumps the patch version and gets a new zip (commit messages like "v1.0.22 + zip").
 - The repo has no git tags, although the README checklist ends with "tag the commit `vX.Y.Z`".
 
