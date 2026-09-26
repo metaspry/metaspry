@@ -34,6 +34,6 @@
     {value}
     on:input={handle}
     {placeholder}
-    class="w-full rounded-full border border-slate-500 bg-white/60 py-2 pl-9 pr-3 text-sm text-slate-900 placeholder:text-muted backdrop-blur-md transition focus:border-indigo-600 focus:bg-white/80 focus:outline-none focus:ring-2 focus:ring-indigo-400/40 dark:border-white/40 dark:bg-white/5 dark:text-slate-100 dark:placeholder:text-muted-dark dark:focus:border-indigo-300 dark:focus:bg-white/10"
+    class="ms-input pl-9"
   />
 </label>

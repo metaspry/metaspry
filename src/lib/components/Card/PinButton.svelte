@@ -3,6 +3,7 @@
   import { toast } from '../Toast/toast';
   import { tooltip } from '../../actions/tooltip';
   import { bandClasses } from '../../audit/band';
+  import { FOCUS_RING } from '../toolbar';
 
   // The star keeps its amber, now the band token (amber-700 light, R2-29; amber-500 was ~1.9:1).
   const PIN_HUE = bandClasses('warn').stroke;
@@ -30,7 +31,7 @@
   aria-pressed={active}
   use:tooltip={active ? 'Unpin from top' : 'Pin to top of list'}
   on:click={onClick}
-  class="flex h-7 w-7 items-center justify-center rounded-lg transition {active
+  class="flex h-8 w-8 items-center justify-center rounded-lg transition {FOCUS_RING} {active
     ? `${PIN_HUE} hover:bg-amber-100/60 dark:hover:bg-amber-500/10`
     : `ms-muted hover:bg-white/60 dark:hover:bg-white/10 ${PIN_HOVER}`}"
 >

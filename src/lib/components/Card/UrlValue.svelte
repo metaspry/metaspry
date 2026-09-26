@@ -25,6 +25,6 @@
   <button
     type="button"
     on:click={() => (expanded = !expanded)}
-    class="ml-1 inline text-[10px] font-medium text-indigo-600 hover:underline dark:text-indigo-300"
+    class="ml-1 inline text-[0.6875rem] font-medium text-indigo-600 hover:underline dark:text-indigo-300"
   >{expanded ? 'Show less' : 'Show more'}</button>
 {/if}

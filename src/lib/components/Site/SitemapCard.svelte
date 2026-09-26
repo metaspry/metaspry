@@ -13,9 +13,9 @@
   <header class="flex items-center justify-between border-b border-white/40 px-4 py-2 dark:border-white/10">
     <h4 class="text-sm font-semibold text-slate-900 dark:text-slate-50">sitemap.xml</h4>
     {#if sitemap.present}
-      <span class="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">Found</span>
+      <span class="rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-wider {bandClasses('good').chip}">Found</span>
     {:else}
-      <span class="rounded-full bg-rose-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-rose-700 dark:bg-rose-500/20 dark:text-rose-300">Missing</span>
+      <span class="rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-wider {bandClasses('fail').chip}">Missing</span>
     {/if}
   </header>
   <div class="space-y-2 px-4 py-3 text-xs">
@@ -30,7 +30,7 @@
         </p>
         {#if sitemap.children.length > 0}
           <div class="space-y-1">
-            <button type="button" on:click={() => (showChildren = !showChildren)} class="text-[10px] font-medium text-indigo-600 hover:underline dark:text-indigo-300">
+            <button type="button" on:click={() => (showChildren = !showChildren)} class="text-[0.6875rem] font-medium text-indigo-600 hover:underline dark:text-indigo-300">
               {showChildren ? 'Hide child sitemaps' : `Show ${sitemap.children.length} child sitemap${sitemap.children.length === 1 ? '' : 's'}`}
             </button>
             {#if showChildren}
@@ -38,11 +38,11 @@
                 {#each sitemap.children as child, i (i)}
                   <li class="rounded-lg border border-white/40 bg-white/40 px-2 py-1 dark:border-white/10 dark:bg-white/5">
                     {#if safeHref(child.url)}
-                      <a href={safeHref(child.url)} target="_blank" rel="noopener noreferrer" class="block break-all text-[11px] text-indigo-600 hover:underline dark:text-indigo-300">{child.url}</a>
+                      <a href={safeHref(child.url)} target="_blank" rel="noopener noreferrer" class="block break-all text-[0.6875rem] text-indigo-600 hover:underline dark:text-indigo-300">{child.url}</a>
                     {:else}
-                      <span class="block break-all text-[11px] ms-muted" use:tooltip={'Not an http(s) URL'}>{child.url}<span class="sr-only"> (not an http(s) URL)</span></span>
+                      <span class="block break-all text-[0.6875rem] ms-muted" use:tooltip={'Not an http(s) URL'}>{child.url}<span class="sr-only"> (not an http(s) URL)</span></span>
                     {/if}
-                    <p class="text-[10px] ms-muted">
+                    <p class="text-[0.6875rem] ms-muted">
                       {#if child.error}
                         <span class={bandClasses('fail').ink}>{child.error}</span>
                       {:else}
@@ -61,7 +61,7 @@
         </p>
         {#if sitemap.sample.length > 0}
           <div class="space-y-1">
-            <p class="text-[10px] font-semibold uppercase tracking-wider ms-muted">Sample (first 10)</p>
+            <p class="text-[0.6875rem] font-semibold uppercase tracking-wider ms-muted">Sample (first 10)</p>
             <ul class="space-y-0.5">
               {#each sitemap.sample as s, i (i)}
                 <li>

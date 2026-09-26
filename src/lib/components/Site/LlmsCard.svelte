@@ -1,6 +1,7 @@
 <script lang="ts">
   import { safeHref } from '../../util/safe-href';
   import { tooltip } from '../../actions/tooltip';
+  import { bandClasses, CHIP_NEUTRAL } from '../../audit/band';
   import type { LlmsInfo } from '../../scrapers/SiteFiles';
 
   export let llms: LlmsInfo;
@@ -12,9 +13,9 @@
   <header class="flex items-center justify-between border-b border-white/40 px-4 py-2 dark:border-white/10">
     <h4 class="text-sm font-semibold text-slate-900 dark:text-slate-50">llms.txt</h4>
     {#if llms.present}
-      <span class="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">Found</span>
+      <span class="rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-wider {bandClasses('good').chip}">Found</span>
     {:else}
-      <span class="rounded-full bg-slate-400/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-600 dark:bg-slate-500/20 dark:text-slate-300">Not present</span>
+      <span class="rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-wider {CHIP_NEUTRAL}">Not present</span>
     {/if}
   </header>
   <div class="space-y-2 px-4 py-3 text-xs">
@@ -25,7 +26,7 @@
           <li>
             <p class="font-medium text-slate-900 dark:text-slate-100">{section.heading}</p>
             {#if section.links.length > 0}
-              <ul class="ml-3 mt-1 list-disc space-y-0.5 text-[11px] marker:text-muted dark:marker:text-muted-dark">
+              <ul class="ml-3 mt-1 list-disc space-y-0.5 text-[0.6875rem] marker:text-muted dark:marker:text-muted-dark">
                 {#each section.links as link, j (j)}
                   <li>
                     {#if safeHref(link.url)}
@@ -41,11 +42,11 @@
         {/each}
       </ul>
       {#if llms.raw}
-        <button type="button" on:click={() => (showRaw = !showRaw)} class="text-[10px] font-medium text-indigo-600 hover:underline dark:text-indigo-300">
+        <button type="button" on:click={() => (showRaw = !showRaw)} class="text-[0.6875rem] font-medium text-indigo-600 hover:underline dark:text-indigo-300">
           {showRaw ? 'Hide raw' : 'Show raw'}
         </button>
         {#if showRaw}
-          <pre class="max-h-48 overflow-auto rounded-lg bg-slate-900/80 p-2 text-[10px] text-slate-100 dark:bg-slate-950/80">{llms.raw}</pre>
+          <pre class="max-h-48 overflow-auto rounded-lg bg-slate-900/80 p-2 text-[0.6875rem] text-slate-100 dark:bg-slate-950/80">{llms.raw}</pre>
         {/if}
       {/if}
     {:else}

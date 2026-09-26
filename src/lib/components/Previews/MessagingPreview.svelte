@@ -9,7 +9,7 @@
   aria-label="Messaging preview (iMessage / WhatsApp)"
   class="overflow-hidden rounded-2xl border border-white/40 bg-white/60 shadow-md shadow-indigo-500/5 backdrop-blur-md dark:border-white/10 dark:bg-white/5"
 >
-  <header class="border-b border-white/40 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider ms-muted dark:border-white/10">
+  <header class="border-b border-white/40 px-4 py-2 text-[0.6875rem] font-semibold uppercase tracking-wider ms-muted dark:border-white/10">
     iMessage / WhatsApp
   </header>
   <div class="bg-emerald-50 p-3 dark:bg-emerald-950/30">
@@ -21,8 +21,8 @@
       {/if}
       <div class="space-y-0.5 px-3 py-2">
         <p class="line-clamp-2 text-sm font-semibold">{title}</p>
-        <p class="line-clamp-2 text-[11px] opacity-90">{description}</p>
-        <p class="text-[10px] opacity-80">{host}</p>
+        <p class="line-clamp-2 text-[0.6875rem] opacity-90">{description}</p>
+        <p class="text-[0.6875rem] opacity-80">{host}</p>
       </div>
     </div>
   </div>

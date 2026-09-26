@@ -32,7 +32,7 @@
   import { effectiveSettings } from "../cloud/plan";
   import { pushHistory } from "../storage/history";
   import { registerShortcuts, helpOpen } from "../components/Shortcuts/keyboard";
-  import { toolbarButtonClass, TOOLBAR_GROUP, FOCUS_RING } from "../components/toolbar";
+  import { toolbarButtonClass, TOOLBAR_GROUP, FOCUS_RING_ON_FILL } from "../components/toolbar";
   import CloudSync from "../components/CloudSync/CloudSync.svelte";
   import { tooltip } from "../actions/tooltip";
   import { cloudUser } from "../cloud/auth";
@@ -311,7 +311,7 @@
         <CloudSync />
 
         <div role="toolbar" aria-label="Extension controls" tabindex="-1" class={TOOLBAR_GROUP} on:keydown={onToolbarKey}>
-          <HistoryDropdown />
+          <HistoryDropdown onScan={() => void scrape()} />
 
           <button
             type="button"
@@ -394,7 +394,11 @@
       </aside>
     {/if}
 
-    <main class="flex min-h-0 flex-1 flex-col gap-4">
+    <!-- Every view but the results scrolls here (R3-10): at 200 % text in a 320 px panel the wrapped
+         header pushed "Scan this page" below the fold of the `h-screen overflow-hidden` shell, and a
+         pointer could not reach it. `-m-1 p-1` keeps the 4 px focus ring inside the scroll box.
+         Results keep their own scroll area between the tabs and Re-scan. -->
+    <main class="flex min-h-0 flex-1 flex-col gap-4 {view === 'results' ? '' : '-m-1 overflow-y-auto p-1'}">
     {#if view === "landing"}
       <div class="flex flex-col gap-1">
         <!-- Says what the extension does before asking for a click (R-38). -->
@@ -432,7 +436,7 @@
       <button
         type="button"
         on:click={retry}
-        class="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-indigo-500/30 transition hover:bg-indigo-700 motion-safe:active:scale-[0.99] dark:bg-indigo-600 dark:hover:bg-indigo-700 {FOCUS_RING}"
+        class="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-indigo-500/30 transition hover:bg-indigo-700 motion-safe:active:scale-[0.99] dark:bg-indigo-600 dark:hover:bg-indigo-700 {FOCUS_RING_ON_FILL}"
       >
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true">
           <path d="M3 12a9 9 0 0 1 15.5-6.4L21 8" />
