@@ -1,8 +1,9 @@
 /**
- * `prefers-reduced-motion` for the shell's Svelte transitions. CSS transitions are gated in
- * `src/routes/app.css`; every `fly` / `fade` / `scale` call (Settings drawer and its overlay, History
- * panel, shortcuts help and its overlay, toasts) takes `dur(ms)` so a user who asked for less motion
- * gets none.
+ * `prefers-reduced-motion` for the shell's Svelte transitions: every `fly` / `fade` / `scale` call
+ * (Settings drawer and its overlay, History panel, shortcuts help and its overlay, toasts) takes
+ * `dur(ms)`. The CSS half lives in `src/routes/app.css`: under reduce, every CSS transition and
+ * keyframe animation (spinners, skeleton pulse, ring sweep, colour fades) has 0 duration, and the
+ * movement utilities (hover lift, press scale, ring sweep) are `motion-safe:` where they are used.
  */
 export function reducedMotion(): boolean {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;

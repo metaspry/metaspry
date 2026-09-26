@@ -14,6 +14,7 @@
   import { tooltip } from "../../actions/tooltip";
   import { popover } from "../../actions/popover";
   import { FOCUS_RING } from "../toolbar";
+  import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../button";
   import {
     initCloudWorkspaces,
     workspaces,
@@ -152,7 +153,7 @@
       on:click={() => (open = !open)}
       aria-expanded={open}
       use:tooltip={"Sign in to sync scans to your account"}
-      class="flex h-9 shrink-0 items-center rounded-xl bg-indigo-600 px-3 text-xs font-semibold text-white shadow-sm shadow-indigo-500/30 transition hover:bg-indigo-500 {FOCUS_RING}"
+      class="{BUTTON_SECONDARY} shrink-0 whitespace-nowrap"
     >Sign in</button>
   {/if}
 
@@ -203,7 +204,7 @@
             <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-indigo-500/20 text-indigo-600 dark:text-indigo-300">
               <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
             </span>
-            <span class="min-w-0 flex-1 truncate text-slate-800 dark:text-slate-100">Personal history</span>
+            <span class="min-w-0 flex-1 truncate text-slate-800 dark:text-slate-100">Personal</span>
             {#if isPersonal}<span class="text-indigo-500" aria-hidden="true">✓</span>{/if}
           </button>
 
@@ -230,7 +231,7 @@
           <button
             type="button"
             on:click={out}
-            class="w-full rounded-full border border-white/40 bg-white/40 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-white/70 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 {FOCUS_RING}"
+            class="{BUTTON_SECONDARY} w-full"
             >Sign out</button
           >
         </div>
@@ -248,7 +249,7 @@
           </button>
         </div>
         <p class="ms-muted text-xs">
-          Sign in to save every scan to your history at app.metaspry.com.
+          Sign in to sync your scans to the Metaspry web app (free account: your 10 most recent).
         </p>
         <!-- A real form: labels, names and autocomplete let password managers fill it, and Enter in
              either field submits. -->
@@ -282,7 +283,7 @@
           <button
             type="submit"
             disabled={busy || !email.trim() || !password}
-            class="rounded-full bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-500 disabled:opacity-60 {FOCUS_RING}"
+            class={BUTTON_PRIMARY}
             >{busy ? "Signing in…" : "Sign in"}</button
           >
         </form>
@@ -290,7 +291,7 @@
           type="button"
           on:click={google}
           disabled={busy}
-          class="rounded-full border border-white/40 bg-white/60 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-white/80 disabled:opacity-60 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 {FOCUS_RING}"
+          class={BUTTON_SECONDARY}
           >Continue with Google</button
         >
         <p class="ms-muted text-[11px]">Same login as the web app.</p>

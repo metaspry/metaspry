@@ -1,6 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher, onMount } from 'svelte';
   import { FOCUS_RING } from '../toolbar';
+  import { BUTTON_PRIMARY } from '../button';
 
   /** Plain reason, from `describeScanError` or `unscriptableMessage`. */
   export let reason: string = 'Something went wrong while reading this page. Try again.';
@@ -40,7 +41,7 @@
   <button
     type="button"
     on:click={() => dispatch('retry')}
-    class="mt-2 rounded-full bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white shadow-md shadow-indigo-500/30 transition hover:bg-indigo-500 active:scale-[0.98] dark:bg-indigo-600 dark:hover:bg-indigo-500 {FOCUS_RING}"
+    class="{BUTTON_PRIMARY} mt-2 motion-safe:active:scale-[0.98]"
   >
     Retry
   </button>

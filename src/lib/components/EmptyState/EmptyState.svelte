@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
+  import { BUTTON_PRIMARY } from '../button';
   const dispatch = createEventDispatcher<{ retry: void }>();
 </script>
 
@@ -30,7 +31,7 @@
   <button
     type="button"
     on:click={() => dispatch('retry')}
-    class="mt-2 rounded-full bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white shadow-md shadow-indigo-500/30 transition hover:bg-indigo-500 active:scale-[0.98] dark:bg-indigo-600 dark:hover:bg-indigo-500"
+    class="{BUTTON_PRIMARY} mt-2 motion-safe:active:scale-[0.98]"
   >
     Try again
   </button>

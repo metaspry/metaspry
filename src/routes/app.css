@@ -78,6 +78,21 @@ html[data-mode="popup"] [data-bg-orb] {
   }
 }
 
+/* Reduced motion (P-18), the CSS half of `src/lib/motion.ts`: no CSS transition or keyframe animation
+ * runs (the spinners and the skeleton pulse stand still; colour changes snap). Movement itself - the
+ * landing tile's hover lift, the press scale, the score ring's sweep - is also `motion-safe:` at the
+ * call site, so nothing jumps either. Svelte transitions take `dur(ms)`. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0s !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 ::-webkit-scrollbar {
   @apply w-1.5;
 }

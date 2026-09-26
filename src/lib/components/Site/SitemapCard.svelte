@@ -2,6 +2,7 @@
   import { safeHref } from '../../util/safe-href';
   import { tooltip } from '../../actions/tooltip';
   import type { SitemapInfo } from '../../scrapers/SiteFiles';
+  import { bandClasses } from '../../audit/band';
 
   export let sitemap: SitemapInfo;
 
@@ -22,7 +23,7 @@
       {#if sitemap.isIndex}
         <p class="text-slate-700 dark:text-slate-300">
           Sitemap index · {sitemap.childCount} child sitemap{sitemap.childCount === 1 ? '' : 's'}
-          {#if sitemap.truncated}<span class="text-amber-600 dark:text-amber-400"> (showing first 20)</span>{/if}
+          {#if sitemap.truncated}<span class={bandClasses('warn').ink}> (showing first 20)</span>{/if}
           · {sitemap.budgetExhausted ? 'at least' : '~'}{sitemap.urlCount} total URL{sitemap.urlCount === 1
             ? ''
             : 's'}{sitemap.budgetExhausted ? ' (some child sitemaps not read)' : ''}
@@ -43,7 +44,7 @@
                     {/if}
                     <p class="text-[10px] ms-muted">
                       {#if child.error}
-                        <span class="text-rose-600 dark:text-rose-400">{child.error}</span>
+                        <span class={bandClasses('fail').ink}>{child.error}</span>
                       {:else}
                         {child.isIndex ? 'nested index · ' : ''}{child.urlCount} URL{child.urlCount === 1 ? '' : 's'}
                       {/if}
@@ -76,7 +77,7 @@
         {/if}
       {/if}
       {#if sitemap.error}
-        <p class="text-amber-600 dark:text-amber-400">{sitemap.error}</p>
+        <p class={bandClasses('warn').ink}>{sitemap.error}</p>
       {/if}
     {:else}
       <p class="ms-muted">{sitemap.error ?? 'No /sitemap.xml at this host.'}</p>

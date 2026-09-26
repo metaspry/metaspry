@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { bandClasses } from '../../audit/band';
+
   export let length: number;
   export let min: number;
   export let max: number;
@@ -8,16 +10,13 @@
   $: overflow = length > max;
   $: under = length < min;
 
-  $: barClass = overflow
-    ? 'bg-rose-500 dark:bg-rose-400'
-    : under
-      ? 'bg-amber-500 dark:bg-amber-400'
-      : 'bg-emerald-500 dark:bg-emerald-400';
+  // Band tokens (R2-29): over the max fails, under the min needs work.
+  $: barClass = bandClasses(overflow ? 'fail' : under ? 'warn' : 'good').fill;
 </script>
 
 <div class="flex items-center gap-2">
   <div class="relative h-1.5 w-full overflow-hidden rounded-full bg-slate-200/60 dark:bg-slate-700/40">
-    <div class="absolute inset-y-0 left-0 {barClass} transition-all" style="width: {pct}%" />
+    <div class="absolute inset-y-0 left-0 {barClass} motion-safe:transition-all" style="width: {pct}%" />
     {#if max > 0}
       <span class="pointer-events-none absolute inset-y-0" style="left: {Math.min(100, (min / max) * 100)}%; width: 1px; background: rgba(0,0,0,0.2);" />
     {/if}
