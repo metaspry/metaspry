@@ -4,7 +4,7 @@
   import { history, clearHistory } from '../../storage/history';
   import SiteIcon from '../SiteIcon/SiteIcon.svelte';
   import { toolbarButtonClass, FOCUS_RING, FOCUS_RING_INSET } from '../toolbar';
-  import { bandClasses, bandFor, scoreLabel } from '../../audit/band';
+  import { bandClasses, bandFor, scoreLabel, REQUIRED_FAILING } from '../../audit/band';
   import { tooltip } from '../../actions/tooltip';
   import { popover } from '../../actions/popover';
   import { dur } from '../../motion';
@@ -145,7 +145,8 @@
       {:else}
         <ul class="max-h-72 overflow-y-auto">
           {#each $history as entry (entry.timestamp)}
-            {@const label = scoreLabel(entry.score)}
+            {@const capRules = entry.requiredFailing ? REQUIRED_FAILING : undefined}
+            {@const label = scoreLabel(entry.score, capRules)}
             <li class="border-b border-slate-200 last:border-b-0 dark:border-white/10">
               <button
                 type="button"
@@ -180,7 +181,7 @@
                   role="img"
                   aria-label={label}
                   use:tooltip={label}
-                  class="shrink-0 rounded-full px-1.5 py-0.5 text-[0.6875rem] font-semibold tabular-nums {bandClasses(bandFor(entry.score)).chip}"
+                  class="shrink-0 rounded-full px-1.5 py-0.5 text-[0.6875rem] font-semibold tabular-nums {bandClasses(bandFor(entry.score, capRules)).chip}"
                 >{Math.round(entry.score)}</span>
               </button>
             </li>
