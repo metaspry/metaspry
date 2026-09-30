@@ -6,10 +6,41 @@
  */
 export type Band = 'good' | 'warn' | 'fail';
 
-export function bandFor(score: number): Band {
-  if (score >= 80) return 'good';
-  if (score >= 50) return 'warn';
-  return 'fail';
+/** A rule result as far as the band cap cares. `status` may also be `pending` (not a fail). */
+export interface BandRule {
+  severity?: string;
+  status?: string;
+}
+
+/** Does any rule with severity `required` have status `fail`? */
+export function hasFailingRequired(rules: readonly BandRule[] | null | undefined): boolean {
+  return (rules ?? []).some((r) => !!r && r.severity === 'required' && r.status === 'fail');
+}
+
+/** The required-fail cap (2026-09-30): `good` becomes `warn`; `warn` and `fail` are unchanged. */
+export function capBand(band: Band, requiredFailing: boolean): Band {
+  return requiredFailing && band === 'good' ? 'warn' : band;
+}
+
+/**
+ * Score band: 80+ good, 50-79 warn, under 50 fail; capped at `warn` when any `required` rule fails
+ * (a noindex page scoring 85 is not "healthy"). The score is unchanged. Same rule and unit-test
+ * table as the web app's `bandFor` and the server engine's `band()`.
+ */
+export function bandFor(score: number, rules?: readonly BandRule[] | null): Band {
+  const b: Band = score >= 80 ? 'good' : score >= 50 ? 'warn' : 'fail';
+  return capBand(b, hasFailingRequired(rules));
+}
+
+/** Stand-in rule list for a stored result that kept only "a required rule failed" (local History). */
+export const REQUIRED_FAILING: readonly BandRule[] = [{ severity: 'required', status: 'fail' }];
+
+/** Verdict / tooltip copy wherever a band was capped, so number and colour do not contradict. */
+export const CAPPED_BAND_REASON = 'Needs work: a required check is failing';
+
+/** True when the rules capped the band below what the score alone gives. */
+export function isCappedBand(score: number, rules?: readonly BandRule[] | null): boolean {
+  return bandFor(score) === 'good' && bandFor(score, rules) === 'warn';
 }
 
 /** The legend words, shared with the web app. */
@@ -17,9 +48,13 @@ export function bandLabel(band: Band): 'healthy' | 'needs work' | 'failing' {
   return band === 'good' ? 'healthy' : band === 'warn' ? 'needs work' : 'failing';
 }
 
-/** Accessible name for any rendered score. Band and number come from the same rounded value. */
-export function scoreLabel(score: number): string {
+/**
+ * Accessible name for any rendered score. Band and number come from the same rounded value; with
+ * the rules, a capped band says why ("Score 85 of 100, needs work: a required check is failing").
+ */
+export function scoreLabel(score: number, rules?: readonly BandRule[] | null): string {
   const n = Math.max(0, Math.min(100, Math.round(score)));
+  if (isCappedBand(n, rules)) return `Score ${n} of 100, ${CAPPED_BAND_REASON.toLowerCase()}`;
   return `Score ${n} of 100, ${bandLabel(bandFor(n))}`;
 }
 

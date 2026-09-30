@@ -31,6 +31,7 @@
   import type { Settings } from "../storage/settings";
   import { effectiveSettings } from "../cloud/plan";
   import { pushHistory } from "../storage/history";
+  import { hasFailingRequired } from "../audit/band";
   import { registerShortcuts, helpOpen } from "../components/Shortcuts/keyboard";
   import { toolbarButtonClass, TOOLBAR_GROUP, FOCUS_RING_ON_FILL } from "../components/toolbar";
   import CloudSync from "../components/CloudSync/CloudSync.svelte";
@@ -143,6 +144,7 @@
         score: finalResult.score,
         timestamp: Date.now(),
         ...(pageIcon ? { icon: pageIcon } : {}),
+        ...(hasFailingRequired(finalResult.rules) ? { requiredFailing: true } : {}),
       });
       // Cloud sync: if signed in, save this scan to the user's cloud history.
       const cu = get(cloudUser);
@@ -430,7 +432,7 @@
             <AeoView html={pageHtml} baseUrl={pageUrl} />
           {/key}
         {:else if activeTab === "compare"}
-          <CompareView leftMeta={pageMeta} leftUrl={pageUrl} leftScore={auditResult.score} />
+          <CompareView leftMeta={pageMeta} leftUrl={pageUrl} leftScore={auditResult.score} leftRules={auditResult.rules} />
         {/if}
       </div>
       <button

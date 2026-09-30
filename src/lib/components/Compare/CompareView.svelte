@@ -4,7 +4,7 @@
   import { audit } from '../../audit/rules';
   import { needsAsyncResolution, resolveAsyncRules } from '../../audit/asyncRules';
   import { effectiveSettings } from '../../cloud/plan';
-  import { bandClasses, bandFor, scoreLabel } from '../../audit/band';
+  import { bandClasses, bandFor, scoreLabel, type BandRule } from '../../audit/band';
   import { tooltip } from '../../actions/tooltip';
   import { diffMeta, type DiffRow } from './diff';
   import { sameUrl } from '../../audit/url-match';
@@ -13,6 +13,8 @@
   export let leftMeta: PageMeta;
   export let leftUrl: string;
   export let leftScore: number = 0;
+  /** The left side's rule results: a failing required rule caps its band at warn (band.ts). */
+  export let leftRules: readonly BandRule[] = [];
 
   /** Every fetch in this tab is bounded; a host that never answers used to hang it forever. */
   const FETCH_TIMEOUT_MS = 6000;
@@ -28,6 +30,7 @@
   let rightUrl = '';
   let rows: DiffRow[] = [];
   let rightScore = 0;
+  let rightRules: readonly BandRule[] = [];
   /** True when the left side is the rendered DOM and the right side is served HTML. */
   let mixedSources = false;
 
@@ -110,9 +113,11 @@
       rows = diffMeta(leftSource ?? leftMeta, meta);
       const initial = audit(meta, $effectiveSettings);
       rightScore = initial.score;
+      rightRules = initial.rules;
       if (needsAsyncResolution(initial, meta)) {
         const resolved = await resolveAsyncRules(initial, meta, $effectiveSettings);
         rightScore = resolved.score;
+        rightRules = resolved.rules;
       }
     } catch (err) {
       errorMessage = err instanceof Error ? err.message : String(err);
@@ -127,7 +132,7 @@
     return 'border-slate-200/60 bg-slate-50/40 dark:border-slate-700/40 dark:bg-slate-900/20';
   }
 
-  const scoreColor = (s: number): string => bandClasses(bandFor(s)).text;
+  const scoreColor = (s: number, rules: readonly BandRule[]): string => bandClasses(bandFor(s, rules)).text;
 </script>
 
 <div class="flex flex-col gap-3">
@@ -172,17 +177,17 @@
     {/if}
     <div class="grid grid-cols-2 gap-2">
       <!-- Label + url on the left, score on the right of the same card: the shared placement rule. -->
-      {#each [{ label: 'Current', url: leftUrl, score: leftScore }, { label: 'Compared', url: rightUrl, score: rightScore }] as card (card.label)}
+      {#each [{ label: 'Current', url: leftUrl, score: leftScore, rules: leftRules }, { label: 'Compared', url: rightUrl, score: rightScore, rules: rightRules }] as card (card.label)}
         <div class="flex items-center justify-between gap-2 rounded-xl border border-white/40 bg-white/40 px-3 py-2 backdrop-blur-md dark:border-white/10 dark:bg-white/5">
           <div class="min-w-0 flex-1">
             <p class="text-[0.6875rem] font-semibold uppercase tracking-wider ms-muted">{card.label}</p>
             <p class="truncate text-xs text-slate-700 dark:text-slate-300" use:tooltip={card.url}>{card.url}</p>
           </div>
           <p
-            class="shrink-0 text-lg font-bold tabular-nums {scoreColor(card.score)}"
+            class="shrink-0 text-lg font-bold tabular-nums {scoreColor(card.score, card.rules)}"
             role="img"
-            aria-label={scoreLabel(card.score)}
-            use:tooltip={scoreLabel(card.score)}
+            aria-label={scoreLabel(card.score, card.rules)}
+            use:tooltip={scoreLabel(card.score, card.rules)}
           >{card.score}</p>
         </div>
       {/each}

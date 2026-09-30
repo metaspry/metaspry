@@ -9,6 +9,8 @@ export interface HistoryEntry {
   timestamp: number;
   /** Resolved favicon URL (see `scrapers/icon.ts`). Absent on entries written before it existed. */
   icon?: string;
+  /** A required rule failed, so the band is capped at warn (band.ts). Absent = none or older entry. */
+  requiredFailing?: boolean;
 }
 
 const STORAGE_KEY = 'history';

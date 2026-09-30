@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { AuditResult, RuleResult, RuleSeverity } from '../../audit/AuditResult';
   import type { PageMeta } from '../../scrapers/PageMeta';
-  import { bandClasses, bandFor, bandForVerdict, scoreLabel } from '../../audit/band';
+  import { bandClasses, bandFor, bandForVerdict, scoreLabel, isCappedBand, CAPPED_BAND_REASON } from '../../audit/band';
   import { tooltip } from '../../actions/tooltip';
   import { FOCUS_RING } from '../toolbar';
   import { compareChangedHref } from '../../cloud/compare-link';
@@ -40,10 +40,11 @@
   const CIRC = 2 * Math.PI * RADIUS;
 
   $: dashOffset = CIRC * (1 - result.score / 100);
-  // Colour from the shared band helper (80 / 50), not from `result.band`, so the ring can never
-  // disagree with the History chip or the Compare numbers.
-  $: ringStroke = bandClasses(bandFor(result.score)).stroke;
-  $: ringLabel = scoreLabel(result.score);
+  // Colour from the shared band helper (80 / 50, capped at warn while a required rule fails), not
+  // from `result.band`, so the ring can never disagree with the History chip or the Compare numbers.
+  $: ringStroke = bandClasses(bandFor(result.score, result.rules)).stroke;
+  $: ringLabel = scoreLabel(result.score, result.rules);
+  $: capped = isCappedBand(result.score, result.rules);
 
   const SEVERITY_LABEL: Record<RuleSeverity, string> = {
     required: 'Required',
@@ -69,9 +70,14 @@
   <header class="flex items-center justify-between gap-4 rounded-2xl border border-white/40 bg-white/50 p-4 backdrop-blur-md dark:border-white/10 dark:bg-white/5">
     <div class="flex min-w-0 flex-1 flex-col">
       <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">SEO Health</h3>
-      <p class="text-xs ms-muted">
-        {result.hasPending ? 'Resolving async checks…' : 'Score weighted by rule severity.'}
-      </p>
+      {#if capped}
+        <!-- The required-fail cap (2026-09-30): an amber ring at 80+ says why. -->
+        <p class="text-xs font-medium {bandClasses('warn').ink}">{CAPPED_BAND_REASON}</p>
+      {:else}
+        <p class="text-xs ms-muted">
+          {result.hasPending ? 'Resolving async checks…' : 'Score weighted by rule severity.'}
+        </p>
+      {/if}
     </div>
     <div class="relative h-20 w-20 shrink-0" role="img" aria-label={ringLabel} use:tooltip={ringLabel}>
       <svg viewBox="0 0 80 80" class="h-full w-full -rotate-90" aria-hidden="true">

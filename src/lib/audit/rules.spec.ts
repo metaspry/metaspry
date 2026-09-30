@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { audit } from './rules';
+import { audit, rescoreAfterAsync } from './rules';
 import type { PageMeta } from '../scrapers/PageMeta';
 import type { RobotsInfo } from '../scrapers/getRobots';
 
@@ -111,5 +111,17 @@ describe('dup-tags and media-scoped duplicates', () => {
       tag('theme-color', '#bbb', '(prefers-color-scheme: dark)'),
     ]);
     expect(r?.status).toBe('warn');
+  });
+});
+
+describe('band cap (a failing required rule)', () => {
+  it('keeps the score but caps an otherwise healthy result at warning', () => {
+    const rules = audit(meta()).rules.map((r) => ({ ...r, status: r.id === 'noindex' ? ('fail' as const) : ('pass' as const) }));
+    const res = rescoreAfterAsync(rules);
+    expect(res.score).toBeGreaterThanOrEqual(80);
+    expect(res.band).toBe('warning');
+    const fixed = rescoreAfterAsync(rules.map((r) => ({ ...r, status: 'pass' as const })));
+    expect(fixed.score).toBe(100);
+    expect(fixed.band).toBe('success');
   });
 });

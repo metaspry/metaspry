@@ -9,6 +9,7 @@ import type {
 import type { Settings } from '../storage/settings';
 import { DEFAULT_SETTINGS } from '../storage/settings';
 import { sameUrl } from './url-match';
+import { bandFor } from './band';
 
 interface RuleDefinition {
   id: string;
@@ -315,10 +316,11 @@ function scoreFor(status: RuleStatus, severity: RuleSeverity, weights: Settings[
   return 0;
 }
 
-function band(score: number): ScoreBand {
-  if (score >= 80) return 'success';
-  if (score >= 50) return 'warning';
-  return 'danger';
+/** The result band, in this file's `success | warning | danger` names: `bandFor` (band.ts), which
+ *  caps it at warning while a required rule fails (2026-09-30). */
+function band(score: number, rules: readonly RuleResult[]): ScoreBand {
+  const b = bandFor(score, rules);
+  return b === 'good' ? 'success' : b === 'warn' ? 'warning' : 'danger';
 }
 
 export function audit(meta: PageMeta, settings: Settings = DEFAULT_SETTINGS): AuditResult {
@@ -342,7 +344,7 @@ export function audit(meta: PageMeta, settings: Settings = DEFAULT_SETTINGS): Au
 
   return {
     score,
-    band: band(score),
+    band: band(score, results),
     rules: results,
     hasPending: results.some((r) => r.status === 'pending'),
   };
@@ -355,7 +357,7 @@ export function rescoreAfterAsync(rules: RuleResult[], settings: Settings = DEFA
   const score = possible > 0 ? Math.round((earned / possible) * 100) : 0;
   return {
     score,
-    band: band(score),
+    band: band(score, rules),
     rules,
     hasPending: rules.some((r) => r.status === 'pending'),
   };

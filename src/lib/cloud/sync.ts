@@ -91,7 +91,8 @@ export function toScanPayload(
     workspaceId: null,
     // denormalized summary for the history list
     score: auditResult.score,
-    band: bandFor(auditResult.score),
+    // Capped at warn while a required rule fails (2026-09-30), same as the server engine.
+    band: bandFor(auditResult.score, auditResult.rules),
     pageMeta: {
       title: meta.title ?? undefined,
       description: tagValue('description'),
@@ -103,7 +104,7 @@ export function toScanPayload(
     },
     audit: {
       score: auditResult.score,
-      band: bandFor(auditResult.score),
+      band: bandFor(auditResult.score, auditResult.rules),
       rules: auditResult.rules.map((r) => ({
         id: r.id,
         label: r.title,
