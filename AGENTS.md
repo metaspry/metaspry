@@ -2,7 +2,7 @@
 
 Feature map for AI coding agents working in this repo. It describes only what `main` does.
 
-Verified against `origin/main` at `e9f0a0b` plus the `fix/ultra-ext-2026-09-25` changes (extension `1.0.26`) on 2026-09-25, against the batch D changes (`fix/ultra2-ext`, extension `1.0.27`) on 2026-09-26, against the round-3 batch 6 changes (`fix/ultra3-ext`, extension `1.0.28`) on 2026-09-26, and against the required-fail band cap (`feat/required-fail-band-cap`, extension `1.0.29`) on 2026-09-30. If this file and the code disagree, the code wins: fix this file in the same PR (section 6).
+Verified against `origin/main` at `e9f0a0b` plus the `fix/ultra-ext-2026-09-25` changes (extension `1.0.26`) on 2026-09-25, against the batch D changes (`fix/ultra2-ext`, extension `1.0.27`) on 2026-09-26, against the round-3 batch 6 changes (`fix/ultra3-ext`, extension `1.0.28`) on 2026-09-26, against the required-fail band cap (`feat/required-fail-band-cap`, extension `1.0.29`) on 2026-09-30, and against the auth web-extension entry (`fix/auth-web-extension`, extension `1.0.30`) on 2026-10-01. If this file and the code disagree, the code wins: fix this file in the same PR (section 6).
 
 ---
 
@@ -24,7 +24,7 @@ It is one of three sibling repositories:
 |---|---|
 | UI | Svelte `^4.0.5`; components use `<script lang="ts">` |
 | App shell | SvelteKit `^1.27.4` + `@sveltejs/adapter-static` `^2.0.3`, `appDir: 'app'`, `prerender = true` |
-| Build | Vite `^4.4.2`, then `removeInlineScript.cjs` (MV3 CSP fix-up) |
+| Build | Vite `^4.4.2`, then `removeInlineScript.cjs` (MV3 CSP fix-up), then `scripts/check-remote-code.mjs` (remote-code guard) |
 | Styling | Tailwind CSS `^3.3.5` (`darkMode: 'class'`), PostCSS, Autoprefixer |
 | Cloud | Firebase JS SDK `^12.15.0` (Auth + Firestore) |
 | Tooltips | `@floating-ui/dom` `^1.8.0` (bundled by Vite; positions the `use:tooltip` element, 3.17) |
@@ -38,7 +38,7 @@ It is one of three sibling repositories:
 
 | Task | Command | Notes |
 |---|---|---|
-| Build | `npm run build` | `vite build && node removeInlineScript.cjs`; output in `build/` |
+| Build | `npm run build` | `vite build && node removeInlineScript.cjs && node scripts/check-remote-code.mjs`; output in `build/` |
 | Run it | `chrome://extensions` -> Developer mode -> Load unpacked -> `build/` | The only way to exercise the extension end to end |
 | Rebuild on change | `npm run watch-src` | nodemon watches `src` with `--ext svelte` only; editing a `.ts` file does not trigger a rebuild |
 | Dev server | `npm run dev` | Runs in a normal tab with no `chrome.*` APIs: scraping fails and storage-backed stores use defaults. Layout work only. |
@@ -137,6 +137,7 @@ This is the complete inventory. There are no ports (`runtime.connect`), no conte
 | `src/lib/components/` | One folder per UI feature: `Aeo`, `Audit`, `Card`, `Categories`, `CloudSync`, `Compare`, `EmptyState`, `ErrorState`, `Exporters`, `Grid`, `History`, `Preview`, `Previews`, `Screen`, `Settings`, `Shortcuts`, `Site`, `SiteIcon`, `Skeleton`, `Tabs`, `Toast` |
 | `src/lib/index.js` | Empty `$lib` barrel placeholder |
 | `removeInlineScript.cjs` | Post-build CSP fixer |
+| `scripts/check-remote-code.mjs` | Post-build guard: fails the build if `build/` references a remote script loader (4.1) |
 | `scripts/` | Node asset generators |
 | `promo/` | Store promo tiles and screenshots (`raw-screenshots/` holds the unprocessed captures) |
 | `docs/` | Store runbooks: `chrome-store-resubmit.md`, `store-screenshots.md` |
@@ -163,7 +164,7 @@ This is the complete inventory. There are no ports (`runtime.connect`), no conte
 
 Other storage:
 
-- **IndexedDB (extension origin):** the Firebase Auth session (SDK default persistence), shared by popup and side panel.
+- **IndexedDB (extension origin):** the Firebase Auth session (`firebase/auth/web-extension`'s `getAuth` persists in IndexedDB only, the same `firebaseLocalStorageDb` store the default entry used), shared by popup and side panel.
 - **Firestore:** see section 5. Firestore runs with the default in-memory cache (no offline persistence).
 
 Each store module persists through `store.subscribe(writeStorage)`, which also fires once at init with the value just read. Every storage module is a no-op when `chrome` is undefined (dev server).
@@ -187,7 +188,7 @@ Each feature lists: purpose and user flow, key files, data and storage, permissi
 
 ### 3.1 Manifest and permissions
 
-**Purpose.** `static/manifest.json` declares the extension: MV3, name `Metaspry`, version `1.0.29`, `minimum_chrome_version: "114"`, `offline_enabled: true`.
+**Purpose.** `static/manifest.json` declares the extension: MV3, name `Metaspry`, version `1.0.30`, `minimum_chrome_version: "114"`, `offline_enabled: true`.
 
 - `background.service_worker`: `scripts/background.js` (classic script; no `"type": "module"`).
 - `side_panel.default_path`: `index.html`.
@@ -561,7 +562,7 @@ Checks in `src/lib/audit/aeo.ts`:
 
 **Purpose and flow.** The header's account control (`CloudSync.svelte`) is a secondary (`BUTTON_SECONDARY`, 3.17) "Sign in" button when signed out - the landing "Scan this page" tile is the view's one primary (T-07) - and, when signed in, an initials circle (`initialsFor(email)`, `src/lib/cloud/initials.ts`) with a green dot, the sync target's name (hidden below 460 px) and a chevron; both expose `aria-expanded`. Its dropdown (and History's) is positioned against the header's right-hand block in `Extension.svelte`, not against its own button, so it stays inside a narrow side panel. The dropdown is one `role="dialog"` panel run by `use:popover` (3.17): focus lands on the email field (signed out) or the first item (signed in), Escape or a press outside closes it (there is no click-away backdrop button any more), and focus returns to the account control. Signed out, it offers a real `<form>` with labelled "Email" (`name="email"`, `autocomplete="email"`) and "Password" (`name="password"`, `autocomplete="current-password"`) fields (Enter submits), "Continue with Google", "Same login as the web app.", a visible Close (x) button beside the title, the line "Sign in to sync your scans to the Metaspry web app (free account: your 10 most recent)." (the app's `FREE_HISTORY_LIMIT`), `BUTTON_PRIMARY` "Sign in" and `BUTTON_SECONDARY` "Continue with Google" / "Sign out", and two 24 px links into the web app (new tab): **Create an account** -> `${APP_URL}/signup` and **Forgot password?** -> `${APP_URL}/login` (the app's reset lives on its sign-in page as a button that needs the email; there is no reset query parameter). Fields are `.ms-input` (3.17). The panel is `.ms-popover`; "Open Metaspry web app" and the target items are `.ms-menu-item` (the picked one `aria-checked` tinted). The target menu is `aria-label="Save new scans to"` (KB3-13: named by its CSS-uppercased line it was announced "SAVE NEW SCANS TO"; that line is `aria-hidden`). The signed-out Close is 32 px (K3-15). The "signed in" / "Synced" dots are `emerald-600` / `dark:emerald-400` (C3-15; `emerald-500` was 2.25:1). Signed in, it shows the email, "Open Metaspry web app" (new tab, `app.metaspry.com/dashboard`), the sync target picker (3.14) and "Sign out". Every button in it carries `FOCUS_RING` (3.17).
 
-- `cloud/firebase.ts` initialises Firebase from the public web config (project `metaspry`). Firestore uses `ignoreUndefinedProperties: true`.
+- `cloud/firebase.ts` initialises Firebase from the public web config (project `metaspry`). Firestore uses `ignoreUndefinedProperties: true`. Auth is imported from `firebase/auth/web-extension` (both `firebase.ts` and `auth.ts`), never `firebase/auth`: that entry has every API used here (email/password, `signInWithCredential` + `GoogleAuthProvider.credential`, `onAuthStateChanged`, `signOut`) and none of the popup/redirect/reCAPTCHA code. Its public `.d.ts` (Firebase 12.15) declares `Auth` and `User` without exporting them, so `firebase.ts` derives and exports them (`ReturnType<typeof getAuth>`, `NonNullable<Auth['currentUser']>`).
 - Email and password: `signInWithEmailAndPassword`.
 - Google: `chrome.identity.launchWebAuthFlow` against Google's OAuth endpoint (`response_type=id_token`, `scope=openid email profile`, a random nonce, `prompt=select_account`) with the Web application OAuth client `540366408211-dgqe276vt9j1b9oin5i27orh30q0js4d.apps.googleusercontent.com`. The returned `id_token` becomes a Firebase `GoogleAuthProvider` credential.
 - `cloudUser` and `cloudReady` stores follow `onAuthStateChanged`.
@@ -573,12 +574,12 @@ Checks in `src/lib/audit/aeo.ts`:
 
 **Permissions.** `identity`.
 
-**Tests.** `src/lib/cloud/initials.spec.ts` (initials from the email). Sign-in itself: none.
+**Tests.** `src/lib/cloud/initials.spec.ts` (initials from the email); `src/lib/cloud/auth-entry.spec.ts` (no source file imports the default `firebase/auth` entry; `scripts/check-remote-code.mjs` passes a clean dir and fails on each loader URL). Sign-in itself: no unit test; verified by hand against the Auth + Firestore emulators for 1.0.30 (email sign-in, wrong-password message, sign-out, session kept across closing and reopening the extension page, a scan written to `users/{uid}/scans` under the rules).
 
 **Gotchas.**
 - The redirect URI is `https://<extension-id>.chromiumapp.org/`, and it must be listed in that OAuth client's authorised redirect URIs. Unpacked builds have their own extension ID, so each needs its own entry. A "Chrome Extension" OAuth client type does not work here (comment in `auth.ts`; history in commits `77cd51f` to `9703b91`).
 - Sign-in errors go through `signInErrorMessage` (`cloud/auth-errors.ts`, specced): unknown user -> "No account with that email - create one on the web app.", wrong password -> "Wrong password...", `auth/invalid-credential` (what current Firebase returns for BOTH, email-enumeration protection) -> "Wrong email or password. No account yet? Create one on the web app.", network -> "Couldn't reach Metaspry...", plus invalid email, too many requests, disabled; never the raw code. Google failures go through `googleSignInErrorMessage` ("Google sign-in was cancelled." or a plain retry sentence). The message is `role="alert"`.
-- The bundle imports the default `firebase/auth` entry (see the store-review note in 4.4).
+- Never import `firebase/auth` (the default entry): it bundles the gapi and reCAPTCHA loader URLs, a store-review remote-code trigger. `auth-entry.spec.ts` and the build guard (4.1) both fail on it. Popup/redirect sign-in and phone/reCAPTCHA APIs are not available in the web-extension entry; Google stays on `launchWebAuthFlow`.
 - **Settings reset on every auth change, sign-out included** (`src/lib/cloud/settings.ts`
   `resolveSettingsForAuth`). The reset happens FIRST, before any cloud load, mirroring what
   `cloud/plan.ts` does for the plan: without it, signing out of account A and into account B left A's
@@ -679,9 +680,9 @@ The help modal (`ShortcutsHelp.svelte`) is `role="dialog" aria-modal="true"`, la
 | --- | --- |
 | `npm test` | Vitest, co-located `*.spec.ts` (`--run` for one pass, `npm run test:watch` to watch). |
 | `npm run check` | `svelte-check` against `tsconfig.json`. |
-| `npm run build` | `vite build` + `removeInlineScript.cjs`. Does not type-check on its own. |
+| `npm run build` | `vite build` + `removeInlineScript.cjs` + `scripts/check-remote-code.mjs` (fails on remote script loaders). Does not type-check on its own. |
 
-- Covered by unit tests: `cloud/sync.ts` (`sync.spec.ts`, in-memory Firestore mock), `cloud/compare-link.ts`, `cloud/auth-errors.ts`, `cloud/workspace-scoring.ts` (resolution, normalisation, entitlement), `scrapers/scan-error.ts`, `components/Shortcuts/keyboard.ts` (`shortcutFor`), `audit/band.ts` (bands, the required-fail cap table, labels, light hues, `fill` / `ink`, `bandForVerdict`), `components/Toast/toast.ts` (`toast.spec.ts`: `toastDuration` at the app's 3.5 s base, per-toast expiry, dismiss, the cap of 3), `util/time-ago.ts`, `actions/tooltip.ts` (`tooltip.spec.ts`: options and listener wiring in node with a fake element; `tooltip.dom.spec.ts`: show/hide, owner hand-off, `aria-describedby`, Escape propagation, nested hover, the hover grace and the bubble bridge, `is-open`, update/destroy in happy-dom with floating-ui mocked), `actions/popover.ts` (`popover.spec.ts`: listener wiring, Escape, outside press, focus in / return, trigger swap, Tab cycling in node with a fake element and document; `popover.dom.spec.ts`: the same against real elements in happy-dom), `motion.ts` (`motion.spec.ts`), `audit/rules.ts`, `audit/asyncRules.ts`, `audit/url-match.ts`,
+- Covered by unit tests: `cloud/sync.ts` (`sync.spec.ts`, in-memory Firestore mock), `cloud/compare-link.ts`, `cloud/auth-errors.ts`, `cloud/workspace-scoring.ts` (resolution, normalisation, entitlement), `scrapers/scan-error.ts`, `components/Shortcuts/keyboard.ts` (`shortcutFor`), `audit/band.ts` (bands, the required-fail cap table, labels, light hues, `fill` / `ink`, `bandForVerdict`), `components/Toast/toast.ts` (`toast.spec.ts`: `toastDuration` at the app's 3.5 s base, per-toast expiry, dismiss, the cap of 3), `util/time-ago.ts`, `actions/tooltip.ts` (`tooltip.spec.ts`: options and listener wiring in node with a fake element; `tooltip.dom.spec.ts`: show/hide, owner hand-off, `aria-describedby`, Escape propagation, nested hover, the hover grace and the bubble bridge, `is-open`, update/destroy in happy-dom with floating-ui mocked), `actions/popover.ts` (`popover.spec.ts`: listener wiring, Escape, outside press, focus in / return, trigger swap, Tab cycling in node with a fake element and document; `popover.dom.spec.ts`: the same against real elements in happy-dom), `motion.ts` (`motion.spec.ts`), the auth entry and `scripts/check-remote-code.mjs` (`cloud/auth-entry.spec.ts`), `audit/rules.ts`, `audit/asyncRules.ts`, `audit/url-match.ts`,
   `cloud/scan-identity.ts`, `cloud/settings.ts`, `scrapers/getHTML.ts`, `scrapers/getRobots.ts`,
   `scrapers/getHeaderRobots.ts`, `storage/watch.ts` and its key helper.
 - Manual verification is still required for anything that needs a real browser: `npm run build`, load
@@ -696,17 +697,18 @@ The help modal (`ShortcutsHelp.svelte`) is `role="dialog" aria-modal="true"`, la
 
 1. `vite build`: SvelteKit with `adapter-static` prerenders `src/routes/+page.svelte` into `build/index.html`, emits JS and CSS under `build/app/immutable/`, and copies `static/` into `build/`.
 2. `node removeInlineScript.cjs`: MV3 extension pages forbid inline scripts, so for every `build/**/*.html` it moves the first inline `<script>` (SvelteKit's bootstrap) into `build/script-<hash>.js` and replaces it with `<script type="module" src="/script-<hash>.js">`. While moving it, it rewrites `__sveltekit` to `const __sveltekit` and `document.currentScript.parentElement` to `document.body.firstElementChild`, which is the `display: contents` wrapper in `src/app.html`.
+3. `node scripts/check-remote-code.mjs`: walks `build/` and exits 1, naming file and URL, if any file contains `apis.google.com/js/api.js`, `google.com/recaptcha/api.js` or `google.com/recaptcha/enterprise.js` (remote script loaders that store review treats as remotely hosted code). `node scripts/check-remote-code.mjs <dir>` checks another folder, for example an unpacked zip.
 
 **Gotchas.**
 - Keep the wrapper `<div>` as the first element child of `<body>` in `src/app.html`, or the app mounts into the wrong node.
 - The glob option is spelled `aboslute: true` deliberately. "Fixing" it to `absolute: true` breaks the build (see the comment in the file).
 - The regex handles one inline script per HTML file.
-- Vite prints a chunk-size warning: the page chunk is about 0.9 MB, mostly Firebase. This is expected.
+- Vite prints a chunk-size warning: the page chunk is about 0.95 MB, mostly Firebase. This is expected.
 - TypeScript is transpiled, not type-checked.
 
 ### 4.2 Versioning
 
-- The version lives in two files that must match: `version` in `static/manifest.json` and in `package.json` (both `1.0.29` on this branch; the v1.0.26, v1.0.27, v1.0.28 and v1.0.29 zips are built, none submitted yet, so the store serves `1.0.25`). No script syncs them.
+- The version lives in two files that must match: `version` in `static/manifest.json` and in `package.json` (both `1.0.30` on this branch; the v1.0.26 to v1.0.30 zips are built, none submitted yet, so the store serves `1.0.25`). No script syncs them.
 - Convention from the git history: each shipped change bumps the patch version and gets a new zip (commit messages like "v1.0.22 + zip").
 - The repo has no git tags, although the README checklist ends with "tag the commit `vX.Y.Z`".
 
@@ -743,8 +745,9 @@ Store item ID: `kibedpkbadcofhbcpfigjmjanmdkmaji`. Privacy policy URL: `https://
 - **1.0.26 is skipped (founder, 2026-09-26).** `metaspry-v1.0.26.zip` was built but never submitted; the next store submission is `metaspry-v1.0.27.zip` (1.0.25 -> 1.0.27), which carries every 1.0.26 change. Keep the 1.0.26 zip (never delete old zips).
 - **1.0.28 (round-3 batch 6) waits for 1.0.27 (A-1).** `metaspry-v1.0.28.zip` is built but must not be submitted until 1.0.27 is live in the store.
 - **1.0.29 (required-fail band cap, 2026-09-30).** Release notes: a page with a failing Required check (for example noindex) now shows as "Needs work" instead of "Healthy", whatever its score; the score number is unchanged. The Audit ring turns amber and its caption reads "Needs work: a required check is failing"; the History chip, the Compare numbers and the uploaded scan's `band` are capped the same way. `metaspry-v1.0.29.zip` is built; it carries 1.0.28's changes, so it can replace 1.0.28 in the queue after 1.0.27 is live.
+- **1.0.30 (auth web-extension entry, 2026-10-01) replaces 1.0.29 in the queue**, still only after 1.0.27 is live. Release note: "Sign-in uses Firebase's extension build; no change for users." `metaspry-v1.0.30.zip` is built and carries every 1.0.28 and 1.0.29 change. Keep the 1.0.29 zip.
 - The README's listing copy, permission justifications and privacy answers were reconciled with sign-in and upload for v1.0.26, carried into v1.0.27 (six tabs, 19 rules, `identity` row, "Authentication info: Yes, only when signed in", Free 10 / Pro 50 + 20 versions). Re-read `static/manifest.json` the day you submit. The v1.0.26 landing changed the store screenshots' first frame: refresh them with this release.
-- The shipped bundle contains the strings `https://apis.google.com/js/api.js` and `https://www.google.com/recaptcha/api.js`, which come from the default `firebase/auth` entry. Store review for MV3 checks for remotely hosted code, and these URLs are a commonly reported rejection trigger for extensions that use `firebase/auth`. The installed Firebase version also ships a `firebase/auth/web-extension` entry intended for extensions.
+- **Resolved in 1.0.30:** bundles up to 1.0.29 contain `https://apis.google.com/js/api.js` and `https://www.google.com/recaptcha/api.js` (and `recaptcha/enterprise.js`) from the default `firebase/auth` entry, a commonly reported MV3 remote-code rejection trigger. 1.0.30 imports `firebase/auth/web-extension`, its bundle has none of them, and `npm run build` now fails if one comes back (4.1). 1.0.27 (the next submission) still carries the strings.
 - `docs/chrome-store-resubmit.md` is a record from the v1.0.5 era; its version numbers are historical.
 
 ### 4.5 UI vocabulary

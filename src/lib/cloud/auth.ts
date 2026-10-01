@@ -1,6 +1,7 @@
 /**
  * Cloud auth state for the extension. Same account as the web app. Email/password +
- * Google sign-in (chrome.identity launchWebAuthFlow -> Firebase credential).
+ * Google sign-in (chrome.identity launchWebAuthFlow -> Firebase credential). Imports the
+ * `firebase/auth/web-extension` entry (no popup/redirect/reCAPTCHA; see firebase.ts).
  */
 import { writable } from 'svelte/store';
 import {
@@ -9,9 +10,8 @@ import {
   signInWithCredential,
   signInWithEmailAndPassword,
   signOut as fbSignOut,
-  type User,
-} from 'firebase/auth';
-import { fbAuth } from './firebase';
+} from 'firebase/auth/web-extension';
+import { fbAuth, type User } from './firebase';
 
 // OAuth 2.0 *Web application* client (Google Cloud project "metaspry"). The chrome.identity
 // redirect (https://<extension-id>.chromiumapp.org/) must be added to this client's

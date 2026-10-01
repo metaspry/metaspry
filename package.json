@@ -1,10 +1,10 @@
 {
 	"name": "metaspry",
-	"version": "1.0.29",
+	"version": "1.0.30",
 	"private": true,
 	"scripts": {
 		"dev": "vite dev",
-		"build": "vite build && node removeInlineScript.cjs",
+		"build": "vite build && node removeInlineScript.cjs && node scripts/check-remote-code.mjs",
 		"preview": "vite preview",
 		"watch-src": "nodemon --watch src --ext svelte --exec \"npm run build\"",
 		"gen-icons": "node scripts/gen-icons.mjs",
