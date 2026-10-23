@@ -9,10 +9,16 @@ const source = readFileSync(join(process.cwd(), 'static/scripts/background.js'),
 type Tab = { id?: number; url?: string; favIconUrl?: string };
 type Listener = (request: unknown, sender: unknown, sendResponse: (r: unknown) => void) => unknown;
 
-function loadBackground(tabs: Tab[] | undefined, injected: unknown) {
+function loadBackground(tabs: Tab[] | undefined, injected: unknown, opts: { throwSync?: boolean } = {}) {
   let onMessage: Listener | undefined;
   const noopEvent = { addListener: () => {} };
-  const executeScript = vi.fn((_opts: unknown, cb: (r: unknown) => void) => cb(injected));
+  // Chrome runs the completion callback later, outside the handler's try/catch; so does this fake,
+  // or a throw in the callback would be caught and passed off as the `unscriptable` answer.
+  const executeScript = vi.fn((_opts: unknown, cb: (r: unknown) => void) => {
+    if (opts.throwSync) throw new Error('bad arguments');
+    queueMicrotask(() => cb(injected));
+  });
+  const query = vi.fn((_q: unknown, cb: (t: Tab[] | undefined) => void) => cb(tabs));
   const chrome = {
     action: { setPopup: () => {}, openPopup: () => Promise.resolve() },
     sidePanel: { setPanelBehavior: () => Promise.resolve(), open: () => Promise.resolve() },
@@ -24,15 +30,16 @@ function loadBackground(tabs: Tab[] | undefined, injected: unknown) {
       onStartup: noopEvent,
       onMessage: { addListener: (fn: Listener) => { onMessage = fn; } },
     },
-    tabs: { query: (_q: unknown, cb: (t: Tab[] | undefined) => void) => cb(tabs) },
+    tabs: { query },
     scripting: { executeScript },
   };
   new Function('chrome', source)(chrome);
   return {
     executeScript,
-    ask(): Promise<Record<string, unknown>> {
+    query,
+    ask(request: Record<string, unknown> = { message: 'getHTML', windowId: 7 }): Promise<Record<string, unknown>> {
       return new Promise((resolve) => {
-        onMessage?.({ message: 'getHTML', windowId: 7 }, {}, (r) => resolve(r as Record<string, unknown>));
+        onMessage?.(request, {}, (r) => resolve(r as Record<string, unknown>));
       });
     },
   };
@@ -70,6 +77,21 @@ describe('background getHTML handler', () => {
   it('answers unscriptable when the injection returns nothing', async () => {
     const bg = loadBackground([tabA], undefined);
     expect(await bg.ask()).toMatchObject({ html: null, url: 'https://a.com/', reason: 'unscriptable' });
+  });
+
+  it('answers unscriptable when executeScript throws synchronously', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const bg = loadBackground([tabA], undefined, { throwSync: true });
+    expect(await bg.ask()).toMatchObject({ html: null, url: 'https://a.com/', reason: 'unscriptable' });
+    warn.mockRestore();
+  });
+
+  it("queries the asking page's window, else the last-focused window", async () => {
+    const bg = loadBackground([tabA], [{ result: { html: '<html></html>' } }]);
+    await bg.ask();
+    expect(bg.query.mock.calls[0]?.[0]).toEqual({ active: true, windowId: 7 });
+    await bg.ask({ message: 'getHTML' });
+    expect(bg.query.mock.calls[1]?.[0]).toEqual({ active: true, lastFocusedWindow: true });
   });
 
   it('answers no-tab when tabs.query yields undefined', async () => {

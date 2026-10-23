@@ -64,6 +64,8 @@ describe('restrictedKind', () => {
     expect(restrictedKind('https://acme.com/?ref=chromewebstore.google.com')).toBeNull();
     expect(restrictedKind('https://www.google.com/search?q=annual+report.pdf')).toBeNull();
     expect(restrictedKind('not a url')).toBeNull();
+    expect(restrictedKind('https://chrome.google.com/intl/en/chrome/')).toBeNull();
+    expect(restrictedKind('https://evil-chromewebstore.google.com.example/detail/x')).toBeNull();
   });
 });
 
