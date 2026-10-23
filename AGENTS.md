@@ -315,7 +315,7 @@ in the payload as metadata.
 
 **Data.** In memory only (`pageMeta`, `pageHtml`, `auditResult`, `scannedUrl`, `activeUrl`).
 
-**Permissions.** `tabs`, `activeTab`, `scripting`, host `*://*/*`. `tab.favIconUrl` needs only the host permission. Tab tracking reads `tab.url` of tabs the user has not scanned, which needs `tabs` (or a host grant); without it `tabState` degrades to `unknown`. No `webNavigation`.
+**Permissions.** `tabs`, `scripting`, host `*://*/*` (no `activeTab`; the manifest does not declare it). `tab.favIconUrl` needs only the host permission. Tab tracking reads `tab.url` of tabs the user has not scanned, which needs `tabs` (or a host grant); without it `tabState` degrades to `unknown`. No `webNavigation`.
 
 **Tests.** `src/lib/scrapers/icon.spec.ts` (resolution order, skipped schemes, non-http page); `src/lib/tabs/follow-tab.spec.ts` (`tabState` cases, `displayUrl`, `followActiveTab` window / `url` / active filtering, `onReplaced`, out-of-order answers, unsubscribe); `getHTML.spec.ts` (`restrictedKind` incl. query-string false positives, `windowId` sent or omitted); `background-gethtml.spec.ts` (runs `static/scripts/background.js` against a fake `chrome`: document URL labels the result, favicon dropped on a moved document, `unscriptable`, `no-tab`); the scrapers listed in 3.18. The banner itself: by hand (tab switch, same-tab link, SPA route, `chrome://`, scan in flight, two windows).
 
@@ -661,7 +661,7 @@ Checks in `src/lib/audit/aeo.ts`:
 **Purpose and flow.** Keys are ignored while typing in an input, textarea, select or contenteditable element:
 - `/` focuses the tag search (switching to Tags).
 - `?` toggles the help modal.
-- `r` re-scans (ignored while results are shown and the tab is one Chrome blocks, 3.4).
+- `r` re-scans (ignored while results are shown and the tab is one Chrome blocks, 3.4; so is History's empty-state "Scan this page").
 - `1` to `6` select tabs by position: Tags, Previews, Audit, Site, AI, Compare.
 
 In the tab strip, Arrow Left/Right, Home and End move between tabs. `Esc` closes every open layer: the Settings drawer, the help modal, the History panel and the account popover (the last three through `use:popover`, 3.17), each returning focus to the control that opened it. `Esc` also hides a visible tooltip (3.17); neither the tooltip's handler nor the popover action calls `stopPropagation`, so one press hides the tooltip and closes whatever is open behind it. While the Settings drawer or the help modal is open, Tab and Shift+Tab cycle inside it (`cycleTab` in `src/lib/actions/popover.ts`; 3.8).

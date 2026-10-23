@@ -361,7 +361,7 @@
         <CloudSync />
 
         <div role="toolbar" aria-label="Extension controls" tabindex="-1" class={TOOLBAR_GROUP} on:keydown={onToolbarKey}>
-          <HistoryDropdown onScan={() => void scrape()} />
+          <HistoryDropdown onScan={() => { if (!blockRescan) void scrape(); }} />
 
           <button
             type="button"
