@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { getHTML, restrictedKind, unscriptableMessage } from './getHTML';
+import { CAPTURE_TIMEOUT_MS, getHTML, restrictedKind, unscriptableMessage } from './getHTML';
 
 describe('unscriptableMessage', () => {
   it('names a browser settings page', () => {
@@ -94,5 +94,42 @@ describe('getHTML request', () => {
     expect(sendMessage.mock.calls[0]?.[0]).toEqual({ message: 'getHTML' });
     expect(Object.keys(sendMessage.mock.calls[0]?.[0] as object)).not.toContain('windowId');
     expect(page.reason).toBe('no-tab');
+  });
+
+  describe('capture timeout', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('rejects when the background never answers', async () => {
+      vi.useFakeTimers();
+      vi.stubGlobal('chrome', { runtime: { sendMessage: vi.fn(), lastError: undefined } });
+      const page = getHTML(1);
+      const settled = expect(page).rejects.toThrow('Timed out waiting for the page after 15 s.');
+      await vi.advanceTimersByTimeAsync(CAPTURE_TIMEOUT_MS);
+      await settled;
+    });
+
+    it('ignores an answer that arrives after the timeout', async () => {
+      vi.useFakeTimers();
+      let answer: ((r: unknown) => void) | undefined;
+      const sendMessage = vi.fn((_msg: unknown, cb: (r: unknown) => void) => {
+        answer = cb;
+      });
+      vi.stubGlobal('chrome', { runtime: { sendMessage, lastError: undefined } });
+      const page = getHTML(1, 1000);
+      const settled = expect(page).rejects.toThrow('Timed out');
+      await vi.advanceTimersByTimeAsync(1000);
+      await settled;
+      expect(() => answer?.({ html: '<html></html>', url: 'https://a.com/' })).not.toThrow();
+    });
+
+    it('does not fire after a prompt answer', async () => {
+      vi.useFakeTimers();
+      stubChrome({ html: null, url: 'https://a.com/', reason: 'unscriptable' });
+      const page = await getHTML(1);
+      expect(page.reason).toBe('unscriptable');
+      expect(vi.getTimerCount()).toBe(0);
+    });
   });
 });

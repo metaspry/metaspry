@@ -15,6 +15,12 @@ describe('describeScanError', () => {
     expect(describeScanError(new Error('No response from background script.')).reason).toBe(BLOCKED_PAGE_REASON);
   });
 
+  it('explains a capture timeout', () => {
+    const r = describeScanError(new Error('Timed out waiting for the page after 15 s.'));
+    expect(r.reason).toContain("didn't answer in time");
+    expect(r.reason).toContain('dialog');
+  });
+
   it('names a permission problem', () => {
     expect(describeScanError(new Error('Cannot access contents of the page.')).reason).toContain("doesn't have permission");
   });

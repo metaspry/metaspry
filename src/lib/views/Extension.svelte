@@ -75,14 +75,27 @@
   // lives there (`#/pricing` -> `#/blog`), while `scannedUrl` and the scan identity drop it.
   let scannedHref = "";
   let activeUrl: string | null = null;
+  // A re-scan from the results view in flight (results stay on screen), and why the last one
+  // failed (shown instead of the stale banner until the next scan or tab change).
+  let rescanning = false;
+  let rescanError: { reason: string; url: string } | null = null;
+  $: clearRescanError(activeUrl);
+  function clearRescanError(_url: string | null) {
+    rescanError = null;
+  }
   $: staleState = activeUrl === null ? "same" : tabState(scannedHref, activeUrl);
   $: isStale = staleState !== "same";
   $: canScanTab = staleState === "other" || staleState === "unknown";
-  // On a page Chrome blocks, a re-scan would discard the current results for an error.
+  // On a page Chrome is known to block a re-scan can only fail, so it is not offered. Pages the URL
+  // check misses are covered by `scrape()` keeping the results when the capture fails.
   $: blockRescan = view === "results" && staleState === "restricted";
   $: scannedLabel = displayUrl(scannedUrl);
   $: showScannedPage = !!scannedUrl && (view === "results" || view === "empty" || view === "error");
-  $: staleMessage = !showScannedPage || !isStale
+  $: rescanMessage = rescanError ? rescanNotice(rescanError, scannedLabel) : "";
+  function rescanNotice(err: { reason: string; url: string }, label: string): string {
+    return `Couldn't scan ${err.url ? displayUrl(err.url) : "this tab"}: ${err.reason} Results are still for ${label}.`;
+  }
+  $: staleMessage = !showScannedPage || !isStale || rescanError
     ? ""
     : staleState === "restricted"
       ? `This tab is ${restrictedKind(activeUrl ?? "") ?? "a page Chrome blocks"}; Chrome blocks extensions there. Results are for ${scannedLabel}.`
@@ -127,29 +140,50 @@
   }
 
   async function scrape() {
-    if (view === "loading") return;
+    if (view === "loading" || rescanning) return;
     const id = ++scrapeId;
-    view = "loading";
-    errorReason = "";
-    errorDetail = null;
+    // A re-scan from the results view captures first and replaces the results only once the new
+    // page is parsed; a failure leaves them on screen. Every other view clears as before.
+    const keep = view === "results";
+    let committed = false;
     announcement = "";
-    cloudScan = null;
-    scannedUrl = "";
-    scannedHref = "";
+    rescanError = null;
+    if (keep) {
+      rescanning = true;
+    } else {
+      view = "loading";
+      errorReason = "";
+      errorDetail = null;
+      cloudScan = null;
+      scannedUrl = "";
+      scannedHref = "";
+    }
     try {
       // E-19: capture the active tab of the window hosting this page, not the last-focused one.
       const windowId = await getHostWindowId();
       if (id !== scrapeId) return;
       const { html, url: tabUrl, reason, favIconUrl } = await getHTML(windowId ?? undefined);
       if (id !== scrapeId) return;
-      scannedUrl = normalizeScanUrl(tabUrl);
-      scannedHref = tabUrl;
       if (!html) {
+        if (keep) {
+          keepResults(unscriptableMessage(tabUrl, reason), tabUrl);
+          return;
+        }
+        scannedUrl = normalizeScanUrl(tabUrl);
+        scannedHref = tabUrl;
         fail(unscriptableMessage(tabUrl, reason), tabUrl ? `Page: ${tabUrl}` : null);
         return;
       }
       const meta = getMetaTags(html, tabUrl);
       if (id !== scrapeId) return;
+      // Commit: from here on the new page replaces the old results.
+      committed = true;
+      rescanning = false;
+      errorReason = "";
+      errorDetail = null;
+      cloudScan = null;
+      scannedUrl = normalizeScanUrl(tabUrl);
+      scannedHref = tabUrl;
       // Kept beside `meta`, not inside it: `PageMeta.icon` stays the declared <link>, so the Tags
       // tab, the exports and the empty-page check report only markup that exists. The resolved
       // icon feeds the SERP preview, History and the cloud payload.
@@ -200,8 +234,20 @@
     } catch (error) {
       if (id !== scrapeId) return;
       const described = describeScanError(error);
+      if (keep && !committed) {
+        keepResults(described.reason, "");
+        return;
+      }
       fail(described.reason, described.detail);
+    } finally {
+      if (id === scrapeId) rescanning = false;
     }
+  }
+
+  // A re-scan failed before replacing anything: the results stay, and a notice says why.
+  function keepResults(reason: string, url: string) {
+    rescanError = { reason, url };
+    announcement = rescanNotice(rescanError, scannedLabel);
   }
 
   function fail(reason: string, detail: string | null) {
@@ -339,7 +385,8 @@
 </svelte:head>
 
 <!-- Assertive: a failed scan replaces the button that started it, so it is announced here as well as
-     by moving focus to the error heading (R-34). -->
+     by moving focus to the error heading (R-34). A failed re-scan that keeps the results is announced
+     here too, without moving focus. -->
 <div class="sr-only" aria-live="assertive" aria-atomic="true">{announcement}</div>
 <!-- Polite and always mounted, so the stale-results banner below is announced when it appears or
      changes, without moving focus (E-1). The visible banner carries the "Scan this tab" button. -->
@@ -471,13 +518,27 @@
             <circle cx="12" cy="12" r="10" stroke-width="1.5" />
           </svg>
           <p class="min-w-0 flex-1 break-words">{staleMessage}</p>
-          {#if canScanTab}
+          {#if canScanTab && !rescanning}
             <button
               type="button"
               on:click={retry}
               class="shrink-0 rounded-lg px-2 py-1 font-semibold underline underline-offset-2 hover:bg-amber-200/60 dark:hover:bg-amber-500/20 {FOCUS_RING}"
             >Scan this tab</button>
           {/if}
+        </aside>
+      {/if}
+      {#if rescanMessage}
+        <!-- A re-scan failed and the results were kept. Announced through the assertive region
+             above (`announcement`), so this has no live role of its own. -->
+        <aside
+          aria-label="Scan failed, results kept"
+          class="flex shrink-0 items-center gap-2 rounded-xl border border-amber-300/50 bg-amber-50/80 px-3 py-2 text-xs text-amber-900 backdrop-blur-md dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 flex-shrink-0" aria-hidden="true">
+            <path d="M12 9v4M12 17h.01" />
+            <circle cx="12" cy="12" r="10" stroke-width="1.5" />
+          </svg>
+          <p class="min-w-0 flex-1 break-words">{rescanMessage}</p>
         </aside>
       {/if}
     {/if}
@@ -518,7 +579,8 @@
       <button
         type="button"
         on:click={retry}
-        disabled={blockRescan}
+        disabled={blockRescan || rescanning}
+        aria-busy={rescanning}
         class="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 disabled:cursor-not-allowed disabled:opacity-50 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-indigo-500/30 transition hover:bg-indigo-700 motion-safe:active:scale-[0.99] dark:bg-indigo-600 dark:hover:bg-indigo-700 {FOCUS_RING_ON_FILL}"
       >
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true">
@@ -527,7 +589,7 @@
           <path d="M21 12a9 9 0 0 1-15.5 6.4L3 16" />
           <path d="M3 21v-5h5" />
         </svg>
-        {isStale ? "Scan this tab" : "Re-scan this page"}
+        {rescanning ? "Scanning..." : isStale ? "Scan this tab" : "Re-scan this page"}
       </button>
     {/if}
     </main>

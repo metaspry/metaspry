@@ -17,6 +17,13 @@ export function describeScanError(error: unknown): ScanError {
   const raw = error instanceof Error ? error.message : typeof error === 'string' ? error : '';
   const detail = raw.trim() ? raw.trim() : null;
   const m = raw.toLowerCase();
+  // getHTML's capture timeout: the injection never ran, most often because the page has a dialog open.
+  if (m.includes('timed out waiting for the page')) {
+    return {
+      reason: "The page didn't answer in time. If it has a dialog open (an alert or a confirm box), close it, then scan again.",
+      detail,
+    };
+  }
   // The runtime message channel to the background script: missing (dev page, extension reloaded)
   // or answered by nobody (a page Chrome would not inject into).
   if (

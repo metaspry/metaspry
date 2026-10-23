@@ -45,16 +45,28 @@ export function unscriptableMessage(url: string, reason?: PageHtml['reason']): s
   return "This page can't be scanned. Chrome blocked access to it, or it hadn't finished loading. Open a normal web page and try again.";
 }
 
+/** How long a capture may take. A tab with an open alert() / confirm() never runs the injection. */
+export const CAPTURE_TIMEOUT_MS = 15_000;
+
 /**
  * Captures the active tab of `windowId` (the window hosting this side panel / popup, E-19). Without
  * it the background falls back to the last-focused window. `url` is the captured document's own URL.
+ * Rejects after `timeoutMs` so a page that never answers cannot leave the scan loading forever.
  */
-export async function getHTML(windowId?: number): Promise<PageHtml> {
+export async function getHTML(windowId?: number, timeoutMs = CAPTURE_TIMEOUT_MS): Promise<PageHtml> {
   const request = typeof windowId === 'number' ? { message: 'getHTML', windowId } : { message: 'getHTML' };
   return new Promise((resolve, reject) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      settled = true;
+      reject(new Error(`Timed out waiting for the page after ${Math.round(timeoutMs / 1000)} s.`));
+    }, timeoutMs);
     chrome.runtime.sendMessage(request, (response) => {
       // A dead message port sets lastError; reading it also stops Chrome logging it as unchecked.
       const lastError = chrome.runtime.lastError;
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
       if (!response) {
         reject(new Error(lastError?.message ?? 'No response from background script.'));
         return;
