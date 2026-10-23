@@ -99,6 +99,7 @@ describe('getHTML request', () => {
   describe('capture timeout', () => {
     afterEach(() => {
       vi.useRealTimers();
+      vi.restoreAllMocks();
     });
 
     it('rejects when the background never answers', async () => {
@@ -124,7 +125,6 @@ describe('getHTML request', () => {
       await settled;
       answer?.({ html: '<html></html>', url: 'https://a.com/' });
       expect(parse).not.toHaveBeenCalled();
-      parse.mockRestore();
     });
 
     it('rejects at once and clears the timer when sendMessage throws', async () => {

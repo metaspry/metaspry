@@ -202,6 +202,8 @@
       }
       activeTab = "tags";
       view = "results";
+      // Now, not after the audit and upload: the commit just unmounted the stale banner.
+      if (keep && hadFocus) void keepFocus();
       prevSettings = $effectiveSettings;
       const finalResult = await runAudit(meta, $effectiveSettings, id);
       if (id !== scrapeId) return;
@@ -243,7 +245,8 @@
       fail(described.reason, described.detail);
     } finally {
       if (id === scrapeId) rescanning = false;
-      if (keep && hadFocus) void keepFocus();
+      // Kept-results failure: the notice replaced the banner. Success restored focus at the commit.
+      if (keep && hadFocus && !committed && id === scrapeId) void keepFocus();
     }
   }
 
