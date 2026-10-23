@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onDestroy, onMount } from "svelte";
   import Screen from "../components/Screen/Screen.svelte";
   import Grid from "../components/Grid/Grid.svelte";
   import type { GridProps } from "../components/Grid/Grid";
@@ -15,10 +15,12 @@
   import CompareView from "../components/Compare/CompareView.svelte";
   import SiteView from "../components/Site/SiteView.svelte";
   import AeoView from "../components/Aeo/AeoView.svelte";
+  import SiteIcon from "../components/SiteIcon/SiteIcon.svelte";
 
-  import { getHTML, unscriptableMessage } from "../scrapers/getHTML";
+  import { getHTML, restrictedKind, unscriptableMessage } from "../scrapers/getHTML";
   import { describeScanError } from "../scrapers/scan-error";
-  import { scanUrlFor } from "../cloud/scan-identity";
+  import { normalizeScanUrl, scanUrlFor } from "../cloud/scan-identity";
+  import { displayUrl, followActiveTab, getHostWindowId, hostOf, tabState } from "../tabs/follow-tab";
   import { getMetaTags } from "../scrapers/getMetaTags";
   import { resolveIcon } from "../scrapers/icon";
   import type { PageMeta } from "../scrapers/PageMeta";
@@ -33,7 +35,7 @@
   import { pushHistory } from "../storage/history";
   import { hasFailingRequired } from "../audit/band";
   import { registerShortcuts, helpOpen } from "../components/Shortcuts/keyboard";
-  import { toolbarButtonClass, TOOLBAR_GROUP, FOCUS_RING_ON_FILL } from "../components/toolbar";
+  import { toolbarButtonClass, TOOLBAR_GROUP, FOCUS_RING, FOCUS_RING_ON_FILL } from "../components/toolbar";
   import CloudSync from "../components/CloudSync/CloudSync.svelte";
   import { tooltip } from "../actions/tooltip";
   import { cloudUser } from "../cloud/auth";
@@ -64,6 +66,26 @@
   let cloudScan: UploadResult | null = null;
   $: if (!$cloudUser) cloudScan = null;
   let settingsOpen = false;
+
+  // E-1: the document URL the current scan captured (not `pageUrl`, which can fall back to the
+  // canonical), and the URL of this window's active tab (null until first read). Comparing the two
+  // flags results that no longer describe the tab; nothing here ever starts a scan.
+  let scannedUrl = "";
+  let activeUrl: string | null = null;
+  $: staleState = activeUrl === null ? "same" : tabState(scannedUrl, activeUrl);
+  $: isStale = staleState !== "same";
+  $: canScanTab = staleState === "other" || staleState === "unknown";
+  // On a page Chrome blocks, a re-scan would discard the current results for an error.
+  $: blockRescan = view === "results" && staleState === "restricted";
+  $: scannedLabel = displayUrl(scannedUrl);
+  $: showScannedPage = !!scannedUrl && (view === "results" || view === "empty" || view === "error");
+  $: staleMessage = !showScannedPage || !isStale
+    ? ""
+    : staleState === "restricted"
+      ? `This tab is ${restrictedKind(activeUrl ?? "") ?? "a page Chrome blocks"}; Chrome blocks extensions there. Results are for ${scannedLabel}.`
+      : staleState === "other"
+        ? `This tab changed. Results are for ${scannedLabel}.`
+        : "This tab changed.";
 
   const tabs: TabDef[] = [
     { id: "tags", label: "Tags" },
@@ -109,9 +131,14 @@
     errorDetail = null;
     announcement = "";
     cloudScan = null;
+    scannedUrl = "";
     try {
-      const { html, url: tabUrl, reason, favIconUrl } = await getHTML();
+      // E-19: capture the active tab of the window hosting this page, not the last-focused one.
+      const windowId = await getHostWindowId();
       if (id !== scrapeId) return;
+      const { html, url: tabUrl, reason, favIconUrl } = await getHTML(windowId ?? undefined);
+      if (id !== scrapeId) return;
+      scannedUrl = normalizeScanUrl(tabUrl);
       if (!html) {
         fail(unscriptableMessage(tabUrl, reason), tabUrl ? `Page: ${tabUrl}` : null);
         return;
@@ -271,7 +298,23 @@
     // click, so chrome.sidePanel.open / chrome.action.openPopup retain gesture context.
   }
 
+  let stopFollowing: (() => void) | null = null;
+  let destroyed = false;
+
+  async function startFollowingTab() {
+    const windowId = await getHostWindowId();
+    if (destroyed || windowId === null || typeof chrome === "undefined" || !chrome.tabs?.onActivated) return;
+    stopFollowing = followActiveTab(windowId, (url) => (activeUrl = url));
+  }
+
+  onDestroy(() => {
+    destroyed = true;
+    stopFollowing?.();
+    stopFollowing = null;
+  });
+
   onMount(() => {
+    void startFollowingTab();
     if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
       chrome.runtime.onMessage.addListener(onRuntimeMessage);
     }
@@ -279,7 +322,9 @@
     registerShortcuts({
       focusSearch,
       selectTab: selectTabByIndex,
-      rescan: () => void scrape(),
+      rescan: () => {
+        if (!blockRescan) void scrape();
+      },
     });
   });
 </script>
@@ -291,6 +336,9 @@
 <!-- Assertive: a failed scan replaces the button that started it, so it is announced here as well as
      by moving focus to the error heading (R-34). -->
 <div class="sr-only" aria-live="assertive" aria-atomic="true">{announcement}</div>
+<!-- Polite and always mounted, so the stale-results banner below is announced when it appears or
+     changes, without moving focus (E-1). The visible banner carries the "Scan this tab" button. -->
+<div class="sr-only" role="status" aria-atomic="true">{staleMessage}</div>
 
 <div class="flex h-full w-full flex-col p-3">
   <Screen>
@@ -401,6 +449,33 @@
          pointer could not reach it. `-m-1 p-1` keeps the 4 px focus ring inside the scroll box.
          Results keep their own scroll area between the tabs and Re-scan. -->
     <main class="flex min-h-0 flex-1 flex-col gap-4 {view === 'results' ? '' : '-m-1 overflow-y-auto p-1'}">
+    {#if showScannedPage}
+      <!-- Names the page these results belong to (E-1). Full host/path/query in the text node, so a
+           screen reader reads it whole however much the CSS truncates. -->
+      <div class="flex min-w-0 shrink-0 items-center gap-2 text-xs ms-muted">
+        <SiteIcon src={view === "error" ? null : pageIcon} hostname={hostOf(scannedUrl)} size={16} />
+        <p class="min-w-0 truncate" title={scannedUrl}><span class="sr-only">Results for </span>{scannedLabel}</p>
+      </div>
+      {#if staleMessage}
+        <aside
+          aria-label="Results are for another page"
+          class="flex shrink-0 items-center gap-2 rounded-xl border border-amber-300/50 bg-amber-50/80 px-3 py-2 text-xs text-amber-900 backdrop-blur-md dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 flex-shrink-0" aria-hidden="true">
+            <path d="M12 9v4M12 17h.01" />
+            <circle cx="12" cy="12" r="10" stroke-width="1.5" />
+          </svg>
+          <p class="min-w-0 flex-1 break-words">{staleMessage}</p>
+          {#if canScanTab}
+            <button
+              type="button"
+              on:click={retry}
+              class="shrink-0 rounded-lg px-2 py-1 font-semibold underline underline-offset-2 hover:bg-amber-200/60 dark:hover:bg-amber-500/20 {FOCUS_RING}"
+            >Scan this tab</button>
+          {/if}
+        </aside>
+      {/if}
+    {/if}
     {#if view === "landing"}
       <div class="flex flex-col gap-1">
         <!-- Says what the extension does before asking for a click (R-38). -->
@@ -438,7 +513,8 @@
       <button
         type="button"
         on:click={retry}
-        class="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-indigo-500/30 transition hover:bg-indigo-700 motion-safe:active:scale-[0.99] dark:bg-indigo-600 dark:hover:bg-indigo-700 {FOCUS_RING_ON_FILL}"
+        disabled={blockRescan}
+        class="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 disabled:cursor-not-allowed disabled:opacity-50 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-indigo-500/30 transition hover:bg-indigo-700 motion-safe:active:scale-[0.99] dark:bg-indigo-600 dark:hover:bg-indigo-700 {FOCUS_RING_ON_FILL}"
       >
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true">
           <path d="M3 12a9 9 0 0 1 15.5-6.4L21 8" />
@@ -446,7 +522,7 @@
           <path d="M21 12a9 9 0 0 1-15.5 6.4L3 16" />
           <path d="M3 21v-5h5" />
         </svg>
-        Re-scan this page
+        {isStale ? "Scan this tab" : "Re-scan this page"}
       </button>
     {/if}
     </main>
