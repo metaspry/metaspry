@@ -75,6 +75,8 @@
   $: staleState = activeUrl === null ? "same" : tabState(scannedUrl, activeUrl);
   $: isStale = staleState !== "same";
   $: canScanTab = staleState === "other" || staleState === "unknown";
+  // On a page Chrome blocks, a re-scan would discard the current results for an error.
+  $: blockRescan = view === "results" && staleState === "restricted";
   $: scannedLabel = displayUrl(scannedUrl);
   $: showScannedPage = !!scannedUrl && (view === "results" || view === "empty" || view === "error");
   $: staleMessage = !showScannedPage || !isStale
@@ -320,7 +322,9 @@
     registerShortcuts({
       focusSearch,
       selectTab: selectTabByIndex,
-      rescan: () => void scrape(),
+      rescan: () => {
+        if (!blockRescan) void scrape();
+      },
     });
   });
 </script>
@@ -509,7 +513,8 @@
       <button
         type="button"
         on:click={retry}
-        class="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-indigo-500/30 transition hover:bg-indigo-700 motion-safe:active:scale-[0.99] dark:bg-indigo-600 dark:hover:bg-indigo-700 {FOCUS_RING_ON_FILL}"
+        disabled={blockRescan}
+        class="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 disabled:cursor-not-allowed disabled:opacity-50 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-indigo-500/30 transition hover:bg-indigo-700 motion-safe:active:scale-[0.99] dark:bg-indigo-600 dark:hover:bg-indigo-700 {FOCUS_RING_ON_FILL}"
       >
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true">
           <path d="M3 12a9 9 0 0 1 15.5-6.4L21 8" />
@@ -517,7 +522,7 @@
           <path d="M21 12a9 9 0 0 1-15.5 6.4L3 16" />
           <path d="M3 21v-5h5" />
         </svg>
-        {canScanTab ? "Scan this tab" : "Re-scan this page"}
+        {isStale ? "Scan this tab" : "Re-scan this page"}
       </button>
     {/if}
     </main>

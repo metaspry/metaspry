@@ -47,6 +47,7 @@ describe('restrictedKind', () => {
   it('recognises the pages Chrome blocks extensions on', () => {
     expect(restrictedKind('chrome://settings')).toBe('a browser settings page');
     expect(restrictedKind('about:newtab')).toBe('the new tab page');
+    expect(restrictedKind('chrome://newtab/')).toBe('the new tab page');
     expect(restrictedKind('https://chromewebstore.google.com/detail/x')).toBe('the Chrome Web Store');
     expect(restrictedKind('https://acme.com/report.pdf')).toBe('a PDF');
     expect(restrictedKind('view-source:https://acme.com/')).toBe('a view-source page');

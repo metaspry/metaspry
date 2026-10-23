@@ -96,7 +96,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       ? { active: true, windowId: request.windowId }
       : { active: true, lastFocusedWindow: true };
     chrome.tabs.query(queryOptions, (tabs) => {
-      let [tab] = tabs;
+      let [tab] = tabs ?? [];
       if (tab && tab.id != null) {
         const tabUrl = tab.url || '';
         // Chrome's own resolution of the page's favicon (covers the implicit /favicon.ico that

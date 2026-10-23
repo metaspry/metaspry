@@ -10,6 +10,7 @@ export interface PageHtml {
 /** Pages Chrome refuses to inject into, recognised from the URL alone. */
 export function restrictedKind(url: string): string | null {
   const u = url.toLowerCase();
+  if (u.startsWith('chrome://newtab') || u.startsWith('edge://newtab')) return 'the new tab page';
   if (u.startsWith('chrome://') || u.startsWith('edge://') || u.startsWith('brave://')) return 'a browser settings page';
   if (u.startsWith('chrome-extension://') || u.startsWith('moz-extension://')) return 'an extension page';
   if (u.startsWith('about:')) return 'the new tab page';
