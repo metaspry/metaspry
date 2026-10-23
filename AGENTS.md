@@ -281,8 +281,10 @@ CSS-truncated, full text in the node, `title` = full URL). `followActiveTab(wind
 the window's active tab on start and on every `tabs.onActivated` (same window), `tabs.onUpdated`
 with `changeInfo.url` for an active tab in that window (full navigations and `pushState` /
 `replaceState` routes) and `tabs.onReplaced` (prerender swap); only the newest query's answer is
-used. `tabState(scannedUrl, activeUrl)` compares the two after `normalizeScanUrl` (so `#anchor` and a
-trailing slash are not changes): `same`, `other`, `restricted` (`restrictedKind`, a page Chrome
+used. `tabState(scannedHref, activeUrl)` compares the two after `normalizeScanUrl` (so `#anchor` and a
+trailing slash are not changes), plus the hash route (`hashRoute`: a fragment starting `#/` or `#!`,
+so `#/pricing` -> `#/blog` on a hash-routed SPA is a change; `scannedHref` keeps the captured
+fragment for this comparison only, while `scannedUrl` and the scan identity drop it): `same`, `other`, `restricted` (`restrictedKind`, a page Chrome
 blocks) or `unknown` (no readable URL). When not `same`, an amber banner under the strip says "This
 tab changed. Results are for <host/path>." with a **Scan this tab** button (`restricted`: "This tab
 is <kind>; Chrome blocks extensions there. Results are for <host/path>." and no button; `unknown`:
@@ -317,7 +319,7 @@ in the payload as metadata.
 
 **Permissions.** `tabs`, `scripting`, host `*://*/*` (no `activeTab`; the manifest does not declare it). `tab.favIconUrl` needs only the host permission. Tab tracking reads `tab.url` of tabs the user has not scanned, which needs `tabs` (or a host grant); without it `tabState` degrades to `unknown`. No `webNavigation`.
 
-**Tests.** `src/lib/scrapers/icon.spec.ts` (resolution order, skipped schemes, non-http page); `src/lib/tabs/follow-tab.spec.ts` (`tabState` cases, `displayUrl`, `followActiveTab` window / `url` / active filtering, `onReplaced`, out-of-order answers, unsubscribe); `getHTML.spec.ts` (`restrictedKind` incl. query-string false positives, `windowId` sent or omitted); `background-gethtml.spec.ts` (runs `static/scripts/background.js` against a fake `chrome`: document URL labels the result, favicon dropped on a moved document, `unscriptable`, `no-tab`); the scrapers listed in 3.18. The banner itself: by hand (tab switch, same-tab link, SPA route, `chrome://`, scan in flight, two windows).
+**Tests.** `src/lib/scrapers/icon.spec.ts` (resolution order, skipped schemes, non-http page); `src/lib/tabs/follow-tab.spec.ts` (`tabState` cases incl. hash routes vs plain anchors, `displayUrl`, `followActiveTab` window / `url` / active filtering, `onReplaced`, out-of-order answers, unsubscribe); `getHTML.spec.ts` (`restrictedKind` incl. query-string false positives, `windowId` sent or omitted); `background-gethtml.spec.ts` (runs `static/scripts/background.js` against a fake `chrome`: document URL labels the result, favicon dropped on a moved document, `unscriptable`, `no-tab`); the scrapers listed in 3.18. The banner itself: by hand (tab switch, same-tab link, SPA route, `chrome://`, scan in flight, two windows).
 
 **Gotchas.**
 - The captured HTML is the rendered DOM after the page's JavaScript ran, not the server HTML a crawler fetches. JavaScript-injected tags count here. Compare (3.12) fetches raw HTML instead.

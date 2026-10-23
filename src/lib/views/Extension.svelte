@@ -71,8 +71,11 @@
   // canonical), and the URL of this window's active tab (null until first read). Comparing the two
   // flags results that no longer describe the tab; nothing here ever starts a scan.
   let scannedUrl = "";
+  // The captured URL with its fragment, for the stale comparison only: a hash-routed SPA's route
+  // lives there (`#/pricing` -> `#/blog`), while `scannedUrl` and the scan identity drop it.
+  let scannedHref = "";
   let activeUrl: string | null = null;
-  $: staleState = activeUrl === null ? "same" : tabState(scannedUrl, activeUrl);
+  $: staleState = activeUrl === null ? "same" : tabState(scannedHref, activeUrl);
   $: isStale = staleState !== "same";
   $: canScanTab = staleState === "other" || staleState === "unknown";
   // On a page Chrome blocks, a re-scan would discard the current results for an error.
@@ -132,6 +135,7 @@
     announcement = "";
     cloudScan = null;
     scannedUrl = "";
+    scannedHref = "";
     try {
       // E-19: capture the active tab of the window hosting this page, not the last-focused one.
       const windowId = await getHostWindowId();
@@ -139,6 +143,7 @@
       const { html, url: tabUrl, reason, favIconUrl } = await getHTML(windowId ?? undefined);
       if (id !== scrapeId) return;
       scannedUrl = normalizeScanUrl(tabUrl);
+      scannedHref = tabUrl;
       if (!html) {
         fail(unscriptableMessage(tabUrl, reason), tabUrl ? `Page: ${tabUrl}` : null);
         return;

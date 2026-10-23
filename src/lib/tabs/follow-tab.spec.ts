@@ -11,6 +11,18 @@ describe('tabState', () => {
     expect(tabState('https://a.com/blog', 'https://a.com/blog/')).toBe('same');
   });
 
+  it('is other for a different hash route, same for the same route', () => {
+    expect(tabState('https://app.com/#/pricing', 'https://app.com/#/blog')).toBe('other');
+    expect(tabState('https://app.com/#!/pricing', 'https://app.com/#!/blog')).toBe('other');
+    expect(tabState('https://app.com/', 'https://app.com/#/blog')).toBe('other');
+    expect(tabState('https://app.com/#/blog', 'https://app.com/#/blog/')).toBe('same');
+    expect(tabState('https://app.com/#/blog', 'https://app.com/#/blog')).toBe('same');
+    expect(tabState('https://app.com/#/blog', 'https://app.com/#top')).toBe('other');
+    expect(tabState('https://app.com/doc#a', 'https://app.com/doc#b')).toBe('same');
+    expect(tabState('https://app.com/', 'https://app.com/#/')).toBe('same');
+    expect(tabState('https://app.com/#!/', 'https://app.com/')).toBe('same');
+  });
+
   it('is other for a different path or host', () => {
     expect(tabState('https://a.com/x', 'https://a.com/z')).toBe('other');
     expect(tabState('https://a.com/x', 'https://b.com/y')).toBe('other');

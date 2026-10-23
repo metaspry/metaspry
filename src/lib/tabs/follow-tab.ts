@@ -9,15 +9,31 @@ import { restrictedKind } from '../scrapers/getHTML';
 export type TabState = 'same' | 'other' | 'restricted' | 'unknown';
 
 /**
+ * The hash route of a hash-routed SPA (`#/pricing`, `#!/blog`), or '' for a plain `#section` anchor
+ * or no fragment. Only the stale-tab comparison uses it; the scan identity still drops the fragment.
+ */
+export function hashRoute(url: string | null | undefined): string {
+  if (!url) return '';
+  const i = url.indexOf('#');
+  if (i === -1) return '';
+  const frag = url.slice(i);
+  if (!frag.startsWith('#/') && !frag.startsWith('#!')) return '';
+  // `#/blog/` and `#/blog` are one route, as with the path; `#/` and `#!/` are the root, i.e. none.
+  const route = frag.endsWith('/') ? frag.slice(0, -1) : frag;
+  return route === '#' || route === '#!' ? '' : route;
+}
+
+/**
  * How the window's active tab relates to the scanned page. Both URLs go through `normalizeScanUrl`,
- * so a `#section` jump or a trailing slash is not a page change. No scanned URL = nothing to flag.
+ * so a `#section` jump or a trailing slash is not a page change; a hash route (`#/pricing` ->
+ * `#/blog`) is. No scanned URL = nothing to flag.
  */
 export function tabState(scannedUrl: string | null | undefined, activeUrl: string | null | undefined): TabState {
   const scanned = normalizeScanUrl(scannedUrl);
   if (!scanned) return 'same';
   const active = normalizeScanUrl(activeUrl);
   if (!active) return 'unknown';
-  if (active === scanned) return 'same';
+  if (active === scanned && hashRoute(activeUrl) === hashRoute(scannedUrl)) return 'same';
   if (restrictedKind(active)) return 'restricted';
   return 'other';
 }
