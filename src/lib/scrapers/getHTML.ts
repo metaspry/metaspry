@@ -8,7 +8,7 @@ export interface PageHtml {
 }
 
 /** Pages Chrome refuses to inject into, recognised from the URL alone. */
-function restrictedKind(url: string): string | null {
+export function restrictedKind(url: string): string | null {
   const u = url.toLowerCase();
   if (u.startsWith('chrome://') || u.startsWith('edge://') || u.startsWith('brave://')) return 'a browser settings page';
   if (u.startsWith('chrome-extension://') || u.startsWith('moz-extension://')) return 'an extension page';
@@ -33,9 +33,14 @@ export function unscriptableMessage(url: string, reason?: PageHtml['reason']): s
   return "This page can't be scanned. Chrome blocked access to it, or it hadn't finished loading. Open a normal web page and try again.";
 }
 
-export async function getHTML(): Promise<PageHtml> {
+/**
+ * Captures the active tab of `windowId` (the window hosting this side panel / popup, E-19). Without
+ * it the background falls back to the last-focused window. `url` is the captured document's own URL.
+ */
+export async function getHTML(windowId?: number): Promise<PageHtml> {
+  const request = typeof windowId === 'number' ? { message: 'getHTML', windowId } : { message: 'getHTML' };
   return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage({ message: 'getHTML' }, (response) => {
+    chrome.runtime.sendMessage(request, (response) => {
       // A dead message port sets lastError; reading it also stops Chrome logging it as unchecked.
       const lastError = chrome.runtime.lastError;
       if (!response) {
