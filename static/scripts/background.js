@@ -88,6 +88,12 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 readAndApplyMode();
 ensureContextMenu();
 
+// A fragment change keeps the same document (and favicon); anything else is another page.
+function stripHash(url) {
+  const i = url.indexOf('#');
+  return i === -1 ? url : url.slice(0, i);
+}
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.message === 'getHTML') {
     // The window that hosts the asking side panel / popup (E-19). Without it (dev page, or the
@@ -124,7 +130,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             const htmlContent = captured && typeof captured.html === 'string' ? captured.html : '';
             if (htmlContent) {
               const href = typeof captured.href === 'string' ? captured.href : '';
-              sendResponse({ html: htmlContent, url: href || tabUrl, favIconUrl });
+              // The favicon was read with the tab, before the injection. If the document moved on
+              // since, it belongs to the previous page: drop it rather than file it under B.
+              const sameDoc = !href || stripHash(href) === stripHash(tabUrl);
+              sendResponse({ html: htmlContent, url: href || tabUrl, favIconUrl: sameDoc ? favIconUrl : null });
             } else {
               sendResponse({ html: null, url: tabUrl, favIconUrl, reason: 'unscriptable' });
             }

@@ -16,8 +16,19 @@ export function restrictedKind(url: string): string | null {
   if (u.startsWith('about:')) return 'the new tab page';
   if (u.startsWith('view-source:')) return 'a view-source page';
   if (u.startsWith('file://')) return 'a local file';
-  if (u.includes('chromewebstore.google.com') || u.includes('chrome.google.com/webstore')) return 'the Chrome Web Store';
-  if (u.endsWith('.pdf')) return 'a PDF';
+  // Host and path come from the parsed URL: a substring match also caught a search for
+  // "chromewebstore.google.com" or a query ending in ".pdf", and the panel blocks re-scan there.
+  let parsed: URL;
+  try {
+    parsed = new URL(u);
+  } catch {
+    return null;
+  }
+  const host = parsed.hostname;
+  if (host === 'chromewebstore.google.com' || (host === 'chrome.google.com' && parsed.pathname.startsWith('/webstore'))) {
+    return 'the Chrome Web Store';
+  }
+  if (parsed.pathname.endsWith('.pdf')) return 'a PDF';
   return null;
 }
 

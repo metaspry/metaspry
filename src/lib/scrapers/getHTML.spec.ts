@@ -56,6 +56,15 @@ describe('restrictedKind', () => {
   it('returns null for a normal web page', () => {
     expect(restrictedKind('https://acme.com/')).toBeNull();
   });
+
+  it('matches the Web Store and PDFs on host and path, not anywhere in the URL', () => {
+    expect(restrictedKind('https://chrome.google.com/webstore/detail/x')).toBe('the Chrome Web Store');
+    expect(restrictedKind('https://acme.com/report.PDF?dl=1')).toBe('a PDF');
+    expect(restrictedKind('https://www.google.com/search?q=chromewebstore.google.com')).toBeNull();
+    expect(restrictedKind('https://acme.com/?ref=chromewebstore.google.com')).toBeNull();
+    expect(restrictedKind('https://www.google.com/search?q=annual+report.pdf')).toBeNull();
+    expect(restrictedKind('not a url')).toBeNull();
+  });
 });
 
 describe('getHTML request', () => {

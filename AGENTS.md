@@ -112,7 +112,7 @@ This is the complete inventory. There are no ports (`runtime.connect`), no conte
 
 | Channel | Direction | Payload | Code |
 |---|---|---|---|
-| `chrome.runtime.sendMessage` | page -> background | Request `{ message: 'getHTML', windowId?: number }` (`windowId` = the window hosting the page; omitted -> last-focused window). Response `{ html: string \| null, url: string, favIconUrl: string \| null, reason?: 'unscriptable' \| 'no-tab' }` (`url` = the captured document's `location.href`, falling back to `tab.url`; `tab.url` on the failure paths; `favIconUrl` = `tab.favIconUrl`, Chrome's resolved favicon) | `src/lib/scrapers/getHTML.ts`; listener in `background.js` returns `true` to answer asynchronously |
+| `chrome.runtime.sendMessage` | page -> background | Request `{ message: 'getHTML', windowId?: number }` (`windowId` = the window hosting the page; omitted -> last-focused window). Response `{ html: string \| null, url: string, favIconUrl: string \| null, reason?: 'unscriptable' \| 'no-tab' }` (`url` = the captured document's `location.href`, falling back to `tab.url`; `tab.url` on the failure paths; `favIconUrl` = `tab.favIconUrl`, Chrome's resolved favicon, `null` when the document's URL differs from the queried tab's apart from the fragment) | `src/lib/scrapers/getHTML.ts`; listener in `background.js` returns `true` to answer asynchronously |
 | `chrome.storage.onChanged` (`local`, key `mode`) | page -> background | `'sidepanel' \| 'popup'` | `src/lib/mode.ts` writes; `background.js` applies |
 | `chrome.contextMenus.onClicked` | Chrome -> background | menu id `metaspry-open` | `background.js` |
 | `chrome.runtime.onMessage` in the page | none | No-op listener `onRuntimeMessage` ("reserved for future cross-surface coordination") | `src/lib/views/Extension.svelte` |
@@ -265,7 +265,7 @@ Each feature lists: purpose and user flow, key files, data and storage, permissi
 **Purpose and flow.** The landing view says what the extension does (heading "Scan this page's meta tags", the line "Titles, descriptions, Open Graph, Twitter cards, robots and structured data - scored in seconds.") and shows one card, "Scan this page". Clicking it (or pressing `r`) runs `scrape()` in `Extension.svelte`:
 
 1. Sets the view to `loading` (skeleton). A second call while loading is ignored.
-2. `getHTML(windowId)` sends `getHTML` with the hosting window's id (`getHostWindowId()`, memoised `chrome.windows.getCurrent()`). The background queries `{ active: true, windowId }` (no id -> `{ active: true, lastFocusedWindow: true }`: the dev page or a failed lookup), injects a function that returns `{ html: outerHTML, href: location.href }`, and replies with the HTML, the document URL (`href`, else `tab.url`) and `tab.favIconUrl` (Chrome's resolved favicon, null until loaded). The page parses the string with `DOMParser` into an inert document and keeps `scannedUrl = normalizeScanUrl(url)` for the current `scrapeId`.
+2. `getHTML(windowId)` sends `getHTML` with the hosting window's id (`getHostWindowId()`, memoised `chrome.windows.getCurrent()`). The background queries `{ active: true, windowId }` (no id -> `{ active: true, lastFocusedWindow: true }`: the dev page or a failed lookup), injects a function that returns `{ html: outerHTML, href: location.href }`, and replies with the HTML, the document URL (`href`, else `tab.url`) and `tab.favIconUrl` (Chrome's resolved favicon, null until loaded; also null when a navigation committed between the query and the injection, so page B never gets page A's icon). The page parses the string with `DOMParser` into an inert document and keeps `scannedUrl = normalizeScanUrl(url)` for the current `scrapeId`.
 3. `getMetaTags(html, tabUrl)` builds `PageMeta`: `<title>`; canonical and icon (`rel=icon`, then `shortcut icon`, then `apple-touch-icon`), both resolved to absolute URLs; every `<meta>` with non-empty `content`, keyed by `property` (preferred) or `name` and categorised; plus `jsonLd`, `hreflang` (resolved) and meta `robots`.
    Then `resolveIcon(meta.icon, favIconUrl, tabUrl)` (`src/lib/scrapers/icon.ts`) computes the **page icon** (`pageIcon` in `Extension.svelte`): the first http(s) URL of the declared link, Chrome's tab icon, `/favicon.ico` at the page origin. `data:`/`chrome:`/`blob:` tab icons are skipped so no icon bytes ever enter a scan document. `PageMeta.icon` itself stays the declared link, so the Tags tab (3.5), the exports and the empty-page check only report markup that exists; the page icon feeds the SERP preview (3.6), History (3.10) and the cloud payload (3.14).
 4. `pageUrl` = `scanUrlFor(tabUrl, canonical)`: the captured document URL, else the canonical. Never `og:url` (scan identity, below).
@@ -286,7 +286,11 @@ trailing slash are not changes): `same`, `other`, `restricted` (`restrictedKind`
 blocks) or `unknown` (no readable URL). When not `same`, an amber banner under the strip says "This
 tab changed. Results are for <host/path>." with a **Scan this tab** button (`restricted`: "This tab
 is <kind>; Chrome blocks extensions there. Results are for <host/path>." and no button; `unknown`:
-"This tab changed." + button), and the bottom button reads "Scan this tab" (`other` / `unknown`).
+"This tab changed." + button), and the bottom button reads "Scan this tab" whenever the state is not
+`same`. In the results view on a `restricted` tab the bottom button is disabled and `r` is ignored, so
+a scan that Chrome would refuse cannot throw the results away. `restrictedKind` names
+`chrome://newtab` / `edge://newtab` "the new tab page" and matches the Web Store and PDFs on the
+parsed URL's host and path (a query string mentioning either does not count).
 Returning to the scanned URL clears it. The text is announced through an always-mounted `sr-only`
 `role="status"` region; focus never moves. **Nothing scans on its own**: every scan still costs a
 History entry, an upload and site-file fetches, so the banner only offers it. A scan in flight when
@@ -313,7 +317,7 @@ in the payload as metadata.
 
 **Permissions.** `tabs`, `activeTab`, `scripting`, host `*://*/*`. `tab.favIconUrl` needs only the host permission. Tab tracking reads `tab.url` of tabs the user has not scanned, which needs `tabs` (or a host grant); without it `tabState` degrades to `unknown`. No `webNavigation`.
 
-**Tests.** `src/lib/scrapers/icon.spec.ts` (resolution order, skipped schemes, non-http page); `src/lib/tabs/follow-tab.spec.ts` (`tabState` cases, `displayUrl`, `followActiveTab` window / `url` / active filtering, `onReplaced`, out-of-order answers, unsubscribe); `getHTML.spec.ts` (`restrictedKind`, `windowId` sent or omitted); the scrapers listed in 3.18. The banner itself: by hand (tab switch, same-tab link, SPA route, `chrome://`, scan in flight, two windows).
+**Tests.** `src/lib/scrapers/icon.spec.ts` (resolution order, skipped schemes, non-http page); `src/lib/tabs/follow-tab.spec.ts` (`tabState` cases, `displayUrl`, `followActiveTab` window / `url` / active filtering, `onReplaced`, out-of-order answers, unsubscribe); `getHTML.spec.ts` (`restrictedKind` incl. query-string false positives, `windowId` sent or omitted); `background-gethtml.spec.ts` (runs `static/scripts/background.js` against a fake `chrome`: document URL labels the result, favicon dropped on a moved document, `unscriptable`, `no-tab`); the scrapers listed in 3.18. The banner itself: by hand (tab switch, same-tab link, SPA route, `chrome://`, scan in flight, two windows).
 
 **Gotchas.**
 - The captured HTML is the rendered DOM after the page's JavaScript ran, not the server HTML a crawler fetches. JavaScript-injected tags count here. Compare (3.12) fetches raw HTML instead.
@@ -657,7 +661,7 @@ Checks in `src/lib/audit/aeo.ts`:
 **Purpose and flow.** Keys are ignored while typing in an input, textarea, select or contenteditable element:
 - `/` focuses the tag search (switching to Tags).
 - `?` toggles the help modal.
-- `r` re-scans.
+- `r` re-scans (ignored while results are shown and the tab is one Chrome blocks, 3.4).
 - `1` to `6` select tabs by position: Tags, Previews, Audit, Site, AI, Compare.
 
 In the tab strip, Arrow Left/Right, Home and End move between tabs. `Esc` closes every open layer: the Settings drawer, the help modal, the History panel and the account popover (the last three through `use:popover`, 3.17), each returning focus to the control that opened it. `Esc` also hides a visible tooltip (3.17); neither the tooltip's handler nor the popover action calls `stopPropagation`, so one press hides the tooltip and closes whatever is open behind it. While the Settings drawer or the help modal is open, Tab and Shift+Tab cycle inside it (`cycleTab` in `src/lib/actions/popover.ts`; 3.8).
