@@ -117,11 +117,21 @@ describe('getHTML request', () => {
         answer = cb;
       });
       vi.stubGlobal('chrome', { runtime: { sendMessage, lastError: undefined } });
+      const parse = vi.spyOn(DOMParser.prototype, 'parseFromString');
       const page = getHTML(1, 1000);
       const settled = expect(page).rejects.toThrow('Timed out');
       await vi.advanceTimersByTimeAsync(1000);
       await settled;
-      expect(() => answer?.({ html: '<html></html>', url: 'https://a.com/' })).not.toThrow();
+      answer?.({ html: '<html></html>', url: 'https://a.com/' });
+      expect(parse).not.toHaveBeenCalled();
+      parse.mockRestore();
+    });
+
+    it('rejects at once and clears the timer when sendMessage throws', async () => {
+      vi.useFakeTimers();
+      vi.stubGlobal('chrome', { runtime: { sendMessage: () => { throw new TypeError('no context'); }, lastError: undefined } });
+      await expect(getHTML(1)).rejects.toThrow('no context');
+      expect(vi.getTimerCount()).toBe(0);
     });
 
     it('does not fire after a prompt answer', async () => {

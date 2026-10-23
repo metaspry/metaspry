@@ -310,9 +310,11 @@ happens, and `rescanError` shows an amber notice under the strip in place of the
 announced once through the assertive region; focus does not move. It clears on the next scan and
 when the active tab's URL changes. This covers every page Chrome refuses, recognised by URL or not
 (`devtools://`, a PDF without `.pdf`, policy-blocked hosts); `blockRescan` stays for the recognised
-ones. While `rescanning` the bottom button reads "Scanning...", is disabled with `aria-busy`, and
-every other scan entry (`r`, the banner's "Scan this tab", History's empty-state scan) is ignored by
-`scrape()`'s guard. Scans from landing, the empty view and the error view are unchanged.
+ones. While `rescanning` the bottom button reads "Scanning..." with `aria-busy` and `aria-disabled`
+(not `disabled`, which would drop its focus to `<body>`), the banner's "Scan this tab" stays mounted
+with `aria-disabled`, and every scan entry (`r`, both buttons, History's empty-state scan) is ignored
+by `scrape()`'s guard. If the re-scan's outcome unmounts the focused control (the banner swapped for
+the notice) and focus falls to `<body>`, it moves to the bottom button. Scans from landing, the empty view and the error view are unchanged.
 
 **Unscriptable pages answer honestly.** `chrome://`/`edge://`/`brave://` pages, the New Tab page, the
 Chrome Web Store, PDFs and policy-blocked pages cannot be injected into. The background replies

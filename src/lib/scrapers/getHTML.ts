@@ -61,7 +61,7 @@ export async function getHTML(windowId?: number, timeoutMs = CAPTURE_TIMEOUT_MS)
       settled = true;
       reject(new Error(`Timed out waiting for the page after ${Math.round(timeoutMs / 1000)} s.`));
     }, timeoutMs);
-    chrome.runtime.sendMessage(request, (response) => {
+    const onResponse = (response: any) => {
       // A dead message port sets lastError; reading it also stops Chrome logging it as unchecked.
       const lastError = chrome.runtime.lastError;
       if (settled) return;
@@ -85,6 +85,14 @@ export async function getHTML(windowId?: number, timeoutMs = CAPTURE_TIMEOUT_MS)
       } else {
         resolve(reason ? { html: null, url, reason, ...icon } : { html: null, url, ...icon });
       }
-    });
+    };
+    try {
+      chrome.runtime.sendMessage(request, onResponse);
+    } catch (err) {
+      // No extension context (dev page, reloaded extension): fail now and drop the pending timer.
+      settled = true;
+      clearTimeout(timer);
+      reject(err);
+    }
   });
 }

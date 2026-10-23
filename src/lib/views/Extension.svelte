@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy, onMount } from "svelte";
+  import { onDestroy, onMount, tick } from "svelte";
   import Screen from "../components/Screen/Screen.svelte";
   import Grid from "../components/Grid/Grid.svelte";
   import type { GridProps } from "../components/Grid/Grid";
@@ -145,6 +145,8 @@
     // A re-scan from the results view captures first and replaces the results only once the new
     // page is parsed; a failure leaves them on screen. Every other view clears as before.
     const keep = view === "results";
+    // Whether the user was on a control here (a button they pressed, or `r` with focus inside).
+    const hadFocus = typeof document !== "undefined" && document.activeElement !== null && document.activeElement !== document.body;
     let committed = false;
     announcement = "";
     rescanError = null;
@@ -241,7 +243,16 @@
       fail(described.reason, described.detail);
     } finally {
       if (id === scrapeId) rescanning = false;
+      if (keep && hadFocus) void keepFocus();
     }
+  }
+
+  // A kept-results re-scan swaps the stale banner (and its focused "Scan this tab") for the notice,
+  // or the strip for the new page. If that dropped focus to <body>, put it on the re-scan button.
+  let rescanButton: HTMLButtonElement | null = null;
+  async function keepFocus() {
+    await tick();
+    if (document.activeElement === null || document.activeElement === document.body) rescanButton?.focus();
   }
 
   // A re-scan failed before replacing anything: the results stay, and a notice says why.
@@ -518,11 +529,14 @@
             <circle cx="12" cy="12" r="10" stroke-width="1.5" />
           </svg>
           <p class="min-w-0 flex-1 break-words">{staleMessage}</p>
-          {#if canScanTab && !rescanning}
+          {#if canScanTab}
+            <!-- Stays mounted and focusable while a re-scan runs (aria-disabled, scrape() ignores the
+                 click): removing or disabling the focused button would drop focus to <body>. -->
             <button
               type="button"
               on:click={retry}
-              class="shrink-0 rounded-lg px-2 py-1 font-semibold underline underline-offset-2 hover:bg-amber-200/60 dark:hover:bg-amber-500/20 {FOCUS_RING}"
+              aria-disabled={rescanning}
+              class="shrink-0 rounded-lg px-2 py-1 font-semibold underline underline-offset-2 hover:bg-amber-200/60 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 dark:hover:bg-amber-500/20 {FOCUS_RING}"
             >Scan this tab</button>
           {/if}
         </aside>
@@ -576,12 +590,16 @@
           <CompareView leftMeta={pageMeta} leftUrl={pageUrl} leftScore={auditResult.score} leftRules={auditResult.rules} />
         {/if}
       </div>
+      <!-- aria-disabled, not disabled, while re-scanning: this button usually has focus, and disabling
+           it would drop focus to <body>. scrape() ignores the click. -->
       <button
         type="button"
         on:click={retry}
-        disabled={blockRescan || rescanning}
+        disabled={blockRescan}
+        aria-disabled={rescanning}
         aria-busy={rescanning}
-        class="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 disabled:cursor-not-allowed disabled:opacity-50 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-indigo-500/30 transition hover:bg-indigo-700 motion-safe:active:scale-[0.99] dark:bg-indigo-600 dark:hover:bg-indigo-700 {FOCUS_RING_ON_FILL}"
+        bind:this={rescanButton}
+        class="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 disabled:cursor-not-allowed disabled:opacity-50 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-indigo-500/30 transition hover:bg-indigo-700 motion-safe:active:scale-[0.99] dark:bg-indigo-600 dark:hover:bg-indigo-700 {FOCUS_RING_ON_FILL}"
       >
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true">
           <path d="M3 12a9 9 0 0 1 15.5-6.4L21 8" />
