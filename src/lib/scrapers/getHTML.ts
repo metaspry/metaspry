@@ -8,15 +8,27 @@ export interface PageHtml {
 }
 
 /** Pages Chrome refuses to inject into, recognised from the URL alone. */
-function restrictedKind(url: string): string | null {
+export function restrictedKind(url: string): string | null {
   const u = url.toLowerCase();
+  if (u.startsWith('chrome://newtab') || u.startsWith('edge://newtab')) return 'the new tab page';
   if (u.startsWith('chrome://') || u.startsWith('edge://') || u.startsWith('brave://')) return 'a browser settings page';
   if (u.startsWith('chrome-extension://') || u.startsWith('moz-extension://')) return 'an extension page';
   if (u.startsWith('about:')) return 'the new tab page';
   if (u.startsWith('view-source:')) return 'a view-source page';
   if (u.startsWith('file://')) return 'a local file';
-  if (u.includes('chromewebstore.google.com') || u.includes('chrome.google.com/webstore')) return 'the Chrome Web Store';
-  if (u.endsWith('.pdf')) return 'a PDF';
+  // Host and path come from the parsed URL: a substring match also caught a search for
+  // "chromewebstore.google.com" or a query ending in ".pdf", and the panel blocks re-scan there.
+  let parsed: URL;
+  try {
+    parsed = new URL(u);
+  } catch {
+    return null;
+  }
+  const host = parsed.hostname;
+  if (host === 'chromewebstore.google.com' || (host === 'chrome.google.com' && parsed.pathname.startsWith('/webstore'))) {
+    return 'the Chrome Web Store';
+  }
+  if (parsed.pathname.endsWith('.pdf')) return 'a PDF';
   return null;
 }
 
@@ -33,11 +45,28 @@ export function unscriptableMessage(url: string, reason?: PageHtml['reason']): s
   return "This page can't be scanned. Chrome blocked access to it, or it hadn't finished loading. Open a normal web page and try again.";
 }
 
-export async function getHTML(): Promise<PageHtml> {
+/** How long a capture may take. A tab with an open alert() / confirm() never runs the injection. */
+export const CAPTURE_TIMEOUT_MS = 15_000;
+
+/**
+ * Captures the active tab of `windowId` (the window hosting this side panel / popup, E-19). Without
+ * it the background falls back to the last-focused window. `url` is the captured document's own URL.
+ * Rejects after `timeoutMs` so a page that never answers cannot leave the scan loading forever.
+ */
+export async function getHTML(windowId?: number, timeoutMs = CAPTURE_TIMEOUT_MS): Promise<PageHtml> {
+  const request = typeof windowId === 'number' ? { message: 'getHTML', windowId } : { message: 'getHTML' };
   return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage({ message: 'getHTML' }, (response) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      settled = true;
+      reject(new Error(`Timed out waiting for the page after ${Math.round(timeoutMs / 1000)} s.`));
+    }, timeoutMs);
+    const onResponse = (response: any) => {
       // A dead message port sets lastError; reading it also stops Chrome logging it as unchecked.
       const lastError = chrome.runtime.lastError;
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
       if (!response) {
         reject(new Error(lastError?.message ?? 'No response from background script.'));
         return;
@@ -56,6 +85,14 @@ export async function getHTML(): Promise<PageHtml> {
       } else {
         resolve(reason ? { html: null, url, reason, ...icon } : { html: null, url, ...icon });
       }
-    });
+    };
+    try {
+      chrome.runtime.sendMessage(request, onResponse);
+    } catch (err) {
+      // No extension context (dev page, reloaded extension): fail now and drop the pending timer.
+      settled = true;
+      clearTimeout(timer);
+      reject(err);
+    }
   });
 }

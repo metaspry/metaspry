@@ -18,3 +18,9 @@ vite.config.ts.timestamp-*
 
 # Release zips (regenerable from build/ via Compress-Archive)
 metaspry-v*.zip
+
+# Test output (Vitest coverage, Playwright)
+/coverage
+/test-results
+/playwright-report
+/blob-report

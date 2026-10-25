@@ -88,11 +88,21 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 readAndApplyMode();
 ensureContextMenu();
 
+// A fragment change keeps the same document (and favicon); anything else is another page.
+function stripHash(url) {
+  const i = url.indexOf('#');
+  return i === -1 ? url : url.slice(0, i);
+}
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.message === 'getHTML') {
-    const queryOptions = { active: true, lastFocusedWindow: true };
+    // The window that hosts the asking side panel / popup (E-19). Without it (dev page, or the
+    // page's windows.getCurrent failed) fall back to the last-focused window, as before.
+    const queryOptions = typeof request.windowId === 'number'
+      ? { active: true, windowId: request.windowId }
+      : { active: true, lastFocusedWindow: true };
     chrome.tabs.query(queryOptions, (tabs) => {
-      let [tab] = tabs;
+      let [tab] = tabs ?? [];
       if (tab && tab.id != null) {
         const tabUrl = tab.url || '';
         // Chrome's own resolution of the page's favicon (covers the implicit /favicon.ico that
@@ -107,16 +117,23 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
               // start of <body>, and DOMParser copes with a truncated document.
               const MAX_HTML = 3_000_000;
               const html = document.documentElement.outerHTML;
-              return html.length > MAX_HTML ? html.slice(0, MAX_HTML) : html;
+              // The document's own URL labels the result: a navigation that commits between the tab
+              // query and this injection would otherwise file B's DOM under A's URL.
+              return { html: html.length > MAX_HTML ? html.slice(0, MAX_HTML) : html, href: location.href };
             }
           }, (result) => {
             // On chrome:// pages, the New Tab page, the Web Store, PDFs and policy-blocked pages the
             // injection fails: `result` itself is undefined and lastError is set. Reading lastError
             // and always answering keeps the popup from hanging on a promise that never settles.
             void chrome.runtime.lastError;
-            const htmlContent = Array.isArray(result) ? result[0]?.result : undefined;
+            const captured = Array.isArray(result) ? result[0]?.result : undefined;
+            const htmlContent = captured && typeof captured.html === 'string' ? captured.html : '';
             if (htmlContent) {
-              sendResponse({ html: htmlContent, url: tabUrl, favIconUrl });
+              const href = typeof captured.href === 'string' ? captured.href : '';
+              // The favicon was read with the tab, before the injection. If the document moved on
+              // since, it belongs to the previous page: drop it rather than file it under B.
+              const sameDoc = !href || stripHash(href) === stripHash(tabUrl);
+              sendResponse({ html: htmlContent, url: href || tabUrl, favIconUrl: sameDoc ? favIconUrl : null });
             } else {
               sendResponse({ html: null, url: tabUrl, favIconUrl, reason: 'unscriptable' });
             }

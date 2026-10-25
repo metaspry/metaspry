@@ -2,7 +2,7 @@
 
 Feature map for AI coding agents working in this repo. It describes only what `main` does.
 
-Verified against `origin/main` at `e9f0a0b` plus the `fix/ultra-ext-2026-09-25` changes (extension `1.0.26`) on 2026-09-25, against the batch D changes (`fix/ultra2-ext`, extension `1.0.27`) on 2026-09-26, against the round-3 batch 6 changes (`fix/ultra3-ext`, extension `1.0.28`) on 2026-09-26, against the required-fail band cap (`feat/required-fail-band-cap`, extension `1.0.29`) on 2026-09-30, and against the auth web-extension entry (`fix/auth-web-extension`, extension `1.0.30`) on 2026-10-01. If this file and the code disagree, the code wins: fix this file in the same PR (section 6).
+Verified against `origin/main` at `e9f0a0b` plus the `fix/ultra-ext-2026-09-25` changes (extension `1.0.26`) on 2026-09-25, against the batch D changes (`fix/ultra2-ext`, extension `1.0.27`) on 2026-09-26, against the round-3 batch 6 changes (`fix/ultra3-ext`, extension `1.0.28`) on 2026-09-26, against the required-fail band cap (`feat/required-fail-band-cap`, extension `1.0.29`) on 2026-09-30, against the auth web-extension entry (`fix/auth-web-extension`, extension `1.0.30`) on 2026-10-01, and against the side-panel-follows-tab change (`fix/sidepanel-follows-tab`, extension `1.0.31`) on 2026-10-23. If this file and the code disagree, the code wins: fix this file in the same PR (section 6).
 
 ---
 
@@ -46,7 +46,12 @@ It is one of three sibling repositories:
 | Icons | `npm run gen-icons` | Regenerates `static/icons/*` |
 | Promo tiles | `node scripts/gen-promo-tiles.mjs` | Writes `promo/promo-small-440x280.png`, `promo/promo-marquee-1400x560.png` |
 | Store screenshots | `node scripts/process-screenshots.mjs` | `promo/raw-screenshots/*` -> `promo/screenshot-NN.png` (1280x800, no alpha) |
-| Lint, format, type-check, test | Not configured | `vite build` transpiles TypeScript but does not type-check. There is no `typescript` or `svelte-check` dependency. |
+| Type-check | `npm run check` | `svelte-check` against `tsconfig.json`. `vite build` transpiles TypeScript but does not type-check. |
+| Test | `npm test` | Vitest, co-located `src/**/*.spec.ts`, happy-dom (section 3.18) |
+| Coverage | `npm run test:coverage` | Vitest v8 coverage of every file under `src/lib`; text summary + `coverage/index.html` |
+| E2E | `npm run test:e2e` | Builds, then Playwright loads `build/` unpacked in Chromium and runs `e2e/*.e2e.ts` (section 3.18). `HEADED=1` to watch |
+| Full QA pass | `npm run qa` | `check` + `test` + `test:e2e`; non-zero on any failure. Log each run in `docs/qa/qa-log.md` (hard rule 13) |
+| Lint, format | Not configured | |
 
 ### Hard rules
 
@@ -63,6 +68,8 @@ These summarise the maintainer's agent instructions in `CLAUDE.md` and `.github/
 9. **No shipped `console.*`.** Gate diagnostics behind `import.meta.env.DEV`. (`static/scripts/background.js` is not bundled and keeps `console.error`/`console.warn` in its error handlers.)
 10. **Scraped page content is untrusted.** Never pass it to `{@html}`, `eval` or an unbounded regex.
 11. **Keep this file current** (section 6).
+12. **Tests ship with the code.** Every change that adds or changes behaviour, including bug fixes, adds or updates automated tests in the same commit/PR: Vitest unit specs for logic, Vitest + happy-dom `*.dom.spec.ts` for DOM, actions, stores and messaging (mock `chrome.*` at the boundary), Playwright e2e against the built unpacked extension (`e2e/`, section 3.18) for user flows. A bug fix starts with a failing test. Hard-to-test logic in a `.svelte` file gets extracted to a `.ts` module. The only exception is explicit sign-off from Paul for that change, recorded in the OpenSpec or commit body as `Tests waived: <reason> - approved by Paul <date>`. Every OpenSpec `tasks.md` has a "Write/update tests" task.
+13. **Full-extension QA, periodically.** QA covers the whole extension, not just the diff: `npm run check`, `npm test`, `npm run build` and the e2e suite (all four: `npm run qa`), plus `npm run test:coverage`, then the manual list in section 3.18 for what is not automated. Run it before every release or `metaspry-v*.zip` build, after merging a change to `Extension.svelte`, the manifest, `background.js`, the scan pipeline or messaging, and at least weekly while the repo is active. Log each run (date, commit, result, gaps) in `docs/qa/qa-log.md`; untested modules and flows become OpenSpecs.
 
 ### Stale references elsewhere
 
@@ -71,7 +78,7 @@ These summarise the maintainer's agent instructions in `CLAUDE.md` and `.github/
 - `src/lib/gpt-actions/`, a user-supplied OpenAI key, the `compromise` NLP library, components `KeywordsInfo` / `MetaInfo` / `ScreenInfo`, and scrapers `getKeywords` / `getMostUsedWords` / `getWindow` do not exist.
 - The "use `$lib/...` imports" rule is not followed anywhere; every import is relative.
 - "Type-check runs during `vite build`" is false.
-- `.github/instructions/testing.instructions.md` and `styling.instructions.md` are unfilled template stubs.
+- `.github/instructions/styling.instructions.md` is an unfilled template stub.
 
 ---
 
@@ -86,13 +93,15 @@ These summarise the maintainer's agent instructions in `CLAUDE.md` and `.github/
     and the action popup                       - owns the context menu
   - parsing, audit, fetches,                   - handles the 'getHTML' message
     storage, Firebase
-        |   runtime.sendMessage({ message: 'getHTML' })  ->
-        |   <-  { html: string | null, url: string }
+  - listens to tabs.onActivated / onUpdated /
+    onReplaced for its own window (3.4)
+        |   runtime.sendMessage({ message: 'getHTML', windowId? })  ->
+        |   <-  { html: string | null, url: string }   (url = captured document's location.href)
         |
         |   storage.local 'mode' (written by UI)  ->  storage.onChanged in background
         |
         |                                       chrome.scripting.executeScript
-        |                                       -> active tab returns document.documentElement.outerHTML
+        |                                       -> active tab of windowId returns { outerHTML, location.href }
         |
         +-- fetch(credentials: 'omit'): page host /robots.txt, /llms.txt, sitemap paths;
         |   any URL typed into Compare
@@ -100,9 +109,9 @@ These summarise the maintainer's agent instructions in `CLAUDE.md` and `.github/
         +-- Firebase Auth + Firestore (project "metaspry"); chrome.identity for Google sign-in
 ```
 
-1. **Background service worker** (`static/scripts/background.js`). Copied verbatim to `build/scripts/background.js`; it is not processed by Vite and is not TypeScript. It applies the action behaviour from the storage key `mode`, owns the context menu, and answers `getHTML` by injecting a one-line function into the active tab. It has no Firebase code and does no parsing.
-2. **Extension page** (`build/index.html`, the SvelteKit single page app from `src/`). The same page is the side panel (`side_panel.default_path`) and the action popup (set at runtime with `chrome.action.setPopup`). `html[data-mode="popup"]` switches to a fixed 720px layout. Parsing, auditing, fetching, storage and cloud work all happen here. Each open surface is a separate instance of this page; instances share `chrome.storage.local` and the Firebase IndexedDB session but not in-memory state.
-3. **Web page (active tab).** No content scripts are declared. The only code that runs in the page is the injected `outerHTML` function.
+1. **Background service worker** (`static/scripts/background.js`). Copied verbatim to `build/scripts/background.js`; it is not processed by Vite and is not TypeScript. It applies the action behaviour from the storage key `mode`, owns the context menu, and answers `getHTML` by injecting a small function into the active tab of the asking page's window (`windowId`, else the last-focused window). It has no Firebase code and does no parsing.
+2. **Extension page** (`build/index.html`, the SvelteKit single page app from `src/`). The same page is the side panel (`side_panel.default_path`) and the action popup (set at runtime with `chrome.action.setPopup`). `html[data-mode="popup"]` switches to a fixed 720px layout. Parsing, auditing, fetching, storage and cloud work all happen here. The page also listens to `chrome.tabs.onActivated`, `onUpdated` (only `changeInfo.url` on an active tab) and `onReplaced`, filtered to the window that hosts it (`chrome.windows.getCurrent()`), to flag stale results (3.4, `src/lib/tabs/follow-tab.ts`); the listeners are removed on destroy. Each open surface is a separate instance of this page; instances share `chrome.storage.local` and the Firebase IndexedDB session but not in-memory state.
+3. **Web page (active tab).** No content scripts are declared. The only code that runs in the page is the injected function returning `{ html: outerHTML, href: location.href }`.
 
 ### Messaging map
 
@@ -110,7 +119,7 @@ This is the complete inventory. There are no ports (`runtime.connect`), no conte
 
 | Channel | Direction | Payload | Code |
 |---|---|---|---|
-| `chrome.runtime.sendMessage` | page -> background | Request `{ message: 'getHTML' }`. Response `{ html: string \| null, url: string, favIconUrl: string \| null, reason?: 'unscriptable' \| 'no-tab' }` (`favIconUrl` = `tab.favIconUrl`, Chrome's resolved favicon) | `src/lib/scrapers/getHTML.ts`; listener in `background.js` returns `true` to answer asynchronously |
+| `chrome.runtime.sendMessage` | page -> background | Request `{ message: 'getHTML', windowId?: number }` (`windowId` = the window hosting the page; omitted -> last-focused window). Response `{ html: string \| null, url: string, favIconUrl: string \| null, reason?: 'unscriptable' \| 'no-tab' }` (`url` = the captured document's `location.href`, falling back to `tab.url`; `tab.url` on the failure paths; `favIconUrl` = `tab.favIconUrl`, Chrome's resolved favicon, `null` when the document's URL differs from the queried tab's apart from the fragment) | `src/lib/scrapers/getHTML.ts`; listener in `background.js` returns `true` to answer asynchronously |
 | `chrome.storage.onChanged` (`local`, key `mode`) | page -> background | `'sidepanel' \| 'popup'` | `src/lib/mode.ts` writes; `background.js` applies |
 | `chrome.contextMenus.onClicked` | Chrome -> background | menu id `metaspry-open` | `background.js` |
 | `chrome.runtime.onMessage` in the page | none | No-op listener `onRuntimeMessage` ("reserved for future cross-surface coordination") | `src/lib/views/Extension.svelte` |
@@ -125,6 +134,7 @@ This is the complete inventory. There are no ports (`runtime.connect`), no conte
 | `src/routes/+layout.js` | `export const prerender = true` |
 | `src/routes/app.css` | Tailwind entry, popup sizing, tooltip (`.ms-tooltip`) and scrollbar styles |
 | `src/lib/views/Extension.svelte` | Orchestrator: view state machine, header, tabs, the scan -> audit -> history -> upload pipeline, mode switching |
+| `src/lib/tabs/` | `follow-tab.ts`: `tabState` (scanned vs active tab URL), `followActiveTab` (tabs listeners for one window), `getHostWindowId`, `displayUrl` (3.4) |
 | `src/lib/scrapers/` | `getHTML` (messaging), `getMetaTags` (+ `getJsonLd`, `getHreflang`, `getRobots`), `getSiteFiles` (network), `scan-error.ts` (a failed scan -> plain reason + raw detail, 3.17), types in `PageMeta.ts` and `SiteFiles.ts` |
 | `src/lib/audit/` | `rules.ts` (sync rules + scoring), `asyncRules.ts` (og:image dimensions), `AuditResult.ts` (types), `aeo.ts` (AI readiness) |
 | `src/lib/storage/` | `settings.ts`, `history.ts`, `pinned.ts`, `shortcuts.ts`: Svelte stores persisted to `chrome.storage.local` |
@@ -140,8 +150,10 @@ This is the complete inventory. There are no ports (`runtime.connect`), no conte
 | `scripts/check-remote-code.mjs` | Post-build guard: fails the build if `build/` references a remote script loader (4.1) |
 | `scripts/` | Node asset generators |
 | `promo/` | Store promo tiles and screenshots (`raw-screenshots/` holds the unprocessed captures) |
-| `docs/` | Store runbooks: `chrome-store-resubmit.md`, `store-screenshots.md` |
-| Git-ignored, generated | `build/`, `.svelte-kit/`, `node_modules/`, `metaspry-v*.zip`, `.code-graph/` |
+| `docs/` | Store runbooks: `chrome-store-resubmit.md`, `store-screenshots.md`; `qa/qa-log.md` (one entry per full QA pass) |
+| `e2e/` | Playwright suite: `fixtures.ts` (extension context + `openSurface`), `*.e2e.ts`, `server.mjs` + `site/` (the local fixture site the suite scans) |
+| `playwright.config.ts`, `vitest.config.ts` | Test runner config (3.18) |
+| Git-ignored, generated | `build/`, `.svelte-kit/`, `node_modules/`, `metaspry-v*.zip`, `.code-graph/`, `coverage/`, `test-results/`, `playwright-report/`, `blob-report/` |
 
 ### Startup order
 
@@ -188,7 +200,7 @@ Each feature lists: purpose and user flow, key files, data and storage, permissi
 
 ### 3.1 Manifest and permissions
 
-**Purpose.** `static/manifest.json` declares the extension: MV3, name `Metaspry`, version `1.0.30`, `minimum_chrome_version: "114"`, `offline_enabled: true`.
+**Purpose.** `static/manifest.json` declares the extension: MV3, name `Metaspry`, version `1.0.31`, `minimum_chrome_version: "114"`, `offline_enabled: true`.
 
 - `background.service_worker`: `scripts/background.js` (classic script; no `"type": "module"`).
 - `side_panel.default_path`: `index.html`.
@@ -230,13 +242,14 @@ Each feature lists: purpose and user flow, key files, data and storage, permissi
 
 **Permissions.** `sidePanel`, `storage`.
 
-**Tests.** None. Manually switch both ways and reopen from the toolbar.
+**Tests.** `e2e/shell.e2e.ts` (background.js applies a stored `mode` to `action.getPopup`). Opening the other surface needs a user gesture: manually switch both ways and reopen from the toolbar.
 
 **Gotchas.**
 - `sidePanel.open` and `action.openPopup` only work inside a user gesture. `background.js` mirrors the mode in memory (`currentMode`) so its context-menu handler never awaits storage first.
 - In `switchMode`, the side-panel branch calls `sidePanel.open` inside the `.then()` of `chrome.windows.getCurrent()`, although the comment beside it says no await may come first. If Chrome drops the gesture, the panel does not open (the mode is still saved). Check this by hand when you touch it.
 - `chrome.action.openPopup()` needs Chrome 127 or later; `background.js` falls back to the side panel when it fails.
 - A popup closes as soon as it loses focus, killing in-flight work such as a cloud upload (3.14).
+- Both surfaces run the same tab tracking (3.4). The side panel stays open across tab switches, so it is where the stale-results banner shows most; the popup usually closes on a switch but still shows the banner for same-tab and SPA navigations while open. Side panels are per window: each instance compares against its own window's active tab and scans that tab (E-19).
 - Renaming the `mode` key means changing `background.js` as well.
 
 ### 3.3 Context menu
@@ -260,16 +273,57 @@ Each feature lists: purpose and user flow, key files, data and storage, permissi
 
 **Purpose and flow.** The landing view says what the extension does (heading "Scan this page's meta tags", the line "Titles, descriptions, Open Graph, Twitter cards, robots and structured data - scored in seconds.") and shows one card, "Scan this page". Clicking it (or pressing `r`) runs `scrape()` in `Extension.svelte`:
 
-1. Sets the view to `loading` (skeleton). A second call while loading is ignored.
-2. `getHTML()` sends `getHTML`. The background queries `{ active: true, lastFocusedWindow: true }`, injects a function that returns `document.documentElement.outerHTML`, and replies with the HTML, the tab URL and `tab.favIconUrl` (Chrome's resolved favicon, null until loaded). The page parses the string with `DOMParser` into an inert document.
+1. Sets the view to `loading` (skeleton) and clears the scanned URL, except on a **re-scan from the results view**, which keeps every result on screen (see "Re-scan keeps the results" below). A second call while loading or re-scanning is ignored.
+2. `getHTML(windowId)` sends `getHTML` with the hosting window's id (`getHostWindowId()`, memoised `chrome.windows.getCurrent()`). The background queries `{ active: true, windowId }` (no id -> `{ active: true, lastFocusedWindow: true }`: the dev page or a failed lookup), injects a function that returns `{ html: outerHTML, href: location.href }`, and replies with the HTML, the document URL (`href`, else `tab.url`) and `tab.favIconUrl` (Chrome's resolved favicon, null until loaded; also null when a navigation committed between the query and the injection, so page B never gets page A's icon). The page parses the string with `DOMParser` into an inert document and keeps `scannedUrl = normalizeScanUrl(url)` for the current `scrapeId`. `getHTML` rejects after `CAPTURE_TIMEOUT_MS` (15 s; a late answer is ignored), so a tab with an open `alert()` / `confirm()`, where the injection never runs, cannot leave the scan loading forever; `describeScanError` turns it into "The page didn't answer in time. If it has a dialog open (an alert or a confirm box), close it, then scan again."
 3. `getMetaTags(html, tabUrl)` builds `PageMeta`: `<title>`; canonical and icon (`rel=icon`, then `shortcut icon`, then `apple-touch-icon`), both resolved to absolute URLs; every `<meta>` with non-empty `content`, keyed by `property` (preferred) or `name` and categorised; plus `jsonLd`, `hreflang` (resolved) and meta `robots`.
    Then `resolveIcon(meta.icon, favIconUrl, tabUrl)` (`src/lib/scrapers/icon.ts`) computes the **page icon** (`pageIcon` in `Extension.svelte`): the first http(s) URL of the declared link, Chrome's tab icon, `/favicon.ico` at the page origin. `data:`/`chrome:`/`blob:` tab icons are skipped so no icon bytes ever enter a scan document. `PageMeta.icon` itself stays the declared link, so the Tags tab (3.5), the exports and the empty-page check only report markup that exists; the page icon feeds the SERP preview (3.6), History (3.10) and the cloud payload (3.14).
-4. `pageUrl` = the first `og:url` value, else the canonical, else the tab URL.
+4. `pageUrl` = `scanUrlFor(tabUrl, canonical)`: the captured document URL, else the canonical. Never `og:url` (scan identity, below).
 5. No tags, title, canonical or declared icon -> `empty` view ("No meta tags found"); the page icon fallback does not count. Any error -> `error` view (3.17): an unscriptable page gives `unscriptableMessage()` as the reason (the tab URL behind "Details"); a thrown error goes through `describeScanError()` (`scrapers/scan-error.ts`), which maps the message-channel failures (`sendMessage` missing, "Receiving end does not exist", "No response from background script", a closed port) to "This page can't be scanned (browser or store page)...", permission and bad-URL failures to their own sentence, anything else to a generic one, and keeps the raw text for "Details".
 6. Otherwise the `results` view opens on the Tags tab. `runAudit()` shows the synchronous result at once and the async result when ready.
 7. After the final score: `pushHistory()` (3.10), then the cloud upload if signed in (3.14).
 
 A "Re-scan this page" button sits under the tab content. `scrapeId` and `auditId` counters drop results from superseded runs.
+
+**The panel follows the tab (E-1, 2026-10-23).** The results, empty and error views start with a
+one-line strip naming the scanned page (`SiteIcon` + `displayUrl(scannedUrl)`: host, path, query;
+CSS-truncated, full text in the node, `title` = full URL). `followActiveTab(windowId, ...)` re-reads
+the window's active tab on start and on every `tabs.onActivated` (same window), `tabs.onUpdated`
+with `changeInfo.url` for an active tab in that window (full navigations and `pushState` /
+`replaceState` routes) and `tabs.onReplaced` (prerender swap); only the newest query's answer is
+used. `tabState(scannedHref, activeUrl)` compares the two after `normalizeScanUrl` (so `#anchor` and a
+trailing slash are not changes), plus the hash route (`hashRoute`: a fragment starting `#/` or `#!`,
+so `#/pricing` -> `#/blog` on a hash-routed SPA is a change; `scannedHref` keeps the captured
+fragment for this comparison only, while `scannedUrl` and the scan identity drop it): `same`, `other`, `restricted` (`restrictedKind`, a page Chrome
+blocks) or `unknown` (no readable URL). When not `same`, an amber banner under the strip says "This
+tab changed. Results are for <host/path>." with a **Scan this tab** button (`restricted`: "This tab
+is <kind>; Chrome blocks extensions there. Results are for <host/path>." and no button; `unknown`:
+"This tab changed." + button), and the bottom button reads "Scan this tab" whenever the state is not
+`same`. In the results view on a `restricted` tab the bottom button is disabled and `r` is ignored, so
+a scan that Chrome would refuse cannot throw the results away. `restrictedKind` names
+`chrome://newtab` / `edge://newtab` "the new tab page" and matches the Web Store and PDFs on the
+parsed URL's host and path (a query string mentioning either does not count).
+Returning to the scanned URL clears it. The text is announced through an always-mounted `sr-only`
+`role="status"` region; focus never moves. **Nothing scans on its own**: every scan still costs a
+History entry, an upload and site-file fetches, so the banner only offers it. A scan in flight when
+the tab changes finishes for the page it captured and lands labelled with that page, banner showing.
+`scannedUrl` is cleared when a scan starts, so the landing and loading views show no strip.
+
+**Re-scan keeps the results** (`2026-10-23-keep-results-on-failed-scan`). A scan started while the
+results view is shown sets `rescanning` instead of `view = "loading"` and touches no result state
+(`scannedUrl`, `scannedHref`, `pageMeta`, `pageHtml`, `pageIcon`, `pageUrl`, `auditResult`,
+`activeTab`, `cloudScan`) until the new page's HTML is captured and `getMetaTags` has parsed it;
+only then does it commit and carry on as a normal scan. If it fails first (no HTML, `no-tab`,
+`unscriptable`, timeout, any throw) the results stay, no History entry / upload / site-file fetch
+happens, and `rescanError` shows an amber notice under the strip in place of the stale banner:
+"Couldn't scan <host/path, or 'this tab'>: <reason> Results are still for <scanned page>.",
+announced once through the assertive region; focus does not move. It clears on the next scan and
+when the active tab's URL changes. This covers every page Chrome refuses, recognised by URL or not
+(`devtools://`, a PDF without `.pdf`, policy-blocked hosts); `blockRescan` stays for the recognised
+ones. While `rescanning` the bottom button reads "Scanning..." with `aria-busy` and `aria-disabled`
+(not `disabled`, which would drop its focus to `<body>`), the banner's "Scan this tab" stays mounted
+with `aria-disabled`, and every scan entry (`r`, both buttons, History's empty-state scan) is ignored
+by `scrape()`'s guard. If the re-scan's outcome unmounts the focused control (the banner swapped for
+the notice) and focus falls to `<body>`, it moves to the bottom button. Scans from landing, the empty view and the error view are unchanged.
 
 **Unscriptable pages answer honestly.** `chrome://`/`edge://`/`brave://` pages, the New Tab page, the
 Chrome Web Store, PDFs and policy-blocked pages cannot be injected into. The background replies
@@ -287,16 +341,17 @@ in the payload as metadata.
 
 **Key files.** `src/lib/views/Extension.svelte`; `src/lib/scrapers/getHTML.ts`, `getMetaTags.ts`, `icon.ts`, `getJsonLd.ts`, `getHreflang.ts`, `getRobots.ts`, `PageMeta.ts`; `src/lib/categorize.ts`; `static/scripts/background.js`; components `Grid`, `Skeleton`, `EmptyState`, `ErrorState`, `Screen`.
 
-**Data.** In memory only (`pageMeta`, `pageHtml`, `auditResult`).
+**Data.** In memory only (`pageMeta`, `pageHtml`, `auditResult`, `scannedUrl`, `activeUrl`).
 
-**Permissions.** `tabs`, `activeTab`, `scripting`, host `*://*/*`. `tab.favIconUrl` needs only the host permission.
+**Permissions.** `tabs`, `scripting`, host `*://*/*` (no `activeTab`; the manifest does not declare it). `tab.favIconUrl` needs only the host permission. Tab tracking reads `tab.url` of tabs the user has not scanned, which needs `tabs` (or a host grant); without it `tabState` degrades to `unknown`. No `webNavigation`.
 
-**Tests.** `src/lib/scrapers/icon.spec.ts` (resolution order, skipped schemes, non-http page); the scrapers listed in 3.18.
+**Tests.** `src/lib/scrapers/icon.spec.ts` (resolution order, skipped schemes, non-http page); `src/lib/tabs/follow-tab.spec.ts` (`tabState` cases incl. hash routes vs plain anchors, `displayUrl`, `followActiveTab` window / `url` / active filtering, `onReplaced`, out-of-order answers, unsubscribe); `getHTML.spec.ts` (`restrictedKind` incl. query-string false positives, `windowId` sent or omitted, capture timeout and late answers); `scan-error.spec.ts` (timeout copy); `background-gethtml.spec.ts` (runs `static/scripts/background.js` against a fake `chrome`: document URL labels the result, favicon dropped on a moved document, `unscriptable`, `no-tab`); the scrapers listed in 3.18. The banner itself: by hand (tab switch, same-tab link, SPA route, `chrome://`, scan in flight, two windows). End to end: `e2e/scan.e2e.ts` and `e2e/tab-follow.e2e.ts` (3.18).
 
 **Gotchas.**
 - The captured HTML is the rendered DOM after the page's JavaScript ran, not the server HTML a crawler fetches. JavaScript-injected tags count here. Compare (3.12) fetches raw HTML instead.
-- There are two page URLs. `PageMeta.pageUrl` is the tab URL (used by the `hreflang-self` rule). `Extension.svelte`'s `pageUrl` prefers `og:url` and the canonical, and it drives Previews, Site, AI, Compare, history and the cloud document ID. If `og:url` points at another host, the Site and AI tabs fetch that host's files.
-- `background.js` does not handle a failed injection (`chrome://` pages, the Chrome Web Store, `file://` without access). `result[0]?.result` throws when `result` is undefined, `sendResponse` is never called, and `getHTML()` only settles when Chrome closes the message port (rejecting with "No response from background script.").
+- There are three page URLs. `PageMeta.pageUrl` is the tab URL (used by the `hreflang-self` rule). `Extension.svelte`'s `pageUrl` is `scanUrlFor(tabUrl, canonical)` and drives Previews, Site, AI, Compare, history and the cloud document ID. `scannedUrl` is the normalised captured document URL only (no canonical fallback) and drives the strip and the stale banner.
+- `background.js` answers on every path: a failed injection (`chrome://` pages, the Chrome Web Store, `file://` without access) replies `reason: 'unscriptable'`, a synchronous `executeScript` throw is caught, and no tab replies `reason: 'no-tab'`.
+- Same URL = not stale: a reload after editing the page's tags, or the same URL in a logged-in and a logged-out tab, shows no banner; the user presses Re-scan.
 - Tag values in `PageMeta.tags` are raw; only title, canonical, icon and hreflang hrefs are resolved. Consumers resolve `og:image` themselves.
 - `getRobots.ts` exports a `RobotsInfo` for meta robots that is unrelated to `SiteFiles.ts`'s `RobotsInfo` for robots.txt. Import the right one.
 - `categorize.ts`: `og:*` -> `og`, `twitter:*` -> `twitter`, a fixed SEO set (`description`, `keywords`, `robots`, `canonical`, `author`, `googlebot`) -> `seo`, a fixed basic set (`viewport`, `theme-color`, `generator`, ...) -> `basic`, everything else -> `other`.
@@ -326,7 +381,7 @@ Export bar: Copy JSON, Copy CSV, Download .json, Download .csv. JSON is `{ title
 
 **Permissions.** None beyond the page: `navigator.clipboard` for copy, a blob `<a download>` for files (no `downloads` permission).
 
-**Tests.** None.
+**Tests.** `e2e/scan.e2e.ts` (the fixture page's title, description and OG title render). The search, pins and categories: none.
 
 **Gotchas.**
 - The search input carries `data-shortcut="search"`, which the `/` shortcut looks up. Keep the attribute.
@@ -479,7 +534,7 @@ indexed, and "a canonical tag is present" passed it.
 
 **Permissions.** Host `*://*/*`.
 
-**Tests.** None.
+**Tests.** `src/lib/scrapers/getRobots.spec.ts`; `e2e/scan.e2e.ts` (robots.txt and llms.txt fetched live from the fixture site and rendered).
 
 **Gotchas.**
 - Nothing is cached. The Site tab, the AI tab and the cloud upload each call `fetchSiteFiles` separately, and leaving a tab and coming back fetches again.
@@ -496,7 +551,7 @@ indexed, and "a canonical tag is present" passed it.
 
 **Permissions.** `storage`.
 
-**Tests.** None for the component; the panel behaviour is the popover action's (`actions/popover.spec.ts`, `popover.dom.spec.ts`, 3.18).
+**Tests.** `e2e/scan.e2e.ts` (a scan writes `history` and the entry shows in the dropdown after a reload). Otherwise none for the component; the panel behaviour is the popover action's (`actions/popover.spec.ts`, `popover.dom.spec.ts`, 3.18).
 
 **Gotchas.**
 - Local only and unrelated to cloud history.
@@ -531,7 +586,7 @@ Checks in `src/lib/audit/aeo.ts`:
 
 **Permissions.** Host `*://*/*` (site files).
 
-**Tests.** None.
+**Tests.** `e2e/scan.e2e.ts` (the llms.txt check against the fixture site). The other checks: none.
 
 **Gotchas.**
 - `aeo.ts` mirrors the web app's server analyzer `app/functions/src/aeo.ts` and says "Keep aligned". Change `AI_BOTS` or any check's meaning in both repos.
@@ -549,7 +604,7 @@ Checks in `src/lib/audit/aeo.ts`:
 
 **Permissions.** Host `*://*/*` (cross-origin fetch with `credentials: 'omit'`).
 
-**Tests.** None.
+**Tests.** `e2e/scan.e2e.ts` opens the tab only. `diff.ts` and the fetch: none.
 
 **Gotchas.**
 - The left side is the rendered DOM; the right side is raw server HTML with no JavaScript. Tags that JavaScript injects show as left-only.
@@ -634,7 +689,7 @@ Checks in `src/lib/audit/aeo.ts`:
 **Purpose and flow.** Keys are ignored while typing in an input, textarea, select or contenteditable element:
 - `/` focuses the tag search (switching to Tags).
 - `?` toggles the help modal.
-- `r` re-scans.
+- `r` re-scans (ignored while results are shown and the tab is one Chrome blocks, and while a re-scan is in flight, 3.4; so is History's empty-state "Scan this page").
 - `1` to `6` select tabs by position: Tags, Previews, Audit, Site, AI, Compare.
 
 In the tab strip, Arrow Left/Right, Home and End move between tabs. `Esc` closes every open layer: the Settings drawer, the help modal, the History panel and the account popover (the last three through `use:popover`, 3.17), each returning focus to the control that opened it. `Esc` also hides a visible tooltip (3.17); neither the tooltip's handler nor the popover action calls `stopPropagation`, so one press hides the tooltip and closes whatever is open behind it. While the Settings drawer or the help modal is open, Tab and Shift+Tab cycle inside it (`cycleTab` in `src/lib/actions/popover.ts`; 3.8).
@@ -654,10 +709,11 @@ The help modal (`ShortcutsHelp.svelte`) is `role="dialog" aria-modal="true"`, la
 ### 3.17 UI shell and shared components
 
 - `+page.svelte`: gradient background and two blurred decorative orbs (`data-bg-orb`, hidden in popup mode).
-- Document: `<title>` is "Metaspry", or "Metaspry - <tab label>" while results show (`<svelte:head>` in `Extension.svelte`). The views sit in one `<main>`; the header's logo block is the page's one `<h1>` (the "Metaspry" wordmark is `sr-only` below 400 px, `min-[400px]:not-sr-only` above); view headings (landing, error, empty) are `h2`. An `sr-only` `aria-live="assertive"` region in `Extension.svelte` announces "Couldn't scan this page. <reason>" on a failed scan (cleared when a scan starts).
+- Document: `<title>` is "Metaspry", or "Metaspry - <tab label>" while results show (`<svelte:head>` in `Extension.svelte`). The views sit in one `<main>`; the header's logo block is the page's one `<h1>` (the "Metaspry" wordmark is `sr-only` below 400 px, `min-[400px]:not-sr-only` above); view headings (landing, error, empty) are `h2`. An `sr-only` `aria-live="assertive"` region in `Extension.svelte` announces "Couldn't scan this page. <reason>" on a failed scan, or the kept-results notice on a failed re-scan (3.4) (cleared when a scan starts).
 - Header, left to right: logo (wordmark visible from 400 px); the account control (3.13); one `role="toolbar"` group styled by `src/lib/components/toolbar.ts` (`toolbarButtonClass(active)`, `TOOLBAR_GROUP`; the file also exports the shell's focus rings, below) holding History, Settings, theme toggle and shortcuts `?`. One line at 100 % text from 320 px; the header, its right-hand block (`ml-auto`) and `TOOLBAR_GROUP` all `flex-wrap`, so at 200 % text the block drops under the logo and the toolbar wraps inside itself, and every control stays on screen at 320 and 400 px (R2-16; nothing scrolls sideways, so a control pushed past the edge was unreachable). Hover and "on" differ (V2-08): idle hover is a neutral `slate-900/5` wash with darker ink, `toolbarButtonClass(true)` is a brand tint (`indigo-600/10`, `indigo-700` ink; `indigo-400/20` / `indigo-200` dark) for an open menu or sheet AND for the theme toggle while dark is on (`aria-pressed`). The theme toggle has ONE state model: a fixed name "Dark theme" with `aria-pressed` true in dark mode (the old name flipped with the state AND carried `aria-pressed`). Every button has a `use:tooltip` equal to its `aria-label`; the account control's tooltip is "Sign in to sync scans to your account" or "Signed in as <email> - saving scans to <target>". Arrow Left/Right, Home and End move focus inside the toolbar. The surface toggle lives in Settings (3.2).
 - Both header menus anchor to the header's right-hand block (`relative` in `Extension.svelte`). Nothing between that block and a menu may carry `backdrop-blur`, `filter` or `transform`: that element would become the menu's containing block and stacking context, re-anchoring it and painting it under later glass cards (this bit the toolbar group once).
 - Views: `landing` (heading + value line, then Grid: the "Scan this page" card is a `<button type="button">` with the brand fill - white on `indigo-600`, hover `indigo-700` - the view's one primary action (T-07 / V2-10), first in the tab order after the header, Enter / Space start the scan), `loading` (`Skeleton`), `error` (`ErrorState`: `h2` "Couldn't scan this page" with `tabindex="-1"` that takes focus on mount - the button that started the scan is gone - then the plain `reason`, Retry, a `<details>` "Details" with the raw `detail` when there is one, links to docs and GitHub issues), `empty` (`EmptyState`: "No meta tags found", Try again, docs link), `results` (`Tabs` with Tags, Previews, Audit, Site, AI, Compare).
+- The results, empty and error views open with the scanned-page strip and, when the tab no longer shows that page, the amber stale banner (3.4; the popup note's amber tokens; its "Scan this tab" button takes `FOCUS_RING`). A second `sr-only` region, `role="status"`, always mounted, carries the banner text so it is announced politely when it appears or changes.
 - `Screen`: glass card wrapper. `Grid`: landing action cards (`GridProps` in `Grid.ts`). `<main>` scrolls (`overflow-y-auto`, `-m-1 p-1` so a focus ring is not clipped) in every view but `results`, which keeps its own scroll area between the tabs and Re-scan (R3-10: at 200 % text in a 320 px panel the wrapped header pushed "Scan this page" below the fold of the `h-screen overflow-hidden` root and a pointer could not reach it).
 - Text sizes are rem (R3-20): Tailwind's `text-xs` and up, and `text-[0.6875rem]` (11 px at 100 %) as the floor for small labels, chips, hints and footers. Never `text-[Npx]`: px text ignored the user's text size (at 200 % descriptions stayed 11 px under 24-32 px titles). The one px font size left is `SiteIcon`'s letter tile, sized with its px box.
 - Toasts (R2-27, same meaning as the web app's): `toast(message, variant)`; at most 3 visible, bottom-right (`left-4 right-4 items-end`). Each stays `toastDuration(message, variant)` = 3.5 s + 45 ms per character (the app's, V3-12; it was 2 s), capped at 9 s; errors at least 6 s (`toast.ts`, specced in `toast.spec.ts`). Every toast has a 24 px "Dismiss notification" x (`dismissToast(id)`); its hover is `white/15` on the coloured and dark fills, `slate-900/10` only on the light dark-mode note. Fills are the app's exact values, in both themes: success white on `#007a55`, error white on `#c70036` (the app's Tailwind 4 emerald-700 / rose-700, written as values because Tailwind 3's steps differ), default white on `slate-900` / dark `slate-900` on `slate-50`. Two always-mounted live regions, like the app (KB3-12): notes in `role="status" aria-live="polite"` above, errors in `role="alert" aria-live="assertive"` below; a toast is text added to an existing region, never a freshly inserted `role="alert"` node. (Until 1.0.26 every toast lived 1.5 s with no close, and dark success / error were the popover tint at 1.10:1 vs the page.)
@@ -666,7 +722,7 @@ The help modal (`ShortcutsHelp.svelte`) is `role="dialog" aria-modal="true"`, la
 - Focus rings: `FOCUS_RING` (`toolbar.ts`) is `focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent dark:focus-visible:ring-indigo-300`, on every button and link in the shell (toolbar, account control and its popover, History Clear / confirm, help Close, every drawer button and link including the footer links, the Audit "what changed" button, `BUTTON_SECONDARY`, the pin / copy card buttons and the export pills); `FOCUS_RING_INSET` is the same ring drawn inside for the full-bleed History rows. `FOCUS_RING_ON_FILL` is the same ring with a page-coloured offset (`ring-offset-white` / `dark:ring-offset-slate-950`, the app's brand-fill rule) for every brand or danger fill: "Scan this page", Re-scan, `BUTTON_PRIMARY` (Retry, Try again, Compare, Sign in, Save, Go Pro, History's "Scan this page"), `BUTTON_DANGER` and the category chips (R3-22: with a transparent offset the indigo-600 ring touched the indigo-600 fill, 1.00:1, and read as a 4 px bigger button). Never put both on one element. The old `ring-indigo-500/40` blended to about 1.7:1; the solid ring measures about 6.3:1 on white and 7.2:1 / 9.0:1 on `popover` / `slate-900` (WCAG 2.4.13 needs 3:1). Fields (`.ms-input`) keep a mouse-focus border + soft `indigo-400/30` ring and take the shared ring on keyboard focus. The Surface radio labels use the same colours with `focus-within:`. **Forced colors (R-26):** rings are box-shadows, which Windows contrast themes drop. Tailwind 3's `focus:outline-none` is `outline: 2px solid transparent`, which forced colors repaints, and `app.css` makes it explicit: under `@media (forced-colors: active)` every `:focus-visible` gets `outline: 2px solid Highlight` (offset 2 px), and a label whose `sr-only` input is focused (the Surface radios) gets the same. Never write a bare `outline: none`.
 - Text fields: one look, `.ms-input` (`app.css`; the web app's `ms-input`, R3-24): `rounded-xl`, `px-3 py-2 text-sm` (38 px), light `indigo-100/80` fill with the `field-edge` border (`#737e97`), dark an inset `slate-950/60` well with `field-edge-dark` (`#7880b5`), muted placeholder. Used by the sign-in fields, the tag search (`pl-9` for its icon), the Compare URL field (`aria-label="URL to compare"`) and the Settings number inputs (invalid: `rose-500` / `dark:rose-400` edge). The old three shapes (`rounded-lg`, two `rounded-full` pills) and the lighter `white/5` dark slab are gone. Measured on the Screen (Compare field), light: fill 1.08, edge 3.36 vs fill, 3.62 vs the card, placeholder 6.25 (app field on a card 1.12 / 3.33 / 3.72, placeholder 6.22 on the page); dark 1.14 / 4.80 / 4.19, placeholder 7.07 (app row card 1.16 / 4.99 / 4.28). In the dark sign-in popover the edge is 4.48:1 vs its fill but 2.94:1 vs `popover-raised`.
 - Muted text (R-33): secondary text (captions, section labels, hints, idle icons) uses `.ms-muted` (`app.css`, components layer so a hover utility still wins) = the `muted` colour in `tailwind.config.js`: `#475569` (slate-600) light, `#94a3b8` (slate-400) dark - 6.71:1 on the light Screen, 7.58:1 on white, 5.61:1 on `popover`. Never a raw `text-slate-400` / `text-slate-500` (they measured 2.27:1 and 3.02:1); `grep -rnE "text-slate-(400|500)" src` finds only `Previews/DiscordPreview.svelte`'s host caption, which sits on the fixed dark Discord mock (`bg-[#2b2d31]`) in both themes and keeps `text-slate-400` (5.4:1 there; `.ms-muted` light would be 1.8:1). Fixed-colour preview mocks are exempt from the token.
-- Tooltips: `use:tooltip={text | { text, placement?, delay? }}` (`src/lib/actions/tooltip.ts`, same API and behaviour as the web app's action). One shared body-level element (`role="tooltip"`, `id="ms-tooltip"`, class `.ms-tooltip` + `.ms-tooltip-arrow` in `src/routes/app.css`, `fixed z-[60]` so it clears the drawer and dropdowns; dark-aware; `invisible` while idle so it stays out of the accessibility tree; no transition under `prefers-reduced-motion`). Shows after `delay` (350 ms) on `pointerenter` (not touch), at once on keyboard focus (`:focus-visible` only, so a mouse click never pops it). Hoverable (WCAG 1.4.13): `pointerleave` and `blur` hide it after `HIDE_GRACE_MS` (120 ms); while visible the element carries `is-open`, which is the only time it takes pointer events (`.ms-tooltip.is-open { pointer-events: auto }`), so moving onto the bubble cancels the hide, leaving the bubble starts the same grace, and re-entering the trigger from the bubble keeps it with no new delay. `pointerdown`, `Escape`, emptied text and another trigger's show hide it at once. `aria-describedby="ms-tooltip"` is on the trigger only while visible, and not at all when the text repeats its `aria-label` (so it is announced once). A newer hover cancels any pending one (the History chip inside its row), and a parent's grace never hides a child's tooltip (owner check). Tooltip text wraps (`break-words`), so long URLs stay in the box. floating-ui `computePosition` (`strategy: 'fixed'`, `offset(8)`, `flip()`, `shift({ padding: 8 })`, `arrow`) + `autoUpdate` keep it inside a 320 px side panel. Empty text never shows. Used by: header toolbar, account control, History rows and score chip, Audit ring, Compare URL and scores, `PinButton`, `TagCard` copy, `ExportBar`, Site cards' "Not an http(s) URL" spans (hover-only, so each also carries an `sr-only` " (not an http(s) URL)"), Settings drawer buttons. Controls use the action, never a native `title` (a title beside it doubles up); the one remaining `title` is the truncated href text in `Audit/HreflangSection.svelte`.
+- Tooltips: `use:tooltip={text | { text, placement?, delay? }}` (`src/lib/actions/tooltip.ts`, same API and behaviour as the web app's action). One shared body-level element (`role="tooltip"`, `id="ms-tooltip"`, class `.ms-tooltip` + `.ms-tooltip-arrow` in `src/routes/app.css`, `fixed z-[60]` so it clears the drawer and dropdowns; dark-aware; `invisible` while idle so it stays out of the accessibility tree; no transition under `prefers-reduced-motion`). Shows after `delay` (350 ms) on `pointerenter` (not touch), at once on keyboard focus (`:focus-visible` only, so a mouse click never pops it). Hoverable (WCAG 1.4.13): `pointerleave` and `blur` hide it after `HIDE_GRACE_MS` (120 ms); while visible the element carries `is-open`, which is the only time it takes pointer events (`.ms-tooltip.is-open { pointer-events: auto }`), so moving onto the bubble cancels the hide, leaving the bubble starts the same grace, and re-entering the trigger from the bubble keeps it with no new delay. `pointerdown`, `Escape`, emptied text and another trigger's show hide it at once. `aria-describedby="ms-tooltip"` is on the trigger only while visible, and not at all when the text repeats its `aria-label` (so it is announced once). A newer hover cancels any pending one (the History chip inside its row), and a parent's grace never hides a child's tooltip (owner check). Tooltip text wraps (`break-words`), so long URLs stay in the box. floating-ui `computePosition` (`strategy: 'fixed'`, `offset(8)`, `flip()`, `shift({ padding: 8 })`, `arrow`) + `autoUpdate` keep it inside a 320 px side panel. Empty text never shows. Used by: header toolbar, account control, History rows and score chip, Audit ring, Compare URL and scores, `PinButton`, `TagCard` copy, `ExportBar`, Site cards' "Not an http(s) URL" spans (hover-only, so each also carries an `sr-only` " (not an http(s) URL)"), Settings drawer buttons. Controls use the action, never a native `title` (a title beside it doubles up); the remaining `title`s are on truncated non-interactive text: the href in `Audit/HreflangSection.svelte` and the scanned-page strip in `Extension.svelte`.
 - Buttons (K-18): `src/lib/components/button.ts` exports `BUTTON_PRIMARY` (white on `indigo-600`, hover `indigo-700` - white 12 px on the old `indigo-500` hover was 4.47:1), `BUTTON_SECONDARY` (neutral, `slate-500` / `slate-400` edge) and `BUTTON_DANGER` (white on `rose-600`, hover `rose-700`; `rose-500` was 3.67:1). One shape: `rounded-xl`, 12 px semibold, `min-h-[2.25rem]` (grows with the text); primary and danger take `FOCUS_RING_ON_FILL`, secondary `FOCUS_RING`. Used by the header Sign in (secondary), the sign-in popover, Settings Save / Reset / "Yes, reset" / Go Pro, the Empty / Error states' retry, History's empty-state "Scan this page" and the Compare submit (K3-03 / C3-10: it was a hand-rolled pill hovering to `indigo-500`, 4.47:1, with no focus ring; hover is now `indigo-700`, 7.90:1). Use one primary per view. Icon buttons on cards and dialogs (pin, copy, sign-in Close, shortcuts Close) are 32 px like the toolbar and Settings close (K3-15).
 - Scores: `src/lib/audit/band.ts` (`bandFor`, `bandLabel`, `scoreLabel`, `bandClasses`) is the only place a score turns into a band, a label or colour classes. **Band cap (2026-09-30):** `bandFor(score, rules?)` caps `good` at `warn` when any `required` rule has status `fail` (`pending` is not a fail); `fail` stays `fail`; the score is unchanged. Same rule and unit-test table as the web app's `bandFor` and the server engine's `band()` (`band.spec.ts`); `rules.ts` `audit` / `rescoreAfterAsync` map it to `success | warning | danger`; `CAPPED_BAND_REASON` is the shared copy; the History chip, the Audit ring, the Compare numbers and the cloud payload's `band` all use it, and so do the result views' status marks (R2-29): Audit rule icons (`stroke` via `bandForVerdict(status)`), `CharBar` (`fill`: over max -> fail, under min -> warn), AI-check dots and the AI-ready chip (`fill` / `chip`; `info` dots are `slate-500` / `slate-400`), the pinned star (`warn.stroke`, amber-700) and the sitemap notes (`ink`: `amber-800` / `rose-700` text, 12 px). Measured on the light result card: rule icons and bars emerald-600 3.61, amber-700 4.84, rose-600 4.50; notes amber-800 6.84 (the old `-500` marks were 1.90-2.25, the amber-600 note 2.87). `BandClasses` = `text`, `chip`, `stroke`, `fill`, `ink`. Light hues are `-600 / -700` like the web app (ring stroke and Compare number: emerald-600 3.34:1, amber-700 4.45:1, rose-600 4.16:1 on the light Screen; the old `-500` measured 2.25 / 1.90 / 3.25); dark keeps `-400`. Chips are the web app's `ms-badge-*` (R3-23): the band's fill at 15 % (`bg-emerald-600/[.15]`, `bg-amber-700/[.15]`, `bg-rose-600/[.15]`; dark `-400/[.15]`) with `-800` text (`amber-900` for warn: `-800` read 4.30 on a hovered History row) and `-300` in dark; `CHIP_NEUTRAL` (`slate-500/10`, `slate-600` text) is the app's `ms-badge-neutral`. Used by the History score chip, the AI-ready chip, the Site cards' Found / Missing / Not present and Settings' "Unsaved changes". Measured light: History 6.45 / 5.76 / 6.32 at rest (were 4.09 / 3.88 / 4.33), Site cards 6.22 / 6.09 / 6.46; dark 5.62 / 5.78 / 4.80. Placement rule shared with the web app: identity left, score last on the right. Tailwind 3 gotcha: `bg-*/15` compiles to nothing (no 15 in the opacity scale) - write `/[.15]` (or use `/20`).
 
@@ -681,13 +737,28 @@ The help modal (`ShortcutsHelp.svelte`) is `role="dialog" aria-modal="true"`, la
 | `npm test` | Vitest, co-located `*.spec.ts` (`--run` for one pass, `npm run test:watch` to watch). |
 | `npm run check` | `svelte-check` against `tsconfig.json`. |
 | `npm run build` | `vite build` + `removeInlineScript.cjs` + `scripts/check-remote-code.mjs` (fails on remote script loaders). Does not type-check on its own. |
+| `npm run test:coverage` | The Vitest run with v8 coverage over all of `src/lib` (`all: true`, so untested files show as 0 %). `.svelte` files read 0 % here; e2e covers them. |
+| `npm run test:e2e` | `npm run build`, then `playwright test`. One worker, a fresh persistent Chromium profile per test, new headless (`channel: 'chromium'`); `HEADED=1` shows the browser. Report in `playwright-report/`, traces of failures in `test-results/`. |
+| `npm run qa` | The full pass (hard rule 13): `check` + `test` + `test:e2e`. |
+
+**E2E harness (`e2e/`).** `fixtures.ts` launches Chromium with `--load-extension=build`, reads the extension id from the background service worker, and `openSurface(path)` opens `path` of the fixture site (`e2e/server.mjs` serving `e2e/site/` on `127.0.0.1:4319`, started by Playwright's `webServer`) in its own window, then loads `index.html` in the context's first tab. An init script makes that tab's `chrome.windows.getCurrent()` report the site window, standing in for a side panel docked there; `openSurface` asserts the override took (otherwise the background's last-focused fallback would hit the site window and scans would pass for the wrong reason). Everything else is real (background.js, `getHTML` messaging, `scripting.executeScript`, tabs events, `chrome.storage`, the site-file fetches). Firebase is not stubbed and stays signed out. Every test fails on an uncaught error in the extension page; `backgroundErrors` collects service-worker `console.error`s and context `weberror`s (asserted in `load.e2e.ts`).
+
+| Spec | Covers |
+| --- | --- |
+| `load.e2e.ts` | Service worker registers and applies the default mode, extension id, landing view, no page or service-worker errors |
+| `scan.e2e.ts` | Scan -> all six tabs (Tags title/description/OG/canonical, Previews, Audit score label, Site robots/llms from the server, AI llms.txt check, Compare opens); empty page -> empty state; `chrome://` page -> error state with the plain reason; history entry persisted and shown after reload |
+| `tab-follow.e2e.ts` | Stale banner on navigation, "Scan this tab"; `#section` vs hash route; failed re-scan keeps results (connection-refused error page); restricted page names itself and disables re-scan |
+| `shell.e2e.ts` | Theme toggle + persistence; `?`, digit and `r` shortcuts; settings drawer open/close; background applies `mode` to the action popup |
+
+Gotchas: the suite tests `build/` as built, so `npx playwright test` alone runs against a stale build (use `npm run test:e2e`). `site/` hardcodes port 4319 in canonical/og:url. Chromium extension tests run one at a time on purpose.
 
 - Covered by unit tests: `cloud/sync.ts` (`sync.spec.ts`, in-memory Firestore mock), `cloud/compare-link.ts`, `cloud/auth-errors.ts`, `cloud/workspace-scoring.ts` (resolution, normalisation, entitlement), `scrapers/scan-error.ts`, `components/Shortcuts/keyboard.ts` (`shortcutFor`), `audit/band.ts` (bands, the required-fail cap table, labels, light hues, `fill` / `ink`, `bandForVerdict`), `components/Toast/toast.ts` (`toast.spec.ts`: `toastDuration` at the app's 3.5 s base, per-toast expiry, dismiss, the cap of 3), `util/time-ago.ts`, `actions/tooltip.ts` (`tooltip.spec.ts`: options and listener wiring in node with a fake element; `tooltip.dom.spec.ts`: show/hide, owner hand-off, `aria-describedby`, Escape propagation, nested hover, the hover grace and the bubble bridge, `is-open`, update/destroy in happy-dom with floating-ui mocked), `actions/popover.ts` (`popover.spec.ts`: listener wiring, Escape, outside press, focus in / return, trigger swap, Tab cycling in node with a fake element and document; `popover.dom.spec.ts`: the same against real elements in happy-dom), `motion.ts` (`motion.spec.ts`), the auth entry and `scripts/check-remote-code.mjs` (`cloud/auth-entry.spec.ts`), `audit/rules.ts`, `audit/asyncRules.ts`, `audit/url-match.ts`,
-  `cloud/scan-identity.ts`, `cloud/settings.ts`, `scrapers/getHTML.ts`, `scrapers/getRobots.ts`,
+  `cloud/scan-identity.ts`, `cloud/settings.ts`, `scrapers/getHTML.ts` (`unscriptableMessage`, `restrictedKind`, the `windowId` request), `tabs/follow-tab.ts`, `scrapers/getRobots.ts`,
   `scrapers/getHeaderRobots.ts`, `storage/watch.ts` and its key helper.
-- Manual verification is still required for anything that needs a real browser: `npm run build`, load
-  `build/` unpacked, then check all six tabs, both surfaces, the context menu, sign-in (email and
-  Google), a signed-in scan landing in the app, and free versus Pro scoring.
+- Still manual (not automatable in the harness, or not yet covered): the real side panel and popup
+  surfaces and switching between them (user gesture), the context menu, sign-in (email and Google),
+  a signed-in scan landing in the app, free versus Pro scoring, exports, Compare against a second URL,
+  and visual checks in light and dark. A full QA pass walks this list after `npm run qa`.
 
 ---
 
@@ -708,7 +779,7 @@ The help modal (`ShortcutsHelp.svelte`) is `role="dialog" aria-modal="true"`, la
 
 ### 4.2 Versioning
 
-- The version lives in two files that must match: `version` in `static/manifest.json` and in `package.json` (both `1.0.30` on this branch; the v1.0.26 to v1.0.30 zips are built, none submitted yet, so the store serves `1.0.25`). No script syncs them.
+- The version lives in two files that must match: `version` in `static/manifest.json` and in `package.json` (both `1.0.31` on this branch; the v1.0.26 to v1.0.30 zips are built, none submitted yet, so the store serves `1.0.25`; the 1.0.31 zip is built after merge). No script syncs them.
 - Convention from the git history: each shipped change bumps the patch version and gets a new zip (commit messages like "v1.0.22 + zip").
 - The repo has no git tags, although the README checklist ends with "tag the commit `vX.Y.Z`".
 
@@ -746,6 +817,7 @@ Store item ID: `kibedpkbadcofhbcpfigjmjanmdkmaji`. Privacy policy URL: `https://
 - **1.0.28 (round-3 batch 6) waits for 1.0.27 (A-1).** `metaspry-v1.0.28.zip` is built but must not be submitted until 1.0.27 is live in the store.
 - **1.0.29 (required-fail band cap, 2026-09-30).** Release notes: a page with a failing Required check (for example noindex) now shows as "Needs work" instead of "Healthy", whatever its score; the score number is unchanged. The Audit ring turns amber and its caption reads "Needs work: a required check is failing"; the History chip, the Compare numbers and the uploaded scan's `band` are capped the same way. `metaspry-v1.0.29.zip` is built; it carries 1.0.28's changes, so it can replace 1.0.28 in the queue after 1.0.27 is live.
 - **1.0.30 (auth web-extension entry, 2026-10-01) replaces 1.0.29 in the queue**, still only after 1.0.27 is live. Release note: "Sign-in uses Firebase's extension build; no change for users." `metaspry-v1.0.30.zip` is built and carries every 1.0.28 and 1.0.29 change. Keep the 1.0.29 zip.
+- **1.0.31 (side panel follows the tab, 2026-10-23) replaces 1.0.30 in the queue**, still only after 1.0.27 is live. Release note: "The side panel now shows which page its results are for and tells you when you have switched tabs or navigated away, with a one-click Scan this tab. Scans always target the tab in the panel's own window. A scan that fails no longer wipes the results you were looking at, and a page that never answers (an open dialog) times out after 15 seconds." No permission change. Build `metaspry-v1.0.31.zip` from a fresh `build/` after merge; keep the 1.0.30 zip.
 - The README's listing copy, permission justifications and privacy answers were reconciled with sign-in and upload for v1.0.26, carried into v1.0.27 (six tabs, 19 rules, `identity` row, "Authentication info: Yes, only when signed in", Free 10 / Pro 50 + 20 versions). Re-read `static/manifest.json` the day you submit. The v1.0.26 landing changed the store screenshots' first frame: refresh them with this release.
 - **Resolved in 1.0.30:** bundles up to 1.0.29 contain `https://apis.google.com/js/api.js` and `https://www.google.com/recaptcha/api.js` (and `recaptcha/enterprise.js`) from the default `firebase/auth` entry, a commonly reported MV3 remote-code rejection trigger. 1.0.30 imports `firebase/auth/web-extension`, its bundle has none of them, and `npm run build` now fails if one comes back (4.1). 1.0.27 (the next submission) still carries the strings.
 - `docs/chrome-store-resubmit.md` is a record from the v1.0.5 era; its version numbers are historical.

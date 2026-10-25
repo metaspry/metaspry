@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onDestroy, onMount, tick } from "svelte";
   import Screen from "../components/Screen/Screen.svelte";
   import Grid from "../components/Grid/Grid.svelte";
   import type { GridProps } from "../components/Grid/Grid";
@@ -15,10 +15,12 @@
   import CompareView from "../components/Compare/CompareView.svelte";
   import SiteView from "../components/Site/SiteView.svelte";
   import AeoView from "../components/Aeo/AeoView.svelte";
+  import SiteIcon from "../components/SiteIcon/SiteIcon.svelte";
 
-  import { getHTML, unscriptableMessage } from "../scrapers/getHTML";
+  import { getHTML, restrictedKind, unscriptableMessage } from "../scrapers/getHTML";
   import { describeScanError } from "../scrapers/scan-error";
-  import { scanUrlFor } from "../cloud/scan-identity";
+  import { normalizeScanUrl, scanUrlFor } from "../cloud/scan-identity";
+  import { displayUrl, followActiveTab, getHostWindowId, hostOf, tabState } from "../tabs/follow-tab";
   import { getMetaTags } from "../scrapers/getMetaTags";
   import { resolveIcon } from "../scrapers/icon";
   import type { PageMeta } from "../scrapers/PageMeta";
@@ -33,7 +35,7 @@
   import { pushHistory } from "../storage/history";
   import { hasFailingRequired } from "../audit/band";
   import { registerShortcuts, helpOpen } from "../components/Shortcuts/keyboard";
-  import { toolbarButtonClass, TOOLBAR_GROUP, FOCUS_RING_ON_FILL } from "../components/toolbar";
+  import { toolbarButtonClass, TOOLBAR_GROUP, FOCUS_RING, FOCUS_RING_ON_FILL } from "../components/toolbar";
   import CloudSync from "../components/CloudSync/CloudSync.svelte";
   import { tooltip } from "../actions/tooltip";
   import { cloudUser } from "../cloud/auth";
@@ -64,6 +66,42 @@
   let cloudScan: UploadResult | null = null;
   $: if (!$cloudUser) cloudScan = null;
   let settingsOpen = false;
+
+  // E-1: the document URL the current scan captured (not `pageUrl`, which can fall back to the
+  // canonical), and the URL of this window's active tab (null until first read). Comparing the two
+  // flags results that no longer describe the tab; nothing here ever starts a scan.
+  let scannedUrl = "";
+  // The captured URL with its fragment, for the stale comparison only: a hash-routed SPA's route
+  // lives there (`#/pricing` -> `#/blog`), while `scannedUrl` and the scan identity drop it.
+  let scannedHref = "";
+  let activeUrl: string | null = null;
+  // A re-scan from the results view in flight (results stay on screen), and why the last one
+  // failed (shown instead of the stale banner until the next scan or tab change).
+  let rescanning = false;
+  let rescanError: { reason: string; url: string } | null = null;
+  $: clearRescanError(activeUrl);
+  function clearRescanError(_url: string | null) {
+    rescanError = null;
+  }
+  $: staleState = activeUrl === null ? "same" : tabState(scannedHref, activeUrl);
+  $: isStale = staleState !== "same";
+  $: canScanTab = staleState === "other" || staleState === "unknown";
+  // On a page Chrome is known to block a re-scan can only fail, so it is not offered. Pages the URL
+  // check misses are covered by `scrape()` keeping the results when the capture fails.
+  $: blockRescan = view === "results" && staleState === "restricted";
+  $: scannedLabel = displayUrl(scannedUrl);
+  $: showScannedPage = !!scannedUrl && (view === "results" || view === "empty" || view === "error");
+  $: rescanMessage = rescanError ? rescanNotice(rescanError, scannedLabel) : "";
+  function rescanNotice(err: { reason: string; url: string }, label: string): string {
+    return `Couldn't scan ${err.url ? displayUrl(err.url) : "this tab"}: ${err.reason} Results are still for ${label}.`;
+  }
+  $: staleMessage = !showScannedPage || !isStale || rescanError
+    ? ""
+    : staleState === "restricted"
+      ? `This tab is ${restrictedKind(activeUrl ?? "") ?? "a page Chrome blocks"}; Chrome blocks extensions there. Results are for ${scannedLabel}.`
+      : staleState === "other"
+        ? `This tab changed. Results are for ${scannedLabel}.`
+        : "This tab changed.";
 
   const tabs: TabDef[] = [
     { id: "tags", label: "Tags" },
@@ -102,22 +140,52 @@
   }
 
   async function scrape() {
-    if (view === "loading") return;
+    if (view === "loading" || rescanning) return;
     const id = ++scrapeId;
-    view = "loading";
-    errorReason = "";
-    errorDetail = null;
+    // A re-scan from the results view captures first and replaces the results only once the new
+    // page is parsed; a failure leaves them on screen. Every other view clears as before.
+    const keep = view === "results";
+    // Whether the user was on a control here (a button they pressed, or `r` with focus inside).
+    const hadFocus = typeof document !== "undefined" && document.activeElement !== null && document.activeElement !== document.body;
+    let committed = false;
     announcement = "";
-    cloudScan = null;
+    rescanError = null;
+    if (keep) {
+      rescanning = true;
+    } else {
+      view = "loading";
+      errorReason = "";
+      errorDetail = null;
+      cloudScan = null;
+      scannedUrl = "";
+      scannedHref = "";
+    }
     try {
-      const { html, url: tabUrl, reason, favIconUrl } = await getHTML();
+      // E-19: capture the active tab of the window hosting this page, not the last-focused one.
+      const windowId = await getHostWindowId();
+      if (id !== scrapeId) return;
+      const { html, url: tabUrl, reason, favIconUrl } = await getHTML(windowId ?? undefined);
       if (id !== scrapeId) return;
       if (!html) {
+        if (keep) {
+          keepResults(unscriptableMessage(tabUrl, reason), tabUrl);
+          return;
+        }
+        scannedUrl = normalizeScanUrl(tabUrl);
+        scannedHref = tabUrl;
         fail(unscriptableMessage(tabUrl, reason), tabUrl ? `Page: ${tabUrl}` : null);
         return;
       }
       const meta = getMetaTags(html, tabUrl);
       if (id !== scrapeId) return;
+      // Commit: from here on the new page replaces the old results.
+      committed = true;
+      rescanning = false;
+      errorReason = "";
+      errorDetail = null;
+      cloudScan = null;
+      scannedUrl = normalizeScanUrl(tabUrl);
+      scannedHref = tabUrl;
       // Kept beside `meta`, not inside it: `PageMeta.icon` stays the declared <link>, so the Tags
       // tab, the exports and the empty-page check report only markup that exists. The resolved
       // icon feeds the SERP preview, History and the cloud payload.
@@ -134,6 +202,8 @@
       }
       activeTab = "tags";
       view = "results";
+      // Now, not after the audit and upload: the commit just unmounted the stale banner.
+      if (keep && hadFocus) void keepFocus();
       prevSettings = $effectiveSettings;
       const finalResult = await runAudit(meta, $effectiveSettings, id);
       if (id !== scrapeId) return;
@@ -168,8 +238,30 @@
     } catch (error) {
       if (id !== scrapeId) return;
       const described = describeScanError(error);
+      if (keep && !committed) {
+        keepResults(described.reason, "");
+        return;
+      }
       fail(described.reason, described.detail);
+    } finally {
+      if (id === scrapeId) rescanning = false;
+      // Kept-results failure: the notice replaced the banner. Success restored focus at the commit.
+      if (keep && hadFocus && !committed && id === scrapeId) void keepFocus();
     }
+  }
+
+  // A kept-results re-scan swaps the stale banner (and its focused "Scan this tab") for the notice,
+  // or the strip for the new page. If that dropped focus to <body>, put it on the re-scan button.
+  let rescanButton: HTMLButtonElement | null = null;
+  async function keepFocus() {
+    await tick();
+    if (document.activeElement === null || document.activeElement === document.body) rescanButton?.focus();
+  }
+
+  // A re-scan failed before replacing anything: the results stay, and a notice says why.
+  function keepResults(reason: string, url: string) {
+    rescanError = { reason, url };
+    announcement = rescanNotice(rescanError, scannedLabel);
   }
 
   function fail(reason: string, detail: string | null) {
@@ -271,7 +363,23 @@
     // click, so chrome.sidePanel.open / chrome.action.openPopup retain gesture context.
   }
 
+  let stopFollowing: (() => void) | null = null;
+  let destroyed = false;
+
+  async function startFollowingTab() {
+    const windowId = await getHostWindowId();
+    if (destroyed || windowId === null || typeof chrome === "undefined" || !chrome.tabs?.onActivated) return;
+    stopFollowing = followActiveTab(windowId, (url) => (activeUrl = url));
+  }
+
+  onDestroy(() => {
+    destroyed = true;
+    stopFollowing?.();
+    stopFollowing = null;
+  });
+
   onMount(() => {
+    void startFollowingTab();
     if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
       chrome.runtime.onMessage.addListener(onRuntimeMessage);
     }
@@ -279,7 +387,9 @@
     registerShortcuts({
       focusSearch,
       selectTab: selectTabByIndex,
-      rescan: () => void scrape(),
+      rescan: () => {
+        if (!blockRescan) void scrape();
+      },
     });
   });
 </script>
@@ -289,8 +399,12 @@
 </svelte:head>
 
 <!-- Assertive: a failed scan replaces the button that started it, so it is announced here as well as
-     by moving focus to the error heading (R-34). -->
+     by moving focus to the error heading (R-34). A failed re-scan that keeps the results is announced
+     here too, without moving focus. -->
 <div class="sr-only" aria-live="assertive" aria-atomic="true">{announcement}</div>
+<!-- Polite and always mounted, so the stale-results banner below is announced when it appears or
+     changes, without moving focus (E-1). The visible banner carries the "Scan this tab" button. -->
+<div class="sr-only" role="status" aria-atomic="true">{staleMessage}</div>
 
 <div class="flex h-full w-full flex-col p-3">
   <Screen>
@@ -313,7 +427,7 @@
         <CloudSync />
 
         <div role="toolbar" aria-label="Extension controls" tabindex="-1" class={TOOLBAR_GROUP} on:keydown={onToolbarKey}>
-          <HistoryDropdown onScan={() => void scrape()} />
+          <HistoryDropdown onScan={() => { if (!blockRescan) void scrape(); }} />
 
           <button
             type="button"
@@ -401,6 +515,50 @@
          pointer could not reach it. `-m-1 p-1` keeps the 4 px focus ring inside the scroll box.
          Results keep their own scroll area between the tabs and Re-scan. -->
     <main class="flex min-h-0 flex-1 flex-col gap-4 {view === 'results' ? '' : '-m-1 overflow-y-auto p-1'}">
+    {#if showScannedPage}
+      <!-- Names the page these results belong to (E-1). Full host/path/query in the text node, so a
+           screen reader reads it whole however much the CSS truncates. -->
+      <div class="flex min-w-0 shrink-0 items-center gap-2 text-xs ms-muted">
+        <SiteIcon src={view === "error" ? null : pageIcon} hostname={hostOf(scannedUrl)} size={16} />
+        <p class="min-w-0 truncate" title={scannedUrl}><span class="sr-only">Results for </span>{scannedLabel}</p>
+      </div>
+      {#if staleMessage}
+        <aside
+          aria-label="Results are for another page"
+          class="flex shrink-0 items-center gap-2 rounded-xl border border-amber-300/50 bg-amber-50/80 px-3 py-2 text-xs text-amber-900 backdrop-blur-md dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 flex-shrink-0" aria-hidden="true">
+            <path d="M12 9v4M12 17h.01" />
+            <circle cx="12" cy="12" r="10" stroke-width="1.5" />
+          </svg>
+          <p class="min-w-0 flex-1 break-words">{staleMessage}</p>
+          {#if canScanTab}
+            <!-- Stays mounted and focusable while a re-scan runs (aria-disabled, scrape() ignores the
+                 click): removing or disabling the focused button would drop focus to <body>. -->
+            <button
+              type="button"
+              on:click={retry}
+              aria-disabled={rescanning}
+              class="shrink-0 rounded-lg px-2 py-1 font-semibold underline underline-offset-2 hover:bg-amber-200/60 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 dark:hover:bg-amber-500/20 {FOCUS_RING}"
+            >Scan this tab</button>
+          {/if}
+        </aside>
+      {/if}
+      {#if rescanMessage}
+        <!-- A re-scan failed and the results were kept. Announced through the assertive region
+             above (`announcement`), so this has no live role of its own. -->
+        <aside
+          aria-label="Scan failed, results kept"
+          class="flex shrink-0 items-center gap-2 rounded-xl border border-amber-300/50 bg-amber-50/80 px-3 py-2 text-xs text-amber-900 backdrop-blur-md dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 flex-shrink-0" aria-hidden="true">
+            <path d="M12 9v4M12 17h.01" />
+            <circle cx="12" cy="12" r="10" stroke-width="1.5" />
+          </svg>
+          <p class="min-w-0 flex-1 break-words">{rescanMessage}</p>
+        </aside>
+      {/if}
+    {/if}
     {#if view === "landing"}
       <div class="flex flex-col gap-1">
         <!-- Says what the extension does before asking for a click (R-38). -->
@@ -435,10 +593,16 @@
           <CompareView leftMeta={pageMeta} leftUrl={pageUrl} leftScore={auditResult.score} leftRules={auditResult.rules} />
         {/if}
       </div>
+      <!-- aria-disabled, not disabled, while re-scanning: this button usually has focus, and disabling
+           it would drop focus to <body>. scrape() ignores the click. -->
       <button
         type="button"
         on:click={retry}
-        class="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-indigo-500/30 transition hover:bg-indigo-700 motion-safe:active:scale-[0.99] dark:bg-indigo-600 dark:hover:bg-indigo-700 {FOCUS_RING_ON_FILL}"
+        disabled={blockRescan}
+        aria-disabled={rescanning}
+        aria-busy={rescanning}
+        bind:this={rescanButton}
+        class="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 disabled:cursor-not-allowed disabled:opacity-50 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-indigo-500/30 transition hover:bg-indigo-700 motion-safe:active:scale-[0.99] dark:bg-indigo-600 dark:hover:bg-indigo-700 {FOCUS_RING_ON_FILL}"
       >
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true">
           <path d="M3 12a9 9 0 0 1 15.5-6.4L21 8" />
@@ -446,7 +610,7 @@
           <path d="M21 12a9 9 0 0 1-15.5 6.4L3 16" />
           <path d="M3 21v-5h5" />
         </svg>
-        Re-scan this page
+        {rescanning ? "Scanning..." : isStale ? "Scan this tab" : "Re-scan this page"}
       </button>
     {/if}
     </main>
