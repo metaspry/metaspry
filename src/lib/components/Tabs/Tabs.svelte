@@ -54,12 +54,14 @@
   role="tablist"
   aria-label="Analysis views"
   on:keydown={onKey}
-  class="flex w-full flex-wrap items-center gap-1 rounded-2xl border border-white/40 bg-white/40 p-1 text-xs font-medium backdrop-blur-md dark:border-white/10 dark:bg-white/5"
+  class="flex w-full flex-wrap items-center gap-1 rounded-2xl border border-white/40 bg-white/40 p-1 text-xs font-medium dark:border-white/10 dark:bg-white/5"
 >
   {#each tabs as tab}
     <button
       type="button"
       role="tab"
+      id="tab-{tab.id}"
+      aria-controls="panel-{tab.id}"
       aria-selected={tab.id === active}
       tabindex={tab.id === active ? 0 : -1}
       bind:this={refs[tab.id]}

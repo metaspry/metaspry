@@ -180,7 +180,7 @@ const RULES: RuleDefinition[] = [
     description: 'When og:type=article, fill article:author, article:published_time, article:section.',
     check: (m) => {
       const type = first(m, 'og:type')?.value.toLowerCase();
-      if (type !== 'article') return { status: 'pass', detail: 'Not an article page; skipped.' };
+      if (type !== 'article') return { status: 'pass', detail: 'Not an article page.', skipped: true };
       const missing = ['article:author', 'article:published_time', 'article:section'].filter((k) => !first(m, k));
       if (missing.length === 0) return { status: 'pass', detail: 'All article tags present.' };
       return { status: 'warn', detail: `Missing: ${missing.join(', ')}` };
@@ -192,7 +192,7 @@ const RULES: RuleDefinition[] = [
     title: 'hreflang self-reference',
     description: 'When hreflang links exist, one should reference this page.',
     check: (m) => {
-      if (m.hreflang.length === 0) return { status: 'pass', detail: 'No hreflang links; skipped.' };
+      if (m.hreflang.length === 0) return { status: 'pass', detail: 'No hreflang links on this page.', skipped: true };
       // "Self" is the scanned page (canonical preferred, else the page URL). Never the popup's
       // own document — getMetaTags parses a detached DOM, so document.location is the extension.
       const here = m.canonical ?? m.pageUrl;
@@ -298,7 +298,7 @@ const RULES: RuleDefinition[] = [
     description: 'Malformed application/ld+json blocks fail.',
     check: (m) => {
       if (m.jsonLd.parseErrors === 0 && m.jsonLd.entities.length === 0) {
-        return { status: 'pass', detail: 'No JSON-LD on page.' };
+        return { status: 'pass', detail: 'No JSON-LD on this page.', skipped: true };
       }
       if (m.jsonLd.parseErrors === 0) {
         return { status: 'pass', detail: `${m.jsonLd.entities.length} entit${m.jsonLd.entities.length === 1 ? 'y' : 'ies'} parsed.` };
@@ -333,6 +333,7 @@ export function audit(meta: PageMeta, settings: Settings = DEFAULT_SETTINGS): Au
       description: rule.description,
       status: r.status,
       detail: r.detail,
+      ...(r.skipped ? { skipped: true as const } : {}),
       ...(r.meta ? { meta: r.meta } : {}),
     };
   });

@@ -3,10 +3,10 @@
  * settings doc (users/{uid}/settings/audit), so scoring rules match the web app.
  * Cloud wins on sign-in (pull); local edits push. A suppress flag avoids the pull echo.
  */
-import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { get } from 'svelte/store';
-import { fbDb } from './firebase';
+import { firestoreSdk } from './sdk';
 import { cloudUser } from './auth';
+import { toast } from '../components/Toast/toast';
 import {
   settings,
   applySettingsWithoutPersisting,
@@ -15,7 +15,8 @@ import {
 } from '../storage/settings';
 
 export async function loadCloudSettings(uid: string): Promise<Settings | null> {
-  const snap = await getDoc(doc(fbDb(), 'users', uid, 'settings', 'audit'));
+  const { db, doc, getDoc } = await firestoreSdk();
+  const snap = await getDoc(doc(db, 'users', uid, 'settings', 'audit'));
   if (!snap.exists()) return null;
   const d = snap.data() as Partial<Settings>;
   return {
@@ -26,7 +27,8 @@ export async function loadCloudSettings(uid: string): Promise<Settings | null> {
 }
 
 export async function saveCloudSettings(uid: string, s: Settings): Promise<void> {
-  await setDoc(doc(fbDb(), 'users', uid, 'settings', 'audit'), s, { merge: true });
+  const { db, doc, setDoc } = await firestoreSdk();
+  await setDoc(doc(db, 'users', uid, 'settings', 'audit'), s, { merge: true });
 }
 
 let started = false;
@@ -92,6 +94,11 @@ export function initCloudSettingsSync(): void {
 
   settings.subscribe((s) => {
     const u = get(cloudUser);
-    if (u && !suppress && pulledUid === u.uid) void saveCloudSettings(u.uid, s).catch(() => {});
+    // A failed push used to be swallowed while the drawer said "saved" (UX review item 1).
+    if (u && !suppress && pulledUid === u.uid) {
+      void saveCloudSettings(u.uid, s).catch(() =>
+        toast("Scoring rules saved on this device, but couldn't sync to your account. Save again to retry.", 'error'),
+      );
+    }
   });
 }

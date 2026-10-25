@@ -1,16 +1,27 @@
 import { get, writable } from 'svelte/store';
 import { watchKey } from './storage/watch';
+import { toast } from './components/Toast/toast';
 
 export type Mode = 'sidepanel' | 'popup';
 
 const STORAGE_KEY = 'mode';
 const DEFAULT_MODE: Mode = 'sidepanel';
 
-export const mode = writable<Mode>(DEFAULT_MODE);
+/** Read synchronously by static/scripts/boot.js before first paint. */
+export const MODE_MIRROR_KEY = 'metaspry:mode';
+
+export const mode = writable<Mode>(
+  typeof document !== 'undefined' && document.documentElement.dataset.mode === 'popup' ? 'popup' : DEFAULT_MODE,
+);
 
 function applyAttr(next: Mode): void {
   if (typeof document === 'undefined') return;
   document.documentElement.dataset.mode = next;
+  try {
+    localStorage.setItem(MODE_MIRROR_KEY, next);
+  } catch {
+    /* storage blocked: boot.js uses the side-panel layout until this runs */
+  }
 }
 
 function readStorage(): Promise<Mode> {
@@ -50,48 +61,60 @@ export function setMode(next: Mode): void {
   });
 }
 
-/**
- * Switch surfaces from a click handler (Settings -> Preferences, and the popup note). Lives here,
- * not in a component, so more than one control can offer it.
- *
- * The click that fired this is a valid user gesture. `chrome.action.openPopup` is called
- * synchronously inside it, as it must be ("must be called in response to a user gesture").
- * The side-panel branch first awaits `chrome.windows.getCurrent()`; Chrome has honoured the
- * gesture across that one hop in practice, and the mode is saved either way (AGENTS 3.2 gotcha).
- */
-export function switchMode(next: Mode): void {
-  if (next === get(mode)) return;
-
-  if (typeof chrome !== 'undefined' && chrome.action) {
-    try {
-      if (next === 'popup') {
-        chrome.action.openPopup().catch((err) => {
-          if (import.meta.env.DEV) console.warn('openPopup:', err);
-        });
-      } else {
-        chrome.windows.getCurrent().then((win) => {
-          if (win?.id != null) {
-            chrome.sidePanel.open({ windowId: win.id }).catch((err) => {
-              if (import.meta.env.DEV) console.warn('sidePanel.open:', err);
-            });
-          }
-        });
-      }
-    } catch (err) {
-      if (import.meta.env.DEV) console.warn('switchMode open failed:', err);
+function openSurface(next: Mode): Promise<void> {
+  if (typeof chrome === 'undefined' || !chrome.action) return Promise.reject(new Error('no chrome.action'));
+  try {
+    // `openPopup` is called synchronously inside the click, as it must be ("in response to a user
+    // gesture"): not after an await. The action has no popup in side-panel mode (background.js sets
+    // it on the `mode` change, which lands later), so `setPopup` goes first; extension API calls
+    // reach the browser in order, so the popup is set by the time `openPopup` runs. The side-panel
+    // branch awaits `windows.getCurrent()` first; Chrome has honoured the gesture across that one hop
+    // in practice (AGENTS 3.2 gotcha). Either way a failure is handled by `switchMode`.
+    if (next === 'popup') {
+      void chrome.action.setPopup({ popup: 'index.html' }).catch(() => undefined);
+      return Promise.resolve(chrome.action.openPopup());
     }
+    return chrome.windows.getCurrent().then((win) => {
+      if (win?.id == null) throw new Error('no window');
+      return chrome.sidePanel.open({ windowId: win.id });
+    });
+  } catch (err) {
+    return Promise.reject(err);
   }
+}
 
+/**
+ * Switch surfaces from an explicit button (Settings -> Preferences "Switch to ...", the popup note).
+ * Lives here, not in a component, so more than one control can offer it.
+ *
+ * The current window closes ONLY once the other surface has opened (UX review item 4): it used to
+ * close after 50 ms regardless, and when Chrome refused the open (popup before Chrome 127, a lost
+ * gesture) the user was left with no Metaspry at all and their results gone. On failure the mode is
+ * put back, a toast says why, and the window stays. Resolves true when it switched.
+ */
+export async function switchMode(next: Mode, closeWindow: () => void = () => window.close()): Promise<boolean> {
+  const prev = get(mode);
+  if (next === prev) return true;
+  const opened = openSurface(next);
   // Persist the new mode so the background script updates the action behaviour.
   setMode(next);
-
-  // Close the surface we were in. window.close() works for the popup; the side panel does not
-  // always honour it, but it is safe to call.
-  setTimeout(() => {
-    try {
-      window.close();
-    } catch {
-      /* ignore */
-    }
-  }, 50);
+  try {
+    await opened;
+  } catch (err) {
+    if (import.meta.env.DEV) console.warn('switchMode open failed:', err);
+    setMode(prev);
+    toast(
+      next === 'popup'
+        ? "Couldn't open the popup (it needs Chrome 127 or later). You're still in the side panel."
+        : "Couldn't open the side panel. You're still in the popup.",
+      'error',
+    );
+    return false;
+  }
+  try {
+    closeWindow();
+  } catch {
+    /* the side panel does not always honour window.close(); harmless */
+  }
+  return true;
 }

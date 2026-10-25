@@ -7,8 +7,7 @@
  * scope. They are read-only here: they are edited in the web app.
  */
 import { writable, derived, type Readable } from 'svelte/store';
-import { doc, onSnapshot } from 'firebase/firestore';
-import { fbDb } from './firebase';
+import { firestoreSdk } from './sdk';
 import { syncScope, workspaces } from './workspaces';
 import { DEFAULT_SETTINGS, type Settings } from '../storage/settings';
 
@@ -67,6 +66,9 @@ export const hasEntitledWorkspace: Readable<boolean> = derived(workspaces, ($ws)
 let started = false;
 let unsub: (() => void) | null = null;
 let watching: string | null = null;
+// Bumped on every target change: an SDK load that lands after another change (A -> none -> A while
+// it loaded) must not attach a second listener (plan.ts does the same).
+let token = 0;
 
 export function initWorkspaceScoring(): void {
   if (started) return;
@@ -84,6 +86,7 @@ export function initWorkspaceScoring(): void {
     unsub?.();
     unsub = null;
     watching = key;
+    const mine = ++token;
     if (!target) {
       workspaceRules.set(null);
       return;
@@ -91,15 +94,23 @@ export function initWorkspaceScoring(): void {
     // Until the document arrives, the workspace scores with the defaults (a missing document is
     // the defaults in the app too), never with the personal rules.
     workspaceRules.set({ wsId: target.wsId, name: target.name, settings: DEFAULT_SETTINGS });
-    unsub = onSnapshot(
-      doc(fbDb(), 'workspaces', target.wsId, 'settings', 'audit'),
-      (snap) => {
-        if (watching !== target.wsId) return;
-        workspaceRules.set({ wsId: target.wsId, name: target.name, settings: normalizeAuditSettings(snap.data()) });
-      },
-      () => {
-        if (watching === target.wsId) workspaceRules.set({ wsId: target.wsId, name: target.name, settings: DEFAULT_SETTINGS });
-      },
-    );
+    void firestoreSdk()
+      .then(({ db, doc, onSnapshot }) => {
+        // The target changed while the SDK loaded.
+        if (mine !== token) return;
+        unsub = onSnapshot(
+          doc(db, 'workspaces', target.wsId, 'settings', 'audit'),
+          (snap) => {
+            if (watching !== target.wsId) return;
+            workspaceRules.set({ wsId: target.wsId, name: target.name, settings: normalizeAuditSettings(snap.data()) });
+          },
+          () => {
+            if (watching === target.wsId) workspaceRules.set({ wsId: target.wsId, name: target.name, settings: DEFAULT_SETTINGS });
+          },
+        );
+      })
+      .catch(() => {
+        /* stays on the defaults, as for a snapshot error */
+      });
   });
 }

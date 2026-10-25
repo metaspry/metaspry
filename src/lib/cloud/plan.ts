@@ -8,8 +8,7 @@
  * that workspace's rules, whatever the personal plan.
  */
 import { writable, derived } from "svelte/store";
-import { doc, onSnapshot } from "firebase/firestore";
-import { fbDb } from "./firebase";
+import { firestoreSdk } from "./sdk";
 import { cloudUser } from "./auth";
 import { settings, DEFAULT_SETTINGS } from "../storage/settings";
 import type { Settings } from "../storage/settings";
@@ -33,6 +32,8 @@ export const effectiveSettings = derived<[typeof settings, typeof cloudIsPro, ty
 
 let started = false;
 let unsub: (() => void) | null = null;
+// Bumped on every auth change: a listener whose SDK load lands after the user changed is dropped.
+let token = 0;
 
 export function initCloudPlan(): void {
   if (started) return;
@@ -40,14 +41,20 @@ export function initCloudPlan(): void {
   cloudUser.subscribe((u) => {
     unsub?.();
     unsub = null;
+    const mine = ++token;
     // Reset on ANY auth change (incl. switching directly from one account to another) so a previous
     // user's Pro status never lingers; re-set to true only when the new user's snapshot resolves.
     cloudIsPro.set(false);
     if (!u) return;
-    unsub = onSnapshot(
-      doc(fbDb(), "users", u.uid),
-      (snap) => cloudIsPro.set(snap.data()?.plan === "pro"),
-      () => cloudIsPro.set(false),
-    );
+    void firestoreSdk()
+      .then(({ db, doc, onSnapshot }) => {
+        if (mine !== token) return;
+        unsub = onSnapshot(
+          doc(db, "users", u.uid),
+          (snap) => cloudIsPro.set(snap.data()?.plan === "pro"),
+          () => cloudIsPro.set(false),
+        );
+      })
+      .catch(() => cloudIsPro.set(false));
   });
 }

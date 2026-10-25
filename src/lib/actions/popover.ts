@@ -6,7 +6,11 @@
  *
  * The caller owns the `open` state: the action only asks to close through `onClose`. Put it on the
  * panel element inside `{#if open}` so it mounts with the panel and unmounts (returning focus) with it.
+ *
+ * Every panel is a layer (`layers.ts`): only the topmost one answers Escape and Tab, so the help
+ * opened over the account menu or Settings closes alone and keeps Tab to itself.
  */
+import { isTop, pushLayer } from '../layers';
 
 export interface PopoverOptions {
   /** Asked to close; the caller flips its `open` flag. */
@@ -74,6 +78,7 @@ function activeElement(): HTMLElement | null {
 
 export function popover(node: HTMLElement, opts: PopoverOptions) {
   let o = opts;
+  const { layer, release } = pushLayer(!!o.modal, 'popover');
   const opener = o.trigger ?? activeElement();
   const returnTarget = (): HTMLElement | null => o.trigger ?? opener;
 
@@ -85,6 +90,7 @@ export function popover(node: HTMLElement, opts: PopoverOptions) {
   };
 
   const onKey = (event: KeyboardEvent) => {
+    if (!isTop(layer)) return;
     if (event.key === 'Escape') {
       // No stopPropagation: a tooltip behind the panel hides on the same press (tooltip.ts).
       event.preventDefault();
@@ -111,6 +117,7 @@ export function popover(node: HTMLElement, opts: PopoverOptions) {
       o = next;
     },
     destroy() {
+      release();
       document.removeEventListener('keydown', onKey);
       document.removeEventListener('pointerdown', onPointerDown);
       // Focus goes back only when it was inside the panel or fell to <body> with it. A user who
@@ -118,7 +125,16 @@ export function popover(node: HTMLElement, opts: PopoverOptions) {
       const active = document.activeElement;
       const lost = active === null || active === document.body || node.contains(active);
       const trigger = returnTarget();
-      if (lost && trigger && trigger.isConnected) trigger.focus();
+      if (lost && trigger && trigger.isConnected) {
+        trigger.focus();
+        // A modal's opener sits in the page that was inert while it was open (layers.ts). `release()`
+        // above lifts `inert` on the next Svelte update, so a refused focus is retried right after it.
+        if (document.activeElement !== trigger) {
+          queueMicrotask(() => {
+            if (trigger.isConnected) trigger.focus();
+          });
+        }
+      }
     },
   };
 }

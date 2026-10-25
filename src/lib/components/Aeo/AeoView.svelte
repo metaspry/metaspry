@@ -1,16 +1,26 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { fetchSiteFiles } from '../../scrapers/getSiteFiles';
+  import { fetchSiteFilesCached } from '../../scrapers/getSiteFiles';
   import type { SiteFiles } from '../../scrapers/SiteFiles';
-  import { analyzeAeo, type AeoResult, type AeoState } from '../../audit/aeo';
+  import { analyzeAeo, type AeoResult, type AeoState, type IndexingVerdict } from '../../audit/aeo';
   import { bandClasses } from '../../audit/band';
 
   export let html: HTMLElement | null;
   export let baseUrl: string;
+  /** The scan this view belongs to: Site, AI and the upload share one fetch per scan. */
+  export let scanKey = 0;
+  /**
+   * The Audit tab's `noindex` verdict (meta robots, googlebot and the X-Robots-Tag header). The AI
+   * tab read the robots meta tag alone, so a header-de-indexed page failed in Audit and passed here
+   * (UX review item 5). Updates when the header check resolves.
+   */
+  export let indexing: IndexingVerdict | null = null;
 
   let loading = true;
   let errorMessage = '';
   let result: AeoResult | null = null;
+  let siteFiles: SiteFiles | null = null;
+  let loaded = false;
 
   // Band tokens (R2-29; the -500 dots had no dark variant and were 1.9-2.25:1 in light). Info is not
   // a verdict: a neutral slate.
@@ -35,18 +45,24 @@
     }
     loading = true;
     errorMessage = '';
-    let siteFiles: SiteFiles | null = null;
     try {
-      siteFiles = baseUrl ? await fetchSiteFiles(baseUrl) : null;
+      siteFiles = baseUrl ? await fetchSiteFilesCached(baseUrl, scanKey) : null;
     } catch {
       siteFiles = null; // site checks just get skipped
     }
+    loaded = true;
+    loading = false;
+  }
+
+  // Re-run (no refetch) when the Audit verdict changes, e.g. the X-Robots-Tag check resolves.
+  $: if (loaded && html) analyze(indexing);
+  function analyze(verdict: IndexingVerdict | null) {
+    if (!html) return;
     try {
-      result = analyzeAeo(html, siteFiles, baseUrl);
+      result = analyzeAeo(html, siteFiles, baseUrl, verdict ?? undefined);
+      errorMessage = '';
     } catch (err) {
       errorMessage = err instanceof Error ? err.message : String(err);
-    } finally {
-      loading = false;
     }
   }
 
@@ -58,7 +74,7 @@
 
 <div class="flex flex-col gap-3">
   {#if loading}
-    <div class="flex items-center gap-2 rounded-2xl border border-white/40 bg-white/40 px-3 py-2 text-xs text-slate-600 backdrop-blur-md dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
+    <div class="flex items-center gap-2 rounded-2xl border border-white/40 bg-white/40 px-3 py-2 text-xs text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" class="h-4 w-4 animate-spin">
         <path d="M21 12a9 9 0 1 1-6.2-8.5" />
       </svg>
@@ -81,7 +97,7 @@
         <div class="flex flex-col gap-2">
           <p class="text-[0.6875rem] font-semibold uppercase tracking-wider ms-muted">{group.title}</p>
           {#each group.items as c (c.id)}
-            <div class="flex items-start gap-2.5 rounded-2xl border border-white/40 bg-white/40 px-3 py-2 backdrop-blur-md dark:border-white/10 dark:bg-white/5">
+            <div class="flex items-start gap-2.5 rounded-2xl border border-white/40 bg-white/40 px-3 py-2 dark:border-white/10 dark:bg-white/5">
               <span class="mt-1 h-2 w-2 shrink-0 rounded-full {dot[c.state]}" aria-hidden="true"></span>
               <div class="min-w-0">
                 <div class="flex items-center gap-2">

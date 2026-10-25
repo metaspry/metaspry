@@ -17,6 +17,7 @@
   import { toast } from '../Toast/toast';
   import { tooltip } from '../../actions/tooltip';
   import { cycleTab, focusables } from '../../actions/popover';
+  import { isTop, pushLayer, topLayer, type Layer } from '../../layers';
   import { FOCUS_RING } from '../toolbar';
   import { BUTTON_DANGER, BUTTON_PRIMARY, BUTTON_SECONDARY } from '../button';
   import { dur } from '../../motion';
@@ -24,8 +25,24 @@
 
   const SURFACES: { value: Mode; label: string; hint: string }[] = [
     { value: 'sidepanel', label: 'Side panel', hint: 'Stays open beside the page while you browse.' },
-    { value: 'popup', label: 'Popup', hint: 'Opens from the toolbar icon; closes when you click away.' },
+    { value: 'popup', label: 'Popup', hint: 'Opens from the toolbar icon; closes when you click away or switch tabs.' },
   ];
+  const SURFACE_NAME: Record<Mode, string> = { sidepanel: 'side panel', popup: 'popup' };
+
+  // The radios only choose (WCAG 3.2.2): an arrow key on them used to switch surface on the spot,
+  // closing this window and the results in it. The switch is the explicit button below.
+  let pendingSurface: Mode = 'sidepanel';
+  let switching = false;
+  async function applySurface() {
+    if (switching) return;
+    switching = true;
+    try {
+      // Closes this window once the other surface is open; false = it stayed (a toast says why).
+      if (!(await switchMode(pendingSurface))) pendingSurface = $mode;
+    } finally {
+      switching = false;
+    }
+  }
 
   export let open = false;
 
@@ -70,6 +87,9 @@
   let wasOpen = false;
   let resetArmed = false;
   let resetTimer: ReturnType<typeof setTimeout> | null = null;
+  // This drawer's place in the layer stack while open (layers.ts).
+  let layer: Layer | null = null;
+  let releaseLayer: (() => void) | null = null;
 
   function clone(s: Settings): Settings {
     return { ...s, weights: { ...s.weights } };
@@ -100,6 +120,8 @@
   $: if (open !== wasOpen) {
     wasOpen = open;
     if (open) {
+      ({ layer, release: releaseLayer } = pushLayer(true, 'settings'));
+      pendingSurface = $mode;
       opener = document.activeElement;
       baseline = clone($settings);
       draft = clone($settings);
@@ -120,21 +142,32 @@
   }
 
   function onClose() {
+    releaseLayer?.();
+    releaseLayer = null;
+    layer = null;
     disarmReset();
-    if (opener instanceof HTMLElement) opener.focus();
+    const back = opener;
     opener = null;
+    if (!(back instanceof HTMLElement)) return;
+    back.focus();
+    // The opener is in the page that was inert behind this drawer: `inert` goes on the next update.
+    if (document.activeElement !== back) void tick().then(() => back.isConnected && back.focus());
   }
 
-  onDestroy(() => disarmReset());
+  onDestroy(() => {
+    releaseLayer?.();
+    disarmReset();
+  });
 
   function close() {
     dispatch('close');
   }
 
-  // Esc closes; Tab and Shift+Tab stay inside the dialog (it is modal, but the popup has no inert
-  // support to lean on). `cycleTab` is shared with the shortcuts help (actions/popover.ts).
+  // Esc closes; Tab and Shift+Tab stay inside the dialog. `cycleTab` is shared with the shortcuts
+  // help (actions/popover.ts). Only while this drawer is the top layer: with the help open over it,
+  // the help owns both keys (and has already handled this Escape: `defaultPrevented`).
   function onKey(event: KeyboardEvent) {
-    if (!open) return;
+    if (!open || event.defaultPrevented || !isTop(layer)) return;
     if (event.key === 'Escape') {
       event.preventDefault();
       close();
@@ -211,6 +244,7 @@
   <div transition:fade={{ duration: dur(120) }} class="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm" on:click={close} role="presentation" />
   <aside
     bind:this={drawerEl}
+    inert={($topLayer !== null && $topLayer !== layer) || undefined}
     transition:fly={{ x: 360, duration: dur(220) }}
     class="fixed inset-y-0 right-0 z-50 flex w-full max-w-[360px] flex-col gap-4 overflow-y-auto border-l border-slate-200 bg-white p-4 text-slate-900 shadow-2xl dark:border-slate-800 dark:bg-popover dark:text-slate-100"
     role="dialog"
@@ -238,7 +272,7 @@
       <div role="radiogroup" aria-label="Surface" class="grid grid-cols-2 gap-2">
         {#each SURFACES as s (s.value)}
           <label
-            class="flex cursor-pointer flex-col gap-0.5 rounded-lg border px-3 py-2 transition focus-within:ring-2 focus-within:ring-indigo-600 focus-within:ring-offset-2 focus-within:ring-offset-transparent dark:focus-within:ring-indigo-300 {$mode === s.value
+            class="flex cursor-pointer flex-col gap-0.5 rounded-lg border px-3 py-2 transition focus-within:ring-2 focus-within:ring-indigo-600 focus-within:ring-offset-2 focus-within:ring-offset-transparent dark:focus-within:ring-indigo-300 {pendingSurface === s.value
               ? 'border-indigo-500 bg-indigo-500/10'
               : 'border-slate-300 hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-800'}"
           >
@@ -246,15 +280,29 @@
               type="radio"
               name="surface"
               value={s.value}
-              checked={$mode === s.value}
-              on:change={() => switchMode(s.value)}
+              checked={pendingSurface === s.value}
+              on:change={() => (pendingSurface = s.value)}
               class="sr-only"
             />
-            <span class="text-xs font-semibold text-slate-800 dark:text-slate-100">{s.label}</span>
+            <span class="text-xs font-semibold text-slate-800 dark:text-slate-100">{s.label}{#if $mode === s.value}<span class="font-normal ms-muted"> (current)</span>{/if}</span>
             <span class="text-[0.6875rem] leading-snug ms-muted">{s.hint}</span>
           </label>
         {/each}
       </div>
+      {#if pendingSurface !== $mode}
+        <div class="flex flex-col gap-1.5 rounded-lg border border-indigo-400/40 bg-indigo-500/5 px-3 py-2">
+          <p id="surface-switch-note" class="text-[0.6875rem] leading-snug text-slate-700 dark:text-slate-200">
+            This window closes and Metaspry opens as a {SURFACE_NAME[pendingSurface]}. Your current results are not kept.
+          </p>
+          <button
+            type="button"
+            on:click={applySurface}
+            aria-describedby="surface-switch-note"
+            aria-disabled={switching}
+            class="{BUTTON_PRIMARY} self-start"
+          >Switch to {SURFACE_NAME[pendingSurface]}</button>
+        </div>
+      {/if}
       <!-- WCAG 2.1.4: single-character shortcuts can be turned off. Off leaves ? and Esc. -->
       <label class="mt-1 flex cursor-pointer items-start gap-2.5 rounded-lg border border-slate-300 px-3 py-2 transition hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-800">
         <input

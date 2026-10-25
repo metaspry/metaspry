@@ -9,7 +9,7 @@
   let showRaw = false;
 </script>
 
-<section class="overflow-hidden rounded-2xl border border-white/40 bg-white/50 shadow-md shadow-indigo-500/5 backdrop-blur-md dark:border-white/10 dark:bg-white/5">
+<section class="overflow-hidden rounded-2xl border border-white/40 bg-white/50 shadow-md shadow-indigo-500/5 dark:border-white/10 dark:bg-white/5">
   <header class="flex items-center justify-between border-b border-white/40 px-4 py-2 dark:border-white/10">
     <h4 class="text-sm font-semibold text-slate-900 dark:text-slate-50">llms.txt</h4>
     {#if llms.present}

@@ -8,7 +8,6 @@
   import Preview from "../components/Preview/Preview.svelte";
   import Audit from "../components/Audit/Audit.svelte";
   import Skeleton from "../components/Skeleton/Skeleton.svelte";
-  import EmptyState from "../components/EmptyState/EmptyState.svelte";
   import ErrorState from "../components/ErrorState/ErrorState.svelte";
   import SettingsDrawer from "../components/Settings/SettingsDrawer.svelte";
   import HistoryDropdown from "../components/History/HistoryDropdown.svelte";
@@ -33,7 +32,7 @@
   import type { Settings } from "../storage/settings";
   import { effectiveSettings } from "../cloud/plan";
   import { pushHistory } from "../storage/history";
-  import { hasFailingRequired } from "../audit/band";
+  import { hasFailingRequired, scoreLabel } from "../audit/band";
   import { registerShortcuts, helpOpen } from "../components/Shortcuts/keyboard";
   import { toolbarButtonClass, TOOLBAR_GROUP, FOCUS_RING, FOCUS_RING_ON_FILL } from "../components/toolbar";
   import CloudSync from "../components/CloudSync/CloudSync.svelte";
@@ -41,10 +40,13 @@
   import { cloudUser } from "../cloud/auth";
   import { syncScope } from "../cloud/workspaces";
   import { toScanPayload, uploadScan, type UploadResult } from "../cloud/sync";
-  import { fetchSiteFiles } from "../scrapers/getSiteFiles";
+  import { guardUnload, resetSyncFor, trackUpload } from "../cloud/sync-status";
+  import { fetchSiteFilesCached } from "../scrapers/getSiteFiles";
+  import { toast } from "../components/Toast/toast";
+  import { modalOpen } from "../layers";
   import { get } from "svelte/store";
 
-  type View = "landing" | "loading" | "error" | "empty" | "results";
+  type View = "landing" | "loading" | "error" | "results";
   type ActiveTab = "tags" | "previews" | "audit" | "site" | "aeo" | "compare";
 
   let view: View = "landing";
@@ -58,6 +60,16 @@
   // scan starts so the same failure twice is announced twice.
   let announcement = "";
   let activeTab: ActiveTab = "tags";
+  // Panels mount on first visit and stay mounted (hidden) until the next scan, so Compare keeps its
+  // URL and diff and Tags its search across tab switches (UX review item 10). `scanKey` changes on
+  // every committed scan: it remounts Site / AI / Compare and keys the shared site-files fetch.
+  let scanKey = 0;
+  let visited = new Set<ActiveTab>(["tags"]);
+  $: if (!visited.has(activeTab)) visited = new Set([...visited, activeTab]);
+  // A page with no meta tags: results open on the Audit tab with this note (item 8).
+  let bareNote = false;
+  // Polite scan progress for screen readers (item 7): the skeleton is aria-hidden.
+  let scanStatus = "";
   let pageUrl = "";
   /** What the browser shows as this page's favicon (declared link -> tab icon -> /favicon.ico). */
   let pageIcon: string | null = null;
@@ -65,6 +77,7 @@
   // the upload failed. Drives the Audit tab's "Changed since" row (AGENTS 3.7).
   let cloudScan: UploadResult | null = null;
   $: if (!$cloudUser) cloudScan = null;
+  $: resetSyncFor($cloudUser?.uid ?? null);
   let settingsOpen = false;
 
   // E-1: the document URL the current scan captured (not `pageUrl`, which can fall back to the
@@ -90,7 +103,7 @@
   // check misses are covered by `scrape()` keeping the results when the capture fails.
   $: blockRescan = view === "results" && staleState === "restricted";
   $: scannedLabel = displayUrl(scannedUrl);
-  $: showScannedPage = !!scannedUrl && (view === "results" || view === "empty" || view === "error");
+  $: showScannedPage = !!scannedUrl && (view === "results" || view === "error");
   $: rescanMessage = rescanError ? rescanNotice(rescanError, scannedLabel) : "";
   function rescanNotice(err: { reason: string; url: string }, label: string): string {
     return `Couldn't scan ${err.url ? displayUrl(err.url) : "this tab"}: ${err.reason} Results are still for ${label}.`;
@@ -149,6 +162,7 @@
     const hadFocus = typeof document !== "undefined" && document.activeElement !== null && document.activeElement !== document.body;
     let committed = false;
     announcement = "";
+    scanStatus = "Scanning page…";
     rescanError = null;
     if (keep) {
       rescanning = true;
@@ -168,6 +182,7 @@
       if (id !== scrapeId) return;
       if (!html) {
         if (keep) {
+          scanStatus = "";
           keepResults(unscriptableMessage(tabUrl, reason), tabUrl);
           return;
         }
@@ -196,17 +211,24 @@
       // that hardcodes it (the very defect this product finds) would otherwise collapse every
       // article into one history row and one overwritten cloud document.
       pageUrl = scanUrlFor(tabUrl, meta.canonical);
-      if (isPageEmpty(meta)) {
-        view = "empty";
-        return;
-      }
-      activeTab = "tags";
+      // A bare page is the case the product exists for: show the audit (what to add) instead of a
+      // dead-end "No meta tags found" view whose Try again repeated it.
+      bareNote = isPageEmpty(meta);
+      activeTab = bareNote ? "audit" : "tags";
+      visited = new Set([activeTab]);
+      scanKey += 1;
       view = "results";
       // Now, not after the audit and upload: the commit just unmounted the stale banner.
       if (keep && hadFocus) void keepFocus();
+      else if (!keep) void focusSelectedTab();
       prevSettings = $effectiveSettings;
-      const finalResult = await runAudit(meta, $effectiveSettings, id);
+      const auditing = runAudit(meta, $effectiveSettings, id);
+      // runAudit sets the synchronous result before its first await.
+      if (auditResult) scanStatus = scanDoneMessage(auditResult, bareNote);
+      const finalResult = await auditing;
       if (id !== scrapeId) return;
+      // The og:image / X-Robots-Tag checks can move the score: say the final one (a no-op when equal).
+      scanStatus = scanDoneMessage(finalResult, bareNote);
       pushHistory({
         url: pageUrl || "(unknown)",
         hostname: hostnameOf(pageUrl),
@@ -219,24 +241,29 @@
       // Cloud sync: if signed in, save this scan to the user's cloud history.
       const cu = get(cloudUser);
       if (cu && pageUrl) {
-        try {
+        const scope = get(syncScope);
+        const key = scanKey;
+        // Tracked, not swallowed (UX review item 1): the account menu shows Saving / Saved / the
+        // reason it failed, and a failure toasts. The menu used to say "Synced" whatever happened.
+        const out = await trackUpload(scope.kind === "workspace" ? scope.name : "Personal", async () => {
           // Best-effort: include site files (robots/sitemap/llms) so the app's Site tab populates.
+          // The same fetch the Site and AI tabs read (one per scan).
           let siteFiles;
           try {
-            siteFiles = await fetchSiteFiles(new URL(pageUrl).origin);
+            siteFiles = await fetchSiteFilesCached(new URL(pageUrl).origin, key);
           } catch {
             siteFiles = undefined;
           }
           const payloadMeta: PageMeta = { ...meta, icon: pageIcon ?? meta.icon };
-          const uploaded = await uploadScan(cu.uid, toScanPayload(payloadMeta, finalResult, pageUrl, siteFiles), get(syncScope));
-          // Also dropped when the user signed out (or switched account) while the write was in flight.
-          if (id === scrapeId && get(cloudUser)?.uid === cu.uid) cloudScan = uploaded;
-        } catch (err) {
-          if (import.meta.env.DEV) console.warn("cloud sync failed", err);
-        }
+          return uploadScan(cu.uid, toScanPayload(payloadMeta, finalResult, pageUrl, siteFiles), scope);
+        });
+        // Also dropped when the user signed out (or switched account) while the write was in flight.
+        if (out.ok && id === scrapeId && get(cloudUser)?.uid === cu.uid) cloudScan = out.value;
+        if (!out.ok && get(cloudUser)?.uid === cu.uid) toast(out.message, "error");
       }
     } catch (error) {
       if (id !== scrapeId) return;
+      scanStatus = "";
       const described = describeScanError(error);
       if (keep && !committed) {
         keepResults(described.reason, "");
@@ -264,7 +291,23 @@
     announcement = rescanNotice(rescanError, scannedLabel);
   }
 
+  function scanDoneMessage(result: AuditResult, bare: boolean): string {
+    const score = scoreLabel(result.score, result.rules);
+    return bare
+      ? `Scan complete. No meta tags found. ${score}. The Audit tab lists what to add.`
+      : `Scan complete. ${score}.`;
+  }
+
+  // A fresh scan unmounts "Scan this page" (focus falls to <body>): put focus on the selected tab
+  // so a keyboard or screen-reader user lands on the results (item 7).
+  async function focusSelectedTab() {
+    await tick();
+    const el = document.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]');
+    if (document.activeElement === null || document.activeElement === document.body) el?.focus();
+  }
+
   function fail(reason: string, detail: string | null) {
+    scanStatus = "";
     errorReason = reason;
     errorDetail = detail;
     view = "error";
@@ -291,6 +334,8 @@
 
   // R-35: the document title names the view, so a screen reader and the tab strip say where you are.
   $: activeTabLabel = tabs.find((t) => t.id === activeTab)?.label ?? "";
+  // The Audit verdict on indexability (meta robots, googlebot, X-Robots-Tag) for the AI tab (item 5).
+  $: noindexRule = auditResult?.rules.find((r) => r.id === "noindex") ?? null;
   $: documentTitle = view === "results" && activeTabLabel ? `Metaspry - ${activeTabLabel}` : "Metaspry";
 
   function isActiveTab(v: string): v is ActiveTab {
@@ -364,6 +409,7 @@
   }
 
   let stopFollowing: (() => void) | null = null;
+  let stopUnloadGuard: (() => void) | null = null;
   let destroyed = false;
 
   async function startFollowingTab() {
@@ -374,12 +420,14 @@
 
   onDestroy(() => {
     destroyed = true;
+    stopUnloadGuard?.();
     stopFollowing?.();
     stopFollowing = null;
   });
 
   onMount(() => {
     void startFollowingTab();
+    stopUnloadGuard = guardUnload();
     if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
       chrome.runtime.onMessage.addListener(onRuntimeMessage);
     }
@@ -405,8 +453,13 @@
 <!-- Polite and always mounted, so the stale-results banner below is announced when it appears or
      changes, without moving focus (E-1). The visible banner carries the "Scan this tab" button. -->
 <div class="sr-only" role="status" aria-atomic="true">{staleMessage}</div>
+<!-- Scan progress (item 7): "Scanning page...", then the score. Separate from the banner region so
+     neither message replaces the other. -->
+<div class="sr-only" role="status" aria-atomic="true">{scanStatus}</div>
 
-<div class="flex h-full w-full flex-col p-3">
+<!-- Inert behind a modal (Settings, shortcuts help): Tab, clicks and the screen-reader cursor stay
+     in the dialog (item 6). The drawer renders outside this block. -->
+<div class="flex h-full w-full flex-col p-3" inert={$modalOpen || undefined}>
   <Screen>
     <!-- Wraps instead of pushing controls off-screen (R2-16): one line at 100 % text from 320 px; at
          200 % text the right-hand block drops below the logo (`ml-auto` keeps it right-aligned) and
@@ -482,7 +535,7 @@
 
     {#if $mode === 'popup' && !popupHintDismissed}
       <aside
-        class="mt-3 flex items-center gap-2 rounded-xl border border-amber-300/50 bg-amber-50/80 px-3 py-2 text-xs text-amber-900 backdrop-blur-md dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200"
+        class="ms-note-warn mt-3"
         role="note"
       >
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 flex-shrink-0">
@@ -525,7 +578,7 @@
       {#if staleMessage}
         <aside
           aria-label="Results are for another page"
-          class="flex shrink-0 items-center gap-2 rounded-xl border border-amber-300/50 bg-amber-50/80 px-3 py-2 text-xs text-amber-900 backdrop-blur-md dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200"
+          class="ms-note-warn shrink-0"
         >
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 flex-shrink-0" aria-hidden="true">
             <path d="M12 9v4M12 17h.01" />
@@ -549,7 +602,7 @@
              above (`announcement`), so this has no live role of its own. -->
         <aside
           aria-label="Scan failed, results kept"
-          class="flex shrink-0 items-center gap-2 rounded-xl border border-amber-300/50 bg-amber-50/80 px-3 py-2 text-xs text-amber-900 backdrop-blur-md dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200"
+          class="ms-note-warn shrink-0"
         >
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 flex-shrink-0" aria-hidden="true">
             <path d="M12 9v4M12 17h.01" />
@@ -570,28 +623,47 @@
       <Skeleton />
     {:else if view === "error"}
       <ErrorState reason={errorReason} detail={errorDetail} on:retry={retry} />
-    {:else if view === "empty"}
-      <EmptyState on:retry={retry} />
     {:else if view === "results" && pageMeta && auditResult}
+      {#if bareNote}
+        <aside aria-label="No meta tags found" class="ms-note-warn shrink-0">
+          <p>No meta tags found on this page. The Audit tab below lists what to add, required rules first.</p>
+        </aside>
+      {/if}
       <Tabs {tabs} active={activeTab} on:change={onTabChange} />
       <div class="flex flex-1 flex-col overflow-y-auto pr-1">
-        {#if activeTab === "tags"}
-          <TagsView meta={pageMeta} />
-        {:else if activeTab === "previews"}
-          <Preview meta={pageMeta} {pageUrl} icon={pageIcon} />
-        {:else if activeTab === "audit"}
-          <Audit result={auditResult} meta={pageMeta} {cloudScan} />
-        {:else if activeTab === "site"}
-          {#key pageUrl}
-            <SiteView baseUrl={pageUrl} />
-          {/key}
-        {:else if activeTab === "aeo"}
-          {#key pageUrl}
-            <AeoView html={pageHtml} baseUrl={pageUrl} />
-          {/key}
-        {:else if activeTab === "compare"}
-          <CompareView leftMeta={pageMeta} leftUrl={pageUrl} leftScore={auditResult.score} leftRules={auditResult.rules} />
+        <!-- Keyed on the scan: a new scan remounts every panel (Tags search, Compare, Site / AI fetch). -->
+        {#key scanKey}
+        {#if visited.has("tags")}
+          <div role="tabpanel" id="panel-tags" aria-labelledby="tab-tags" hidden={activeTab !== "tags"}>
+            <TagsView meta={pageMeta} />
+          </div>
         {/if}
+        {#if visited.has("previews")}
+          <div role="tabpanel" id="panel-previews" aria-labelledby="tab-previews" hidden={activeTab !== "previews"}>
+            <Preview meta={pageMeta} {pageUrl} icon={pageIcon} />
+          </div>
+        {/if}
+        {#if visited.has("audit")}
+          <div role="tabpanel" id="panel-audit" aria-labelledby="tab-audit" hidden={activeTab !== "audit"}>
+            <Audit result={auditResult} meta={pageMeta} {cloudScan} weights={$effectiveSettings.weights} />
+          </div>
+        {/if}
+        {#if visited.has("site")}
+          <div role="tabpanel" id="panel-site" aria-labelledby="tab-site" hidden={activeTab !== "site"}>
+            <SiteView baseUrl={pageUrl} {scanKey} />
+          </div>
+        {/if}
+        {#if visited.has("aeo")}
+          <div role="tabpanel" id="panel-aeo" aria-labelledby="tab-aeo" hidden={activeTab !== "aeo"}>
+            <AeoView html={pageHtml} baseUrl={pageUrl} {scanKey} indexing={noindexRule ? { blocked: noindexRule.status === "fail", detail: noindexRule.detail } : null} />
+          </div>
+        {/if}
+        {#if visited.has("compare")}
+          <div role="tabpanel" id="panel-compare" aria-labelledby="tab-compare" hidden={activeTab !== "compare"}>
+            <CompareView leftMeta={pageMeta} leftUrl={pageUrl} leftScore={auditResult.score} leftRules={auditResult.rules} />
+          </div>
+        {/if}
+        {/key}
       </div>
       <!-- aria-disabled, not disabled, while re-scanning: this button usually has focus, and disabling
            it would drop focus to <body>. scrape() ignores the click. -->

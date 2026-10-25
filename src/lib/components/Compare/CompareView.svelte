@@ -6,7 +6,7 @@
   import { effectiveSettings } from '../../cloud/plan';
   import { bandClasses, bandFor, scoreLabel, type BandRule } from '../../audit/band';
   import { tooltip } from '../../actions/tooltip';
-  import { diffMeta, type DiffRow } from './diff';
+  import { diffMeta, differenceCount, DIFF_LABEL, type DiffRow } from './diff';
   import { sameUrl } from '../../audit/url-match';
   import { BUTTON_PRIMARY } from '../button';
 
@@ -33,6 +33,9 @@
   let rightRules: readonly BandRule[] = [];
   /** True when the left side is the rendered DOM and the right side is served HTML. */
   let mixedSources = false;
+  let onlyDifferences = false;
+  $: shownRows = onlyDifferences ? rows.filter((r) => r.status !== 'same') : rows;
+  $: diffCount = differenceCount(rows);
 
   // Add a scheme when missing + validate http(s). Lets users paste "example.com".
   function normalizeUrl(raw: string): string | null {
@@ -88,6 +91,7 @@
   }
 
   async function compare() {
+    if (loading) return;
     const target = normalizeUrl(url);
     if (!target) {
       errorMessage = 'Enter a valid URL (e.g. example.com).';
@@ -126,13 +130,22 @@
     }
   }
 
-  function statusColor(s: DiffRow['status']): string {
-    if (s === 'same') return 'border-emerald-300/40 bg-emerald-50/40 dark:border-emerald-500/20 dark:bg-emerald-950/30';
-    if (s === 'different') return 'border-amber-300/60 bg-amber-50/60 dark:border-amber-500/30 dark:bg-amber-950/40';
-    return 'border-slate-200/60 bg-slate-50/40 dark:border-slate-700/40 dark:bg-slate-900/20';
+  // A 4 px leading edge in the band hue (>= 3:1 against the card in both themes) plus the text badge:
+  // the tint alone was 1.01:1 between "same" and "different".
+  function statusEdge(s: DiffRow['status']): string {
+    if (s === 'same') return 'border-l-emerald-600 dark:border-l-emerald-400';
+    if (s === 'different') return 'border-l-amber-600 dark:border-l-amber-400';
+    return 'border-l-slate-500 dark:border-l-slate-400';
+  }
+  function badgeClass(s: DiffRow['status']): string {
+    if (s === 'same') return bandClasses('good').ink;
+    if (s === 'different') return bandClasses('warn').ink;
+    return 'text-slate-700 dark:text-slate-200';
   }
 
-  const scoreColor = (s: number, rules: readonly BandRule[]): string => bandClasses(bandFor(s, rules)).text;
+  // `ink` (-700 / -800), not `text` (-600): at 18 px bold these numbers are not "large text" and the
+  // -600 hues were 3.5:1 (emerald) and 4.36:1 (rose).
+  const scoreColor = (s: number, rules: readonly BandRule[]): string => bandClasses(bandFor(s, rules)).ink;
 </script>
 
 <div class="flex flex-col gap-3">
@@ -145,17 +158,22 @@
       placeholder="example.com"
       bind:value={url}
       aria-label="URL to compare"
+      aria-invalid={errorMessage ? true : undefined}
+      aria-describedby={errorMessage ? 'compare-error' : undefined}
       class="ms-input min-w-0 flex-1"
     />
+    <!-- aria-disabled, not disabled: the focused button would otherwise drop focus to <body>.
+         `compare()` ignores a second press while loading. -->
     <button
       type="submit"
-      disabled={loading}
-      class="{BUTTON_PRIMARY} shrink-0"
-    >{loading ? '…' : 'Compare'}</button>
+      aria-disabled={loading}
+      aria-busy={loading}
+      class="{BUTTON_PRIMARY} shrink-0 aria-disabled:opacity-60"
+    >{loading ? 'Comparing…' : 'Compare'}</button>
   </form>
 
   {#if errorMessage}
-    <p class="rounded-xl border border-rose-300/60 bg-rose-50/60 px-3 py-2 text-xs text-rose-700 dark:border-rose-500/30 dark:bg-rose-950/40 dark:text-rose-300">{errorMessage}</p>
+    <p id="compare-error" role="alert" class="ms-note-error">{errorMessage}</p>
   {/if}
 
   {#if rightMeta}
@@ -178,7 +196,7 @@
     <div class="grid grid-cols-2 gap-2">
       <!-- Label + url on the left, score on the right of the same card: the shared placement rule. -->
       {#each [{ label: 'Current', url: leftUrl, score: leftScore, rules: leftRules }, { label: 'Compared', url: rightUrl, score: rightScore, rules: rightRules }] as card (card.label)}
-        <div class="flex items-center justify-between gap-2 rounded-xl border border-white/40 bg-white/40 px-3 py-2 backdrop-blur-md dark:border-white/10 dark:bg-white/5">
+        <div class="flex items-center justify-between gap-2 rounded-xl border border-white/40 bg-white/60 px-3 py-2 dark:border-white/10 dark:bg-white/5">
           <div class="min-w-0 flex-1">
             <p class="text-[0.6875rem] font-semibold uppercase tracking-wider ms-muted">{card.label}</p>
             <p class="truncate text-xs text-slate-700 dark:text-slate-300" use:tooltip={card.url}>{card.url}</p>
@@ -193,16 +211,34 @@
       {/each}
     </div>
 
-    <div class="flex flex-col gap-1">
-      {#each rows as row (row.key)}
-        <div class="rounded-xl border px-3 py-2 text-xs {statusColor(row.status)}">
-          <p class="font-semibold text-slate-900 dark:text-slate-50">{row.key}</p>
-          <div class="grid grid-cols-2 gap-2 pt-1">
-            <p class="break-all text-slate-700 dark:text-slate-300">{row.left ?? '—'}</p>
-            <p class="break-all text-slate-700 dark:text-slate-300">{row.right ?? '—'}</p>
-          </div>
-        </div>
-      {/each}
+    <div class="flex flex-wrap items-center justify-between gap-2 px-1">
+      <p class="text-xs text-slate-700 dark:text-slate-200" role="status">
+        {diffCount === 0 ? 'No differences.' : `${diffCount} of ${rows.length} tags differ.`}
+      </p>
+      <label class="inline-flex min-h-6 cursor-pointer items-center gap-2 text-xs text-slate-700 dark:text-slate-200">
+        <input type="checkbox" bind:checked={onlyDifferences} class="h-4 w-4 accent-indigo-600" />
+        Show differences only
+      </label>
     </div>
+
+    <!-- Column headings, visible and repeated per cell for screen readers (item 3). -->
+    <div class="grid grid-cols-2 gap-2 px-4 text-[0.6875rem] font-semibold uppercase tracking-wider ms-muted" aria-hidden="true">
+      <span>Current</span>
+      <span>Compared</span>
+    </div>
+    <ul class="flex flex-col gap-1" aria-label="Tag differences">
+      {#each shownRows as row (row.key)}
+        <li class="rounded-xl border border-l-4 border-slate-200 bg-white/60 px-3 py-2 text-xs dark:border-slate-700 dark:bg-white/5 {statusEdge(row.status)}">
+          <div class="flex items-center justify-between gap-2">
+            <p class="font-semibold text-slate-900 dark:text-slate-50 [overflow-wrap:anywhere]">{row.key}</p>
+            <span class="shrink-0 text-[0.6875rem] font-semibold {badgeClass(row.status)}">{DIFF_LABEL[row.status]}</span>
+          </div>
+          <div class="grid grid-cols-2 gap-2 pt-1">
+            <p class="break-all text-slate-700 dark:text-slate-300"><span class="sr-only">Current: </span>{row.left ?? '—'}</p>
+            <p class="break-all text-slate-700 dark:text-slate-300"><span class="sr-only">Compared: </span>{row.right ?? '—'}</p>
+          </div>
+        </li>
+      {/each}
+    </ul>
   {/if}
 </div>

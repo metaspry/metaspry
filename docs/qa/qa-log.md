@@ -16,6 +16,17 @@ Template:
 
 ---
 
+## 2026-10-25 - `cff4df7` + the ux-critical-high changes (committed next as "fix(ext): critical and high UI/UX review findings") - PASS (automated part)
+
+- `npm run qa` exit 0. check: 0 errors, 1 warning (`Tabs.svelte` tablist tabindex, pre-existing). unit/integration: 44 files, 331 tests. build: remote-code check passed. e2e: 25 passed (~44 s).
+- Mutation checks: the 11 new `ux.e2e.ts` tests (at the time) all failed against the pre-fix source and passed after; reverting the workspace-scoring counter guard fails `workspace-scoring.race.spec.ts`; the two focus-return asserts failed before the inert/focus fix.
+- Coverage (Vitest): lines 37.92 % (was 30.37 %), branches 81.38 %, functions 60.46 %.
+- Main chunk: 963 KB -> 318 KB (Firebase in lazy chunks, never requested on a signed-out open).
+- Manual list: not walked. Needs a real browser: popup <-> side panel switch (`openPopup` gesture), signed-in sync states (Saving / Saved / error), sign-in from a fresh install with an existing session (IndexedDB probe), light/dark visual pass after the blur removal.
+- Gaps / follow-ups: scoring weights for skipped rules and the og:image triple penalty need a joint ext + app OpenSpec (scores must match the web app); Medium/Low review items not started.
+
+---
+
 ## 2026-10-25 - `e44c66f` + the qa-harness changes (committed next as "test(ext): full-extension QA harness") - PASS (automated part)
 
 - `npm run qa` exit 0. check: svelte-check 0 errors, 1 warning (`Tabs.svelte` `{@html tab.icon}`, pre-existing). unit/integration: 33 files, 277 tests passed. build: remote-code check passed. e2e: 13 passed (~15 s), no page or service-worker errors.

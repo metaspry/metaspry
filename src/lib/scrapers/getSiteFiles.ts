@@ -382,3 +382,37 @@ export async function fetchSiteFiles(baseUrl: string): Promise<SiteFiles> {
   const sitemap = await buildSitemap(baseUrl, robots.sitemaps);
   return { robots, sitemap, llms };
 }
+
+let cacheKey: number | null = null;
+const cache = new Map<string, Promise<SiteFiles>>();
+
+/**
+ * One `fetchSiteFiles` per origin per scan (UX review item 10). The Site tab, the AI tab and the
+ * cloud upload each fetched robots.txt, llms.txt and up to 40 sitemaps on their own, and the tabs
+ * did it again on every visit. `scanKey` is the scan the caller belongs to: a new key drops the
+ * cache, so a re-scan sees the files as they are now. A failed fetch is not cached.
+ */
+export function fetchSiteFilesCached(
+  baseUrl: string,
+  scanKey: number,
+  fetcher: (baseUrl: string) => Promise<SiteFiles> = fetchSiteFiles,
+): Promise<SiteFiles> {
+  if (scanKey !== cacheKey) {
+    cache.clear();
+    cacheKey = scanKey;
+  }
+  let origin = baseUrl;
+  try {
+    origin = new URL(baseUrl).origin;
+  } catch {
+    /* keep the raw value as the key */
+  }
+  const hit = cache.get(origin);
+  if (hit) return hit;
+  const pending = fetcher(baseUrl);
+  cache.set(origin, pending);
+  pending.catch(() => {
+    if (cache.get(origin) === pending) cache.delete(origin);
+  });
+  return pending;
+}

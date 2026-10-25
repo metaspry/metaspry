@@ -72,7 +72,7 @@
   <!-- Facebook -->
   <section
     aria-label="Facebook preview"
-    class="overflow-hidden rounded-2xl border border-white/40 bg-white/60 shadow-md shadow-indigo-500/5 backdrop-blur-md dark:border-white/10 dark:bg-white/5"
+    class="overflow-hidden rounded-2xl border border-white/40 bg-white/60 shadow-md shadow-indigo-500/5 dark:border-white/10 dark:bg-white/5"
   >
     <header class="border-b border-white/40 px-4 py-2 text-[0.6875rem] font-semibold uppercase tracking-wider ms-muted dark:border-white/10">
       Facebook
@@ -94,7 +94,7 @@
   <!-- Twitter -->
   <section
     aria-label="Twitter preview"
-    class="overflow-hidden rounded-2xl border border-white/40 bg-white/60 shadow-md shadow-indigo-500/5 backdrop-blur-md dark:border-white/10 dark:bg-white/5"
+    class="overflow-hidden rounded-2xl border border-white/40 bg-white/60 shadow-md shadow-indigo-500/5 dark:border-white/10 dark:bg-white/5"
   >
     <header class="border-b border-white/40 px-4 py-2 text-[0.6875rem] font-semibold uppercase tracking-wider ms-muted dark:border-white/10">
       Twitter · {twitterCard}{declaredTwitterCard ? '' : ' (no twitter:card — fallback)'}
@@ -133,7 +133,7 @@
   <!-- LinkedIn -->
   <section
     aria-label="LinkedIn preview"
-    class="overflow-hidden rounded-2xl border border-white/40 bg-white/60 shadow-md shadow-indigo-500/5 backdrop-blur-md dark:border-white/10 dark:bg-white/5"
+    class="overflow-hidden rounded-2xl border border-white/40 bg-white/60 shadow-md shadow-indigo-500/5 dark:border-white/10 dark:bg-white/5"
   >
     <header class="border-b border-white/40 px-4 py-2 text-[0.6875rem] font-semibold uppercase tracking-wider ms-muted dark:border-white/10">
       LinkedIn
