@@ -2,6 +2,22 @@ import type { PageMeta } from '../../scrapers/PageMeta';
 
 export type DiffStatus = 'same' | 'different' | 'left-only' | 'right-only';
 
+/**
+ * The status as words (UX review item 3): rows were told apart by a background tint alone,
+ * 1.01:1 between "same" and "different", and not at all for a screen reader.
+ */
+export const DIFF_LABEL: Record<DiffStatus, string> = {
+  same: 'Same',
+  different: 'Different',
+  'left-only': 'Only on current',
+  'right-only': 'Only on compared',
+};
+
+/** How many rows differ in any way (everything but `same`). */
+export function differenceCount(rows: readonly { status: DiffStatus }[]): number {
+  return rows.filter((r) => r.status !== 'same').length;
+}
+
 export interface DiffRow {
   key: string;
   left: string | null;

@@ -1,5 +1,6 @@
 import { writable, get } from 'svelte/store';
 import { shortcutsEnabled } from '../../storage/shortcuts';
+import { layerOpen } from '../../layers';
 
 export interface ShortcutEvents {
   focusSearch?: () => void;
@@ -47,6 +48,9 @@ export function attachShortcuts(): () => void {
     if (event.ctrlKey || event.metaKey || event.altKey) return;
     const action = shortcutFor(event.key, event.shiftKey, get(shortcutsEnabled));
     if (!action) return;
+    // Behind an open dialog or menu, `r` re-scanned and `1`-`6` switched tabs out of sight, and `/`
+    // pulled focus out of the dialog. Only `?` (help, which stacks on top) still works there.
+    if (action.kind !== 'help' && get(layerOpen)) return;
     event.preventDefault();
     if (action.kind === 'help') helpOpen.update((v) => !v);
     else if (action.kind === 'search') handlers.focusSearch?.();

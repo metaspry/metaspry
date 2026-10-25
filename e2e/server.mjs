@@ -14,6 +14,10 @@ const TYPES = {
   '.xml': 'application/xml; charset=utf-8',
   '.png': 'image/png',
 };
+// Response headers a fixture needs beyond the content type.
+const HEADERS = {
+  '/noindex-header.html': { 'x-robots-tag': 'noindex' },
+};
 
 createServer(async (req, res) => {
   const path = new URL(req.url ?? '/', 'http://localhost').pathname;
@@ -24,7 +28,9 @@ createServer(async (req, res) => {
   }
   try {
     const body = await readFile(file);
-    res.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream' }).end(body);
+    res
+      .writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream', ...(HEADERS[path] ?? {}) })
+      .end(body);
   } catch {
     res.writeHead(404, { 'content-type': 'text/plain' }).end('not found');
   }

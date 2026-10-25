@@ -9,6 +9,11 @@ export interface RuleResult {
   description: string;
   status: RuleStatus;
   detail: string;
+  /**
+   * The rule did not apply to this page (not an article, no hreflang, no JSON-LD). Status stays
+   * `pass` so the score matches the web app's engine; the UI says "Not applicable" instead of a tick.
+   */
+  skipped?: true;
   meta?: {
     length?: number;
     min?: number;

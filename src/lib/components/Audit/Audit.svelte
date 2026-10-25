@@ -7,6 +7,8 @@
   import { compareChangedHref } from '../../cloud/compare-link';
   import type { UploadResult } from '../../cloud/sync';
   import { timeAgo } from '../../util/time-ago';
+  import { formulaText, pointsLost, possiblePoints, verdictLabel } from '../../audit/explain';
+  import { DEFAULT_SETTINGS, type RuleWeights } from '../../storage/settings';
   import CharBar from './CharBar.svelte';
   import JsonLdSection from './JsonLdSection.svelte';
   import HreflangSection from './HreflangSection.svelte';
@@ -16,6 +18,10 @@
   export let meta: PageMeta;
   /** The cloud document this scan wrote (AGENTS 3.14); null when signed out or before the upload resolves. */
   export let cloudScan: UploadResult | null = null;
+  /** The weights the score was computed with (`effectiveSettings`), for the formula and points lost. */
+  export let weights: RuleWeights = DEFAULT_SETTINGS.weights;
+
+  $: possible = possiblePoints(result.rules, weights);
 
   // A fact the extension knows (when the previous document was written), not a claim about when
   // the page changed: the app's `@prev` is the newest stored version, which can be older than that.
@@ -60,14 +66,14 @@
 
   // The band tokens (R2-29): the -500 icons were 1.90-2.25:1 on the light card.
   function statusColor(r: RuleResult): string {
-    if (r.status === 'pending') return 'ms-muted';
+    if (r.status === 'pending' || r.skipped) return 'ms-muted';
     return bandClasses(bandForVerdict(r.status)).stroke;
   }
 </script>
 
 <div class="flex flex-col gap-4">
   <!-- Identity left, verdict right: the same order as every list and header in the web app. -->
-  <header class="flex items-center justify-between gap-4 rounded-2xl border border-white/40 bg-white/50 p-4 backdrop-blur-md dark:border-white/10 dark:bg-white/5">
+  <header class="flex items-center justify-between gap-4 rounded-2xl border border-white/40 bg-white/50 p-4 dark:border-white/10 dark:bg-white/5">
     <div class="flex min-w-0 flex-1 flex-col">
       <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">SEO Health</h3>
       {#if capped}
@@ -75,7 +81,7 @@
         <p class="text-xs font-medium {bandClasses('warn').ink}">{CAPPED_BAND_REASON}</p>
       {:else}
         <p class="text-xs ms-muted">
-          {result.hasPending ? 'Resolving async checks…' : 'Score weighted by rule severity.'}
+          {result.hasPending ? 'Measuring og:image and response headers…' : 'Score weighted by rule severity.'}
         </p>
       {/if}
     </div>
@@ -103,7 +109,7 @@
 
   {#if cloudScan?.hadPrevious}
     <!-- The diff itself lives in the web app (versions are written server-side); one click away. -->
-    <div class="flex items-center justify-between gap-3 rounded-xl border border-white/40 bg-white/40 px-3 py-2 backdrop-blur-md dark:border-white/10 dark:bg-white/5">
+    <div class="flex items-center justify-between gap-3 rounded-xl border border-white/40 bg-white/40 px-3 py-2 dark:border-white/10 dark:bg-white/5">
       <span class="min-w-0 truncate text-xs ms-muted">{lastScan}</span>
       <button
         type="button"
@@ -117,15 +123,24 @@
     </div>
   {/if}
 
+  <!-- How the number is made, for every plan (item 9); it used to live only in Pro settings. -->
+  <p class="px-1 text-xs ms-muted">{formulaText(weights)}</p>
+
   {#each groups as group}
     {#if group.rules.length > 0}
       <section class="flex flex-col gap-2">
         <h4 class="text-xs font-semibold uppercase tracking-wider ms-muted">{group.label}</h4>
         <div class="flex flex-col gap-1.5">
           {#each group.rules as rule (rule.id)}
-            <div class="flex items-start gap-3 rounded-xl border border-white/40 bg-white/40 px-3 py-2 backdrop-blur-md dark:border-white/10 dark:bg-white/5">
-              <div class="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center {statusColor(rule)}">
-                {#if rule.status === 'pass'}
+            <div class="flex items-start gap-3 rounded-xl border border-white/40 bg-white/40 px-3 py-2 dark:border-white/10 dark:bg-white/5">
+              <!-- The icon is decoration; the verdict is the sr-only word before the title (item 2,
+                   the AeoView pattern). -->
+              <div class="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center {statusColor(rule)}" aria-hidden="true">
+                {#if rule.skipped}
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" class="h-4 w-4">
+                    <path d="M5 12h14" />
+                  </svg>
+                {:else if rule.status === 'pass'}
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4">
                     <path d="M20 6 9 17l-5-5" />
                   </svg>
@@ -145,8 +160,15 @@
                 {/if}
               </div>
               <div class="min-w-0 flex-1">
-                <p class="text-sm font-medium text-slate-900 dark:text-slate-50">{rule.title}</p>
-                <p class="break-all text-xs ms-muted">{rule.detail}</p>
+                <p class="text-sm font-medium text-slate-900 dark:text-slate-50"><span class="sr-only">{verdictLabel(rule)}: </span>{rule.title}{#if rule.skipped}<span class="ms-muted text-xs font-normal" aria-hidden="true"> · Not applicable</span>{/if}</p>
+                <p class="text-xs ms-muted [overflow-wrap:anywhere]">{rule.detail}</p>
+                {#if rule.status === 'warn' || rule.status === 'fail'}
+                  <!-- Why it matters and what it costs (item 9): the description was never shown. -->
+                  <p class="mt-0.5 text-xs text-slate-700 dark:text-slate-300">
+                    {rule.description}
+                    <span class="whitespace-nowrap font-medium tabular-nums">−{pointsLost(rule, weights, possible)} pts</span>
+                  </p>
+                {/if}
                 {#if rule.meta?.length !== undefined && rule.meta.min !== undefined && rule.meta.max !== undefined}
                   <div class="mt-1.5">
                     <CharBar length={rule.meta.length} min={rule.meta.min} max={rule.meta.max} />

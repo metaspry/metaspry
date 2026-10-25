@@ -31,7 +31,7 @@
       on:click={() => select(chip.id)}
       class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition {FOCUS_RING_ON_FILL} {chip.id === active
         ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/30'
-        : 'border border-white/40 bg-white/40 text-slate-700 backdrop-blur-md hover:bg-white/70 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10'}"
+        : 'border border-white/40 bg-white/40 text-slate-700 hover:bg-white/70 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10'}"
     >
       <span>{chip.label}</span>
       <span class="tabular-nums opacity-80">{count}</span>

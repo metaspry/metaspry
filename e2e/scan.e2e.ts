@@ -11,7 +11,8 @@ test.describe('scan pipeline', () => {
     // Tags: the captured document's own values, not a cached copy.
     await expect(ext.getByRole('tab', { name: 'Tags', exact: true })).toHaveAttribute('aria-selected', 'true');
     await expect(ext).toHaveTitle('Metaspry - Tags');
-    const main = ext.getByRole('main');
+    // Hidden panels stay mounted (they keep their state), so look inside the visible one only.
+    const main = ext.getByRole('tabpanel');
     await expect(main.getByText('Fixture Home - Metaspry E2E').first()).toBeVisible();
     await expect(main.getByText('A fixture page with a complete set of meta tags', { exact: false }).first()).toBeVisible();
     await expect(main.getByText('Fixture OG Title').first()).toBeVisible();
@@ -38,10 +39,17 @@ test.describe('scan pipeline', () => {
     await expect(ext).toHaveTitle('Metaspry - Compare');
   });
 
-  test('a page with no meta tags shows the empty state', async ({ openSurface }) => {
+  test('a page with no meta tags opens the audit with what to add, and is kept in History', async ({ openSurface }) => {
     const { ext } = await openSurface('/empty.html');
     await ext.getByRole('button', { name: 'Scan this page' }).click();
-    await expect(ext.getByRole('heading', { name: 'No meta tags found' })).toBeVisible();
+    await expect(ext.getByRole('complementary', { name: 'No meta tags found' })).toContainText('The Audit tab below lists what to add');
+    await expect(ext.getByRole('tab', { name: 'Audit', exact: true })).toHaveAttribute('aria-selected', 'true');
+    const panel = ext.getByRole('tabpanel');
+    await expect(panel.getByRole('img', { name: /^Score \d{1,3} of 100, / })).toBeVisible();
+    await expect(panel.getByText('Fail: Page title', { exact: false })).toBeAttached();
+    await expect
+      .poll(async () => (await ext.evaluate(async () => (await chrome.storage.local.get('history')).history as { url: string }[] | undefined))?.[0]?.url)
+      .toBe(`${SITE}/empty.html`);
   });
 
   test('a browser page Chrome blocks shows the error state with a plain reason', async ({ openSurface, background }) => {

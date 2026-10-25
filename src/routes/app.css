@@ -53,6 +53,16 @@
   .dark .ms-popover .ms-muted {
     color: #cbd5e1;
   }
+
+  /* The notes (UX review item 12): the amber banner was pasted, with `backdrop-blur-md`, into
+   * Extension.svelte three times and drifted into four variants elsewhere; the rose error box five
+   * times. Solid translucent fills, no blur: blur stays on the shell (Screen) and overlays only. */
+  .ms-note-warn {
+    @apply flex items-center gap-2 rounded-xl border border-amber-300/60 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/60 dark:text-amber-200;
+  }
+  .ms-note-error {
+    @apply rounded-xl border border-rose-300/60 bg-rose-50 px-3 py-2 text-xs text-rose-800 dark:border-rose-500/30 dark:bg-rose-950/60 dark:text-rose-200;
+  }
 }
 
 /* Native parts (number spinners, checkboxes, scrollbars of native controls) follow the class-based

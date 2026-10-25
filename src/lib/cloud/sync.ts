@@ -3,8 +3,7 @@
  * renders, and uploads it to users/{uid}/scans. Re-scanning a URL overwrites its doc
  * (deterministic id) so history shows the latest state per URL, not duplicates.
  */
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { fbDb } from './firebase';
+import { firestoreSdk } from './sdk';
 import type { PageMeta } from '../scrapers/PageMeta';
 import type { AuditResult, RuleStatus } from '../audit/AuditResult';
 import type { SiteFiles } from '../scrapers/SiteFiles';
@@ -134,10 +133,11 @@ export async function uploadScan(
   scope: SyncScope = { kind: 'personal' }
 ): Promise<UploadResult> {
   const id = scanIdFor(payload.url);
+  const { db, doc, getDoc, setDoc, serverTimestamp } = await firestoreSdk();
   const ref =
     scope.kind === 'workspace'
-      ? doc(fbDb(), 'workspaces', scope.wsId, 'scans', id)
-      : doc(fbDb(), 'users', uid, 'scans', id);
+      ? doc(db, 'workspaces', scope.wsId, 'scans', id)
+      : doc(db, 'users', uid, 'scans', id);
   // A plain setDoc wiped the user's `starred` flag and reset createdAt on every re-scan, so
   // re-auditing a page you had starred silently unstarred it and moved it to the top of history as
   // if it were new. Carry those two forward from the snapshot instead of merging: the Firestore

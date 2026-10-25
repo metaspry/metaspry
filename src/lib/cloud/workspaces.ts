@@ -4,8 +4,7 @@
  * can write to (owner/member) are offered; the choice persists in chrome.storage.
  */
 import { writable, get } from 'svelte/store';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { fbDb } from './firebase';
+import { firestoreSdk } from './sdk';
 import { cloudUser } from './auth';
 
 export interface CloudWorkspace {
@@ -56,8 +55,9 @@ export function setSyncScope(s: SyncScope): void {
 
 export async function fetchWorkspaces(uid: string): Promise<void> {
   try {
+    const { db, collection, getDocs, query, where } = await firestoreSdk();
     const snap = await getDocs(
-      query(collection(fbDb(), 'workspaces'), where('memberUids', 'array-contains', uid)),
+      query(collection(db, 'workspaces'), where('memberUids', 'array-contains', uid)),
     );
     const list = snap.docs
       .map((d) => {

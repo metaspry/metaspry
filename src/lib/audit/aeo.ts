@@ -20,6 +20,12 @@ export interface AeoResult {
   chip: 'ready' | 'needs-work';
 }
 
+/** The Audit `noindex` rule's verdict: blocked = it failed (meta robots, googlebot or X-Robots-Tag). */
+export interface IndexingVerdict {
+  blocked: boolean;
+  detail: string;
+}
+
 // Keep aligned with app/functions/src/aeo.ts.
 export const AI_BOTS = {
   retrieval: ['OAI-SearchBot', 'PerplexityBot', 'Claude-SearchBot', 'Googlebot'],
@@ -49,14 +55,20 @@ function bodyText(doc: ParentNode): string {
   return (body.textContent ?? '').replace(/\s+/g, ' ').trim();
 }
 
-export function analyzeAeo(html: ParentNode, siteFiles: SiteFiles | null, baseUrl: string): AeoResult {
+export function analyzeAeo(
+  html: ParentNode,
+  siteFiles: SiteFiles | null,
+  baseUrl: string,
+  indexing?: IndexingVerdict,
+): AeoResult {
   const checks: AeoCheck[] = [];
 
   // --- Page-level (rendered DOM) ---
   const metaRobots = (
     html.querySelector('meta[name="robots" i]')?.getAttribute('content') ?? ''
   ).toLowerCase();
-  const noindex = /\bnoindex\b/.test(metaRobots);
+  // The Audit verdict wins when given, so the two tabs cannot disagree (UX review item 5).
+  const noindex = indexing ? indexing.blocked : /\bnoindex\b/.test(metaRobots);
   const nosnippet = /\bnosnippet\b/.test(metaRobots) || /max-snippet:\s*0/.test(metaRobots);
   checks.push(
     noindex || nosnippet
@@ -64,7 +76,9 @@ export function analyzeAeo(html: ParentNode, siteFiles: SiteFiles | null, baseUr
           id: 'aeo-indexable',
           label: 'Indexable & snippet-eligible',
           state: 'warn',
-          detail: `Page sets ${noindex ? 'noindex' : 'nosnippet'} - AI search features need indexable, snippet-eligible pages.`,
+          detail: noindex && indexing
+            ? `Search engines are told not to index this page (${indexing.detail}), the same finding as Audit > Indexable by search engines. AI search features need indexable, snippet-eligible pages.`
+            : `Page sets ${noindex ? 'noindex' : 'nosnippet'} - AI search features need indexable, snippet-eligible pages.`,
           scope: 'page',
         }
       : {

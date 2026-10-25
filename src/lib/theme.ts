@@ -6,13 +6,24 @@ export type Theme = 'light' | 'dark';
 const STORAGE_KEY = 'theme';
 const DEFAULT_THEME: Theme = 'light';
 
-export const theme = writable<Theme>(DEFAULT_THEME);
+/** Read synchronously by static/scripts/boot.js before first paint. */
+export const THEME_MIRROR_KEY = 'metaspry:theme';
+
+// Starts from what boot.js already applied, so the toggle is right on the first frame too.
+export const theme = writable<Theme>(
+  typeof document !== 'undefined' && document.documentElement.classList.contains('dark') ? 'dark' : DEFAULT_THEME,
+);
 
 function applyClass(next: Theme): void {
   if (typeof document === 'undefined') return;
   const root = document.documentElement;
   if (next === 'dark') root.classList.add('dark');
   else root.classList.remove('dark');
+  try {
+    localStorage.setItem(THEME_MIRROR_KEY, next);
+  } catch {
+    /* storage blocked: boot.js falls back to the OS preference */
+  }
 }
 
 function systemTheme(): Theme {

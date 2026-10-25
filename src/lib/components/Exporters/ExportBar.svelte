@@ -6,7 +6,7 @@
   import { FOCUS_RING } from '../toolbar';
 
   // One pill for the four export actions (K3-15: the chain was pasted four times, with no focus ring).
-  const PILL = `inline-flex items-center gap-1 rounded-full border border-white/40 bg-white/40 px-3 py-1 text-xs font-medium text-slate-700 backdrop-blur-md transition hover:bg-white/70 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10 ${FOCUS_RING}`;
+  const PILL = `inline-flex items-center gap-1 rounded-full border border-white/40 bg-white/40 px-3 py-1 text-xs font-medium text-slate-700 transition hover:bg-white/70 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10 ${FOCUS_RING}`;
 
   export let meta: PageMeta;
 

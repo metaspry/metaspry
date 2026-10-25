@@ -16,7 +16,7 @@
 </script>
 
 <div
-  class="relative flex min-w-[160px] flex-grow flex-shrink flex-col gap-1 rounded-2xl border border-white/40 bg-white/50 p-4 pr-[4.75rem] shadow-md shadow-indigo-500/5 backdrop-blur-md dark:border-white/10 dark:bg-white/5"
+  class="relative flex min-w-[160px] flex-grow flex-shrink flex-col gap-1 rounded-2xl border border-white/40 bg-white/50 p-4 pr-[4.75rem] shadow-md shadow-indigo-500/5 dark:border-white/10 dark:bg-white/5"
 >
   <p class="text-[0.6875rem] font-semibold uppercase tracking-wider ms-muted break-all">
     {tag.key}

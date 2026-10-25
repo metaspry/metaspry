@@ -1,7 +1,9 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { scanSync } from "../../cloud/sync-status";
   import {
     cloudUser,
+    cloudReady,
     initCloudAuth,
     cloudSignIn,
     cloudSignInWithGoogle,
@@ -121,25 +123,51 @@
   $: noneChecked = !isPersonal && !$workspaces.some((w) => $syncScope.kind === "workspace" && $syncScope.wsId === w.id);
   $: targetLabel = $syncScope.kind === "workspace" ? $syncScope.name : "Personal";
   $: initials = initialsFor($cloudUser?.email);
+
+  // The last scan upload, for real (UX review item 1): this used to read "Synced" whatever happened.
+  $: syncDot =
+    $scanSync.kind === "error"
+      ? "bg-rose-600 dark:bg-rose-400"
+      : $scanSync.kind === "saving"
+        ? "bg-amber-500 dark:bg-amber-300"
+        : "bg-emerald-600 dark:bg-emerald-400";
+  $: syncTitle =
+    $scanSync.kind === "error"
+      ? "Couldn't save the last scan"
+      : $scanSync.kind === "saving"
+        ? `Saving to ${$scanSync.target}…`
+        : $scanSync.kind === "saved"
+          ? `Last scan saved to ${$scanSync.target}`
+          : `Saving new scans to ${targetLabel}`;
+  $: syncDetail =
+    $scanSync.kind === "error"
+      ? $scanSync.message
+      : $scanSync.kind === "saving"
+        ? "Keep this open until it finishes."
+        : null;
 </script>
 
 <!-- Not `relative`: the dropdown anchors to the header's right-hand block (Extension.svelte). -->
 <div>
   <!-- Account control. Signed out it is the one "Sign in" call to action in the header; signed in
        it shows who and where scans go, and opens the account dropdown. -->
-  {#if $cloudUser}
+  {#if !$cloudReady}
+    <!-- Auth not known yet: hold the space, so "Sign in" does not flash and morph into the account
+         button for a signed-in user (item 11). -->
+    <span class="block h-9 w-[4.5rem] rounded-xl border border-slate-200/70 bg-white/40 dark:border-white/10 dark:bg-white/5" aria-hidden="true"></span>
+  {:else if $cloudUser}
     <button
       bind:this={trigger}
       type="button"
       on:click={() => (open = !open)}
-      aria-label="Account and sync target"
+      aria-label={$scanSync.kind === "error" ? "Account and sync target, last scan not saved" : "Account and sync target"}
       aria-expanded={open}
       use:tooltip={`Signed in as ${$cloudUser.email} - saving scans to ${targetLabel}`}
-      class="flex h-9 max-w-[170px] items-center gap-1.5 rounded-xl border border-slate-200/70 bg-white/70 py-0.5 pl-0.5 pr-2 text-xs font-medium text-slate-700 backdrop-blur-md transition hover:bg-white dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 {FOCUS_RING}"
+      class="flex h-9 max-w-[170px] items-center gap-1.5 rounded-xl border border-slate-200/70 bg-white/70 py-0.5 pl-0.5 pr-2 text-xs font-medium text-slate-700 transition hover:bg-white dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 {FOCUS_RING}"
     >
       <span class="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500 text-[0.6875rem] font-bold text-white" aria-hidden="true">
         {initials}
-        <span class="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-600 dark:border-slate-900 dark:bg-emerald-400"></span>
+        <span class="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white dark:border-slate-900 {syncDot}"></span>
       </span>
       <span class="hidden min-w-0 truncate min-[460px]:inline">{targetLabel}</span>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ms-muted h-3 w-3 shrink-0" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
@@ -165,10 +193,13 @@
       class="ms-popover absolute right-0 top-full z-50 mt-2 flex w-64 max-w-[calc(100vw-2.5rem)] flex-col gap-2 p-3"
     >
       {#if $cloudUser}
-        <div class="flex items-center gap-2">
-          <span class="h-2 w-2 shrink-0 rounded-full bg-emerald-600 dark:bg-emerald-400" aria-hidden="true"></span>
+        <div class="flex items-start gap-2" role="status">
+          <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full {syncDot}" aria-hidden="true"></span>
           <div class="min-w-0">
-            <p class="text-sm font-medium text-slate-800 dark:text-slate-100">Synced</p>
+            <p class="text-sm font-medium text-slate-800 dark:text-slate-100">{syncTitle}</p>
+            {#if syncDetail}
+              <p class="text-xs {$scanSync.kind === 'error' ? 'text-rose-700 dark:text-rose-300' : 'ms-muted'}">{syncDetail}</p>
+            {/if}
             <p class="ms-muted truncate text-xs">{$cloudUser.email}</p>
           </div>
         </div>
