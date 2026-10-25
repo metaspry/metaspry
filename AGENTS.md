@@ -46,7 +46,9 @@ It is one of three sibling repositories:
 | Icons | `npm run gen-icons` | Regenerates `static/icons/*` |
 | Promo tiles | `node scripts/gen-promo-tiles.mjs` | Writes `promo/promo-small-440x280.png`, `promo/promo-marquee-1400x560.png` |
 | Store screenshots | `node scripts/process-screenshots.mjs` | `promo/raw-screenshots/*` -> `promo/screenshot-NN.png` (1280x800, no alpha) |
-| Lint, format, type-check, test | Not configured | `vite build` transpiles TypeScript but does not type-check. There is no `typescript` or `svelte-check` dependency. |
+| Type-check | `npm run check` | `svelte-check` against `tsconfig.json`. `vite build` transpiles TypeScript but does not type-check. |
+| Test | `npm test` | Vitest, co-located `src/**/*.spec.ts`, happy-dom (section 3.18). No e2e suite yet. |
+| Lint, format | Not configured | |
 
 ### Hard rules
 
@@ -63,6 +65,8 @@ These summarise the maintainer's agent instructions in `CLAUDE.md` and `.github/
 9. **No shipped `console.*`.** Gate diagnostics behind `import.meta.env.DEV`. (`static/scripts/background.js` is not bundled and keeps `console.error`/`console.warn` in its error handlers.)
 10. **Scraped page content is untrusted.** Never pass it to `{@html}`, `eval` or an unbounded regex.
 11. **Keep this file current** (section 6).
+12. **Tests ship with the code.** Every change that adds or changes behaviour, including bug fixes, adds or updates automated tests in the same commit/PR: Vitest unit specs for logic, Vitest + happy-dom `*.dom.spec.ts` for DOM, actions, stores and messaging (mock `chrome.*` at the boundary), e2e against the built unpacked extension for user flows once that harness exists. A bug fix starts with a failing test. Hard-to-test logic in a `.svelte` file gets extracted to a `.ts` module. The only exception is explicit sign-off from Paul for that change, recorded in the OpenSpec or commit body as `Tests waived: <reason> - approved by Paul <date>`. Every OpenSpec `tasks.md` has a "Write/update tests" task.
+13. **Full-extension QA, periodically.** QA covers the whole extension, not just the diff: `npm run check`, `npm test`, `npm run build`, the e2e suite when it exists, and the manual checklist in section 3.18 for what is not automated. Run it before every release or `metaspry-v*.zip` build, after merging a change to `Extension.svelte`, the manifest, `background.js`, the scan pipeline or messaging, and at least weekly while the repo is active. Log each run (date, commit, result, gaps) in `docs/qa/qa-log.md`; untested modules and flows become OpenSpecs.
 
 ### Stale references elsewhere
 
