@@ -47,7 +47,10 @@ It is one of three sibling repositories:
 | Promo tiles | `node scripts/gen-promo-tiles.mjs` | Writes `promo/promo-small-440x280.png`, `promo/promo-marquee-1400x560.png` |
 | Store screenshots | `node scripts/process-screenshots.mjs` | `promo/raw-screenshots/*` -> `promo/screenshot-NN.png` (1280x800, no alpha) |
 | Type-check | `npm run check` | `svelte-check` against `tsconfig.json`. `vite build` transpiles TypeScript but does not type-check. |
-| Test | `npm test` | Vitest, co-located `src/**/*.spec.ts`, happy-dom (section 3.18). No e2e suite yet. |
+| Test | `npm test` | Vitest, co-located `src/**/*.spec.ts`, happy-dom (section 3.18) |
+| Coverage | `npm run test:coverage` | Vitest v8 coverage of every file under `src/lib`; text summary + `coverage/index.html` |
+| E2E | `npm run test:e2e` | Builds, then Playwright loads `build/` unpacked in Chromium and runs `e2e/*.e2e.ts` (section 3.18). `HEADED=1` to watch |
+| Full QA pass | `npm run qa` | `check` + `test` + `test:e2e`; non-zero on any failure. Log each run in `docs/qa/qa-log.md` (hard rule 13) |
 | Lint, format | Not configured | |
 
 ### Hard rules
@@ -65,8 +68,8 @@ These summarise the maintainer's agent instructions in `CLAUDE.md` and `.github/
 9. **No shipped `console.*`.** Gate diagnostics behind `import.meta.env.DEV`. (`static/scripts/background.js` is not bundled and keeps `console.error`/`console.warn` in its error handlers.)
 10. **Scraped page content is untrusted.** Never pass it to `{@html}`, `eval` or an unbounded regex.
 11. **Keep this file current** (section 6).
-12. **Tests ship with the code.** Every change that adds or changes behaviour, including bug fixes, adds or updates automated tests in the same commit/PR: Vitest unit specs for logic, Vitest + happy-dom `*.dom.spec.ts` for DOM, actions, stores and messaging (mock `chrome.*` at the boundary), e2e against the built unpacked extension for user flows once that harness exists. A bug fix starts with a failing test. Hard-to-test logic in a `.svelte` file gets extracted to a `.ts` module. The only exception is explicit sign-off from Paul for that change, recorded in the OpenSpec or commit body as `Tests waived: <reason> - approved by Paul <date>`. Every OpenSpec `tasks.md` has a "Write/update tests" task.
-13. **Full-extension QA, periodically.** QA covers the whole extension, not just the diff: `npm run check`, `npm test`, `npm run build`, the e2e suite when it exists, and the manual checklist in section 3.18 for what is not automated. Run it before every release or `metaspry-v*.zip` build, after merging a change to `Extension.svelte`, the manifest, `background.js`, the scan pipeline or messaging, and at least weekly while the repo is active. Log each run (date, commit, result, gaps) in `docs/qa/qa-log.md`; untested modules and flows become OpenSpecs.
+12. **Tests ship with the code.** Every change that adds or changes behaviour, including bug fixes, adds or updates automated tests in the same commit/PR: Vitest unit specs for logic, Vitest + happy-dom `*.dom.spec.ts` for DOM, actions, stores and messaging (mock `chrome.*` at the boundary), Playwright e2e against the built unpacked extension (`e2e/`, section 3.18) for user flows. A bug fix starts with a failing test. Hard-to-test logic in a `.svelte` file gets extracted to a `.ts` module. The only exception is explicit sign-off from Paul for that change, recorded in the OpenSpec or commit body as `Tests waived: <reason> - approved by Paul <date>`. Every OpenSpec `tasks.md` has a "Write/update tests" task.
+13. **Full-extension QA, periodically.** QA covers the whole extension, not just the diff: `npm run check`, `npm test`, `npm run build` and the e2e suite (all four: `npm run qa`), plus `npm run test:coverage`, then the manual list in section 3.18 for what is not automated. Run it before every release or `metaspry-v*.zip` build, after merging a change to `Extension.svelte`, the manifest, `background.js`, the scan pipeline or messaging, and at least weekly while the repo is active. Log each run (date, commit, result, gaps) in `docs/qa/qa-log.md`; untested modules and flows become OpenSpecs.
 
 ### Stale references elsewhere
 
@@ -75,7 +78,7 @@ These summarise the maintainer's agent instructions in `CLAUDE.md` and `.github/
 - `src/lib/gpt-actions/`, a user-supplied OpenAI key, the `compromise` NLP library, components `KeywordsInfo` / `MetaInfo` / `ScreenInfo`, and scrapers `getKeywords` / `getMostUsedWords` / `getWindow` do not exist.
 - The "use `$lib/...` imports" rule is not followed anywhere; every import is relative.
 - "Type-check runs during `vite build`" is false.
-- `.github/instructions/testing.instructions.md` and `styling.instructions.md` are unfilled template stubs.
+- `.github/instructions/styling.instructions.md` is an unfilled template stub.
 
 ---
 
@@ -147,8 +150,10 @@ This is the complete inventory. There are no ports (`runtime.connect`), no conte
 | `scripts/check-remote-code.mjs` | Post-build guard: fails the build if `build/` references a remote script loader (4.1) |
 | `scripts/` | Node asset generators |
 | `promo/` | Store promo tiles and screenshots (`raw-screenshots/` holds the unprocessed captures) |
-| `docs/` | Store runbooks: `chrome-store-resubmit.md`, `store-screenshots.md` |
-| Git-ignored, generated | `build/`, `.svelte-kit/`, `node_modules/`, `metaspry-v*.zip`, `.code-graph/` |
+| `docs/` | Store runbooks: `chrome-store-resubmit.md`, `store-screenshots.md`; `qa/qa-log.md` (one entry per full QA pass) |
+| `e2e/` | Playwright suite: `fixtures.ts` (extension context + `openSurface`), `*.e2e.ts`, `server.mjs` + `site/` (the local fixture site the suite scans) |
+| `playwright.config.ts`, `vitest.config.ts` | Test runner config (3.18) |
+| Git-ignored, generated | `build/`, `.svelte-kit/`, `node_modules/`, `metaspry-v*.zip`, `.code-graph/`, `coverage/`, `test-results/`, `playwright-report/`, `blob-report/` |
 
 ### Startup order
 
@@ -237,7 +242,7 @@ Each feature lists: purpose and user flow, key files, data and storage, permissi
 
 **Permissions.** `sidePanel`, `storage`.
 
-**Tests.** None. Manually switch both ways and reopen from the toolbar.
+**Tests.** `e2e/shell.e2e.ts` (background.js applies a stored `mode` to `action.getPopup`). Opening the other surface needs a user gesture: manually switch both ways and reopen from the toolbar.
 
 **Gotchas.**
 - `sidePanel.open` and `action.openPopup` only work inside a user gesture. `background.js` mirrors the mode in memory (`currentMode`) so its context-menu handler never awaits storage first.
@@ -340,7 +345,7 @@ in the payload as metadata.
 
 **Permissions.** `tabs`, `scripting`, host `*://*/*` (no `activeTab`; the manifest does not declare it). `tab.favIconUrl` needs only the host permission. Tab tracking reads `tab.url` of tabs the user has not scanned, which needs `tabs` (or a host grant); without it `tabState` degrades to `unknown`. No `webNavigation`.
 
-**Tests.** `src/lib/scrapers/icon.spec.ts` (resolution order, skipped schemes, non-http page); `src/lib/tabs/follow-tab.spec.ts` (`tabState` cases incl. hash routes vs plain anchors, `displayUrl`, `followActiveTab` window / `url` / active filtering, `onReplaced`, out-of-order answers, unsubscribe); `getHTML.spec.ts` (`restrictedKind` incl. query-string false positives, `windowId` sent or omitted, capture timeout and late answers); `scan-error.spec.ts` (timeout copy); `background-gethtml.spec.ts` (runs `static/scripts/background.js` against a fake `chrome`: document URL labels the result, favicon dropped on a moved document, `unscriptable`, `no-tab`); the scrapers listed in 3.18. The banner itself: by hand (tab switch, same-tab link, SPA route, `chrome://`, scan in flight, two windows).
+**Tests.** `src/lib/scrapers/icon.spec.ts` (resolution order, skipped schemes, non-http page); `src/lib/tabs/follow-tab.spec.ts` (`tabState` cases incl. hash routes vs plain anchors, `displayUrl`, `followActiveTab` window / `url` / active filtering, `onReplaced`, out-of-order answers, unsubscribe); `getHTML.spec.ts` (`restrictedKind` incl. query-string false positives, `windowId` sent or omitted, capture timeout and late answers); `scan-error.spec.ts` (timeout copy); `background-gethtml.spec.ts` (runs `static/scripts/background.js` against a fake `chrome`: document URL labels the result, favicon dropped on a moved document, `unscriptable`, `no-tab`); the scrapers listed in 3.18. The banner itself: by hand (tab switch, same-tab link, SPA route, `chrome://`, scan in flight, two windows). End to end: `e2e/scan.e2e.ts` and `e2e/tab-follow.e2e.ts` (3.18).
 
 **Gotchas.**
 - The captured HTML is the rendered DOM after the page's JavaScript ran, not the server HTML a crawler fetches. JavaScript-injected tags count here. Compare (3.12) fetches raw HTML instead.
@@ -376,7 +381,7 @@ Export bar: Copy JSON, Copy CSV, Download .json, Download .csv. JSON is `{ title
 
 **Permissions.** None beyond the page: `navigator.clipboard` for copy, a blob `<a download>` for files (no `downloads` permission).
 
-**Tests.** None.
+**Tests.** `e2e/scan.e2e.ts` (the fixture page's title, description and OG title render). The search, pins and categories: none.
 
 **Gotchas.**
 - The search input carries `data-shortcut="search"`, which the `/` shortcut looks up. Keep the attribute.
@@ -529,7 +534,7 @@ indexed, and "a canonical tag is present" passed it.
 
 **Permissions.** Host `*://*/*`.
 
-**Tests.** None.
+**Tests.** `src/lib/scrapers/getRobots.spec.ts`; `e2e/scan.e2e.ts` (robots.txt and llms.txt fetched live from the fixture site and rendered).
 
 **Gotchas.**
 - Nothing is cached. The Site tab, the AI tab and the cloud upload each call `fetchSiteFiles` separately, and leaving a tab and coming back fetches again.
@@ -546,7 +551,7 @@ indexed, and "a canonical tag is present" passed it.
 
 **Permissions.** `storage`.
 
-**Tests.** None for the component; the panel behaviour is the popover action's (`actions/popover.spec.ts`, `popover.dom.spec.ts`, 3.18).
+**Tests.** `e2e/scan.e2e.ts` (a scan writes `history` and the entry shows in the dropdown after a reload). Otherwise none for the component; the panel behaviour is the popover action's (`actions/popover.spec.ts`, `popover.dom.spec.ts`, 3.18).
 
 **Gotchas.**
 - Local only and unrelated to cloud history.
@@ -581,7 +586,7 @@ Checks in `src/lib/audit/aeo.ts`:
 
 **Permissions.** Host `*://*/*` (site files).
 
-**Tests.** None.
+**Tests.** `e2e/scan.e2e.ts` (the llms.txt check against the fixture site). The other checks: none.
 
 **Gotchas.**
 - `aeo.ts` mirrors the web app's server analyzer `app/functions/src/aeo.ts` and says "Keep aligned". Change `AI_BOTS` or any check's meaning in both repos.
@@ -599,7 +604,7 @@ Checks in `src/lib/audit/aeo.ts`:
 
 **Permissions.** Host `*://*/*` (cross-origin fetch with `credentials: 'omit'`).
 
-**Tests.** None.
+**Tests.** `e2e/scan.e2e.ts` opens the tab only. `diff.ts` and the fetch: none.
 
 **Gotchas.**
 - The left side is the rendered DOM; the right side is raw server HTML with no JavaScript. Tags that JavaScript injects show as left-only.
@@ -732,13 +737,28 @@ The help modal (`ShortcutsHelp.svelte`) is `role="dialog" aria-modal="true"`, la
 | `npm test` | Vitest, co-located `*.spec.ts` (`--run` for one pass, `npm run test:watch` to watch). |
 | `npm run check` | `svelte-check` against `tsconfig.json`. |
 | `npm run build` | `vite build` + `removeInlineScript.cjs` + `scripts/check-remote-code.mjs` (fails on remote script loaders). Does not type-check on its own. |
+| `npm run test:coverage` | The Vitest run with v8 coverage over all of `src/lib` (`all: true`, so untested files show as 0 %). `.svelte` files read 0 % here; e2e covers them. |
+| `npm run test:e2e` | `npm run build`, then `playwright test`. One worker, a fresh persistent Chromium profile per test, new headless (`channel: 'chromium'`); `HEADED=1` shows the browser. Report in `playwright-report/`, traces of failures in `test-results/`. |
+| `npm run qa` | The full pass (hard rule 13): `check` + `test` + `test:e2e`. |
+
+**E2E harness (`e2e/`).** `fixtures.ts` launches Chromium with `--load-extension=build`, reads the extension id from the background service worker, and `openSurface(path)` opens `path` of the fixture site (`e2e/server.mjs` serving `e2e/site/` on `127.0.0.1:4319`, started by Playwright's `webServer`) in its own window, then loads `index.html` in the context's first tab. An init script makes that tab's `chrome.windows.getCurrent()` report the site window, standing in for a side panel docked there; `openSurface` asserts the override took (otherwise the background's last-focused fallback would hit the site window and scans would pass for the wrong reason). Everything else is real (background.js, `getHTML` messaging, `scripting.executeScript`, tabs events, `chrome.storage`, the site-file fetches). Firebase is not stubbed and stays signed out. Every test fails on an uncaught error in the extension page; `backgroundErrors` collects service-worker `console.error`s and context `weberror`s (asserted in `load.e2e.ts`).
+
+| Spec | Covers |
+| --- | --- |
+| `load.e2e.ts` | Service worker registers and applies the default mode, extension id, landing view, no page or service-worker errors |
+| `scan.e2e.ts` | Scan -> all six tabs (Tags title/description/OG/canonical, Previews, Audit score label, Site robots/llms from the server, AI llms.txt check, Compare opens); empty page -> empty state; `chrome://` page -> error state with the plain reason; history entry persisted and shown after reload |
+| `tab-follow.e2e.ts` | Stale banner on navigation, "Scan this tab"; `#section` vs hash route; failed re-scan keeps results (connection-refused error page); restricted page names itself and disables re-scan |
+| `shell.e2e.ts` | Theme toggle + persistence; `?`, digit and `r` shortcuts; settings drawer open/close; background applies `mode` to the action popup |
+
+Gotchas: the suite tests `build/` as built, so `npx playwright test` alone runs against a stale build (use `npm run test:e2e`). `site/` hardcodes port 4319 in canonical/og:url. Chromium extension tests run one at a time on purpose.
 
 - Covered by unit tests: `cloud/sync.ts` (`sync.spec.ts`, in-memory Firestore mock), `cloud/compare-link.ts`, `cloud/auth-errors.ts`, `cloud/workspace-scoring.ts` (resolution, normalisation, entitlement), `scrapers/scan-error.ts`, `components/Shortcuts/keyboard.ts` (`shortcutFor`), `audit/band.ts` (bands, the required-fail cap table, labels, light hues, `fill` / `ink`, `bandForVerdict`), `components/Toast/toast.ts` (`toast.spec.ts`: `toastDuration` at the app's 3.5 s base, per-toast expiry, dismiss, the cap of 3), `util/time-ago.ts`, `actions/tooltip.ts` (`tooltip.spec.ts`: options and listener wiring in node with a fake element; `tooltip.dom.spec.ts`: show/hide, owner hand-off, `aria-describedby`, Escape propagation, nested hover, the hover grace and the bubble bridge, `is-open`, update/destroy in happy-dom with floating-ui mocked), `actions/popover.ts` (`popover.spec.ts`: listener wiring, Escape, outside press, focus in / return, trigger swap, Tab cycling in node with a fake element and document; `popover.dom.spec.ts`: the same against real elements in happy-dom), `motion.ts` (`motion.spec.ts`), the auth entry and `scripts/check-remote-code.mjs` (`cloud/auth-entry.spec.ts`), `audit/rules.ts`, `audit/asyncRules.ts`, `audit/url-match.ts`,
   `cloud/scan-identity.ts`, `cloud/settings.ts`, `scrapers/getHTML.ts` (`unscriptableMessage`, `restrictedKind`, the `windowId` request), `tabs/follow-tab.ts`, `scrapers/getRobots.ts`,
   `scrapers/getHeaderRobots.ts`, `storage/watch.ts` and its key helper.
-- Manual verification is still required for anything that needs a real browser: `npm run build`, load
-  `build/` unpacked, then check all six tabs, both surfaces, the context menu, sign-in (email and
-  Google), a signed-in scan landing in the app, and free versus Pro scoring.
+- Still manual (not automatable in the harness, or not yet covered): the real side panel and popup
+  surfaces and switching between them (user gesture), the context menu, sign-in (email and Google),
+  a signed-in scan landing in the app, free versus Pro scoring, exports, Compare against a second URL,
+  and visual checks in light and dark. A full QA pass walks this list after `npm run qa`.
 
 ---
 

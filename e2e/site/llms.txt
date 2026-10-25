@@ -1,0 +1,7 @@
+# Fixture
+
+> The Metaspry e2e fixture site.
+
+## Pages
+
+- [Home](http://127.0.0.1:4319/)
