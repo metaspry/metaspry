@@ -1,4 +1,4 @@
-import { writable } from 'svelte/store';
+import { get, writable } from 'svelte/store';
 
 export interface ToastEntry {
   id: number;
@@ -21,15 +21,54 @@ export function toastDuration(message: string, variant: ToastEntry['variant']): 
   return variant === 'error' ? Math.max(6000, base) : base;
 }
 
+// Each toast's timer, so it can be held while the pointer or keyboard focus is on the toasts
+// (UX review 2026-10-25, Medium 13: they vanished mid-read, WCAG 2.2.1).
+interface Timer {
+  remaining: number;
+  startedAt: number;
+  handle: ReturnType<typeof setTimeout> | null;
+}
+const timers = new Map<number, Timer>();
+let held = false;
+
+function start(id: number, t: Timer): void {
+  t.startedAt = Date.now();
+  t.handle = setTimeout(() => dismissToast(id), t.remaining);
+}
+
 export function dismissToast(id: number): void {
-  toasts.update((list) => list.filter((t) => t.id !== id));
+  const t = timers.get(id);
+  if (t?.handle) clearTimeout(t.handle);
+  timers.delete(id);
+  toasts.update((list) => list.filter((x) => x.id !== id));
+}
+
+/** Holds every toast while true (pointer over or focus inside them); the countdown resumes after. */
+export function holdToasts(hold: boolean): void {
+  if (hold === held) return;
+  held = hold;
+  for (const [id, t] of timers) {
+    if (hold) {
+      if (t.handle) clearTimeout(t.handle);
+      t.handle = null;
+      t.remaining = Math.max(0, t.remaining - (Date.now() - t.startedAt));
+    } else {
+      start(id, t);
+    }
+  }
 }
 
 export function toast(message: string, variant: ToastEntry['variant'] = 'default'): void {
   const id = ++counter;
-  toasts.update((list) => {
-    const next = [...list, { id, message, variant }];
-    return next.slice(-MAX);
-  });
-  setTimeout(() => dismissToast(id), toastDuration(message, variant));
+  const next = [...get(toasts), { id, message, variant }];
+  // Dropped past MAX: their timers go with them.
+  for (const gone of next.slice(0, Math.max(0, next.length - MAX))) {
+    const t = timers.get(gone.id);
+    if (t?.handle) clearTimeout(t.handle);
+    timers.delete(gone.id);
+  }
+  toasts.set(next.slice(-MAX));
+  const t: Timer = { remaining: toastDuration(message, variant), startedAt: Date.now(), handle: null };
+  timers.set(id, t);
+  if (!held) start(id, t);
 }

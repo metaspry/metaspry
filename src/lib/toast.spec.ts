@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { get } from 'svelte/store';
-import { dismissToast, toast, toastDuration, toasts } from './toast';
+import { dismissToast, holdToasts, toast, toastDuration, toasts } from './toast';
 
 describe('toastDuration', () => {
   it('keeps a short confirmation short and grows with the message', () => {
@@ -44,5 +44,40 @@ describe('toast queue', () => {
     expect(list.map((t) => t.message)).toEqual(['b', 'c', 'd']);
     dismissToast(list[1]!.id);
     expect(get(toasts).map((t) => t.message)).toEqual(['b', 'd']);
+  });
+});
+
+describe('holding toasts (UX review 2026-10-25, Medium 13)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    toasts.set([]);
+  });
+  afterEach(() => {
+    holdToasts(false);
+    vi.useRealTimers();
+  });
+
+  it('a held toast does not expire, and resumes with the time it had left', () => {
+    const d = toastDuration('Copied', 'success');
+    toast('Copied', 'success');
+    vi.advanceTimersByTime(d - 1000);
+    holdToasts(true);
+    vi.advanceTimersByTime(60_000);
+    expect(get(toasts)).toHaveLength(1);
+    holdToasts(false);
+    vi.advanceTimersByTime(999);
+    expect(get(toasts)).toHaveLength(1);
+    vi.advanceTimersByTime(1);
+    expect(get(toasts)).toEqual([]);
+  });
+
+  it('a toast raised while held waits until the hold ends', () => {
+    holdToasts(true);
+    toast('Saved', 'success');
+    vi.advanceTimersByTime(60_000);
+    expect(get(toasts)).toHaveLength(1);
+    holdToasts(false);
+    vi.advanceTimersByTime(toastDuration('Saved', 'success'));
+    expect(get(toasts)).toEqual([]);
   });
 });

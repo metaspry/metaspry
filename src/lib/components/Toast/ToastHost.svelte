@@ -1,6 +1,6 @@
 <script lang="ts">
   import { fly } from 'svelte/transition';
-  import { toasts, dismissToast, type ToastEntry } from '../../toast';
+  import { toasts, dismissToast, holdToasts, type ToastEntry } from '../../toast';
   import { dur } from '../../motion';
 
   // Same fills as the web app's toasts (R2-27, V3-12): its Tailwind 4 emerald-700 / rose-700 are
@@ -29,9 +29,19 @@
   ];
 </script>
 
-<div class="pointer-events-none fixed bottom-4 left-4 right-4 z-50 flex flex-col items-end gap-2">
+<!-- bottom-20 (UX review 2026-10-25, Medium 13): at bottom-4 a toast sat over the Re-scan button for
+     up to 9 s. Hovering or focusing the toasts holds their countdown. -->
+<div class="pointer-events-none fixed bottom-20 left-4 right-4 z-50 flex flex-col items-end gap-2">
   {#each regions as region (region.role)}
-    <div role={region.role} aria-live={region.live} class="flex flex-col items-end gap-2">
+    <div
+      role={region.role}
+      aria-live={region.live}
+      class="flex flex-col items-end gap-2"
+      on:mouseenter={() => holdToasts(true)}
+      on:mouseleave={() => holdToasts(false)}
+      on:focusin={() => holdToasts(true)}
+      on:focusout={() => holdToasts(false)}
+    >
       {#each region.list as t (t.id)}
         <div
           in:fly={{ y: 16, duration: dur(180) }}
