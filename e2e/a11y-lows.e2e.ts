@@ -49,3 +49,23 @@ test('disclosure toggles are 24 px and report their state (Low 29)', async ({ op
   await toggle.click();
   await expect(ext.getByRole('tabpanel').getByRole('button', { name: 'Hide raw' }).first()).toHaveAttribute('aria-expanded', 'true');
 });
+
+test('opening a History row says where it went (Low 32)', async ({ openSurface }) => {
+  const { ext } = await openSurface('/');
+  await scanFromLanding(ext);
+  await ext.getByRole('button', { name: 'History' }).click();
+  const panel = ext.getByRole('dialog', { name: 'Recent scans' });
+  await expect(panel.getByText('Opens the page in a background tab (not the saved results)')).toBeVisible();
+  await panel.getByRole('button', { name: /Fixture Home - Metaspry E2E/ }).first().click();
+  await expect(ext.getByRole('status').filter({ hasText: 'Opened 127.0.0.1 in a background tab' })).toBeAttached();
+});
+
+test('the length bar animates with a transform, not its width (Low 33)', async ({ openSurface }) => {
+  const { ext } = await openSurface('/');
+  await scanFromLanding(ext);
+  await openTab(ext, 'Audit');
+  const fill = ext.getByRole('tabpanel').locator('[data-min-marker]').first().locator('xpath=preceding-sibling::div[1]');
+  const style = await fill.evaluate((el) => ({ prop: getComputedStyle(el).transitionProperty, transform: getComputedStyle(el).transform }));
+  expect(style.prop).not.toContain('width');
+  expect(style.transform).toMatch(/^matrix\(/);
+});

@@ -62,7 +62,7 @@
           {showRaw ? 'Hide raw' : 'Show raw'}
         </button>
         {#if showRaw}
-          <pre class="max-h-48 overflow-auto rounded-lg bg-slate-900/80 p-2 text-[0.6875rem] text-slate-100 dark:bg-slate-950/80">{robots.raw}</pre>
+          <pre class="max-h-48 overflow-auto overscroll-contain rounded-lg bg-slate-900/80 p-2 text-[0.6875rem] text-slate-100 dark:bg-slate-950/80">{robots.raw}</pre>
         {/if}
       {/if}
     {:else}

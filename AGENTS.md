@@ -576,6 +576,8 @@ indexed, and "a canonical tag is present" passed it.
 
 **Permissions.** `storage`.
 
+**Feedback (UX review 2026-10-25, Low 32).** The panel's hint reads "Opens the page in a background tab (not the saved results)", and opening a row toasts "Opened <host> in a background tab. Switch to it and scan it to refresh its results." (a background tab gave no visible sign in the side panel). The list scrolls with `overscroll-contain`.
+
 **Tests.** `e2e/scan.e2e.ts` (a scan writes `history` and the entry shows in the dropdown after a reload); `tabs/open-tab.spec.ts` (an entry opens through `openTab`: background tab, dev-page fallback, non-web URLs such as `(unknown)` open nothing). Otherwise none for the component; the panel behaviour is the popover action's (`actions/popover.spec.ts`, `popover.dom.spec.ts`, 3.18).
 
 **Gotchas.**

@@ -16,7 +16,8 @@
 
 <div class="flex items-center gap-2">
   <div class="relative h-1.5 w-full overflow-hidden rounded-full bg-slate-200/60 dark:bg-slate-700/40">
-    <div class="absolute inset-y-0 left-0 {barClass} motion-safe:transition-all" style="width: {pct}%" />
+    <!-- scaleX, not width: a width transition re-lays out every frame (UX review 2026-10-25, Low 33). -->
+    <div class="absolute inset-0 origin-left {barClass} motion-safe:transition-transform" style="transform: scaleX({pct / 100})" />
     {#if max > 0}
       <!-- The minimum marker: slate-700 / slate-200, >= 3:1 on the track in both themes (it was 1.59 / 1.19:1). -->
       <span data-min-marker class="pointer-events-none absolute inset-y-0 w-0.5 bg-slate-700 dark:bg-slate-200" style="left: {Math.min(100, (min / max) * 100)}%;" />

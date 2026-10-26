@@ -9,6 +9,7 @@
   import { tooltip } from '../../actions/tooltip';
   import { popover } from '../../actions/popover';
   import { dur } from '../../motion';
+  import { toast } from '../../toast';
   import { timeAgo } from '../../util/time-ago';
   import { BUTTON_PRIMARY } from '../button';
 
@@ -42,6 +43,14 @@
     // focus. Without it Chrome immediately closes the popup when the new tab
     // takes focus, leaving the user with an unaudited new page and no UI.
     openTab(url, { active: false });
+    // A background tab gives no visible sign in the side panel (UX review 2026-10-25, Low 32).
+    let host = url;
+    try {
+      host = new URL(url).hostname;
+    } catch {
+      /* keep the raw value */
+    }
+    toast(`Opened ${host} in a background tab. Switch to it and scan it to refresh its results.`);
   }
 
   // Arming swaps the button for the confirm, so focus follows the swap (the Settings drawer's
@@ -127,7 +136,7 @@
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-3 w-3" aria-hidden="true">
             <path d="M7 17 17 7M8 7h9v9" />
           </svg>
-          Click to open in a new tab
+          Opens the page in a background tab (not the saved results)
         </p>
       {/if}
       {#if $history.length === 0}
@@ -144,7 +153,7 @@
           {/if}
         </div>
       {:else}
-        <ul class="max-h-72 overflow-y-auto">
+        <ul class="max-h-72 overflow-y-auto overscroll-contain">
           {#each $history as entry (entry.timestamp)}
             {@const capRules = entry.requiredFailing ? REQUIRED_FAILING : undefined}
             {@const label = scoreLabel(entry.score, capRules)}
