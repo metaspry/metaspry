@@ -118,10 +118,12 @@ These summarise the maintainer's agent instructions in `CLAUDE.md` and `.github/
 
 This is the complete inventory. There are no ports (`runtime.connect`), no content-script messages and no external messaging.
 
+The page side takes every literal and type below from `src/lib/messaging/protocol.ts` (`GET_HTML`, `getHtmlRequest`, `GetHtmlResponse`, `parseGetHtmlResponse`, `CaptureFailure`, `MODE_KEY`, `Mode`, `parseMode`, `POPUP_PATH`). `background.js` is not bundled and repeats them; `protocol.spec.ts` reads its source and `static/manifest.json` and fails when one drifts, and `background-gethtml.spec.ts` asserts every reply the worker sends is already canonical under `parseGetHtmlResponse`. Change both sides together.
+
 | Channel | Direction | Payload | Code |
 |---|---|---|---|
-| `chrome.runtime.sendMessage` | page -> background | Request `{ message: 'getHTML', windowId?: number }` (`windowId` = the window hosting the page; omitted -> last-focused window). Response `{ html: string \| null, url: string, favIconUrl: string \| null, reason?: 'unscriptable' \| 'no-tab' }` (`url` = the captured document's `location.href`, falling back to `tab.url`; `tab.url` on the failure paths; `favIconUrl` = `tab.favIconUrl`, Chrome's resolved favicon, `null` when the document's URL differs from the queried tab's apart from the fragment) | `src/lib/scrapers/getHTML.ts`; listener in `background.js` returns `true` to answer asynchronously |
-| `chrome.storage.onChanged` (`local`, key `mode`) | page -> background | `'sidepanel' \| 'popup'` | `src/lib/mode.ts` writes; `background.js` applies |
+| `chrome.runtime.sendMessage` | page -> background | Request `{ message: 'getHTML', windowId?: number }` (`windowId` = the window hosting the page; omitted -> last-focused window). Response `{ html: string \| null, url: string, favIconUrl: string \| null, reason?: 'unscriptable' \| 'no-tab' }` (`url` = the captured document's `location.href`, falling back to `tab.url`; `tab.url` on the failure paths; `favIconUrl` = `tab.favIconUrl`, Chrome's resolved favicon, `null` when the document's URL differs from the queried tab's apart from the fragment) | `src/lib/scrapers/getHTML.ts` via `messaging/protocol.ts`; listener in `background.js` returns `true` to answer asynchronously |
+| `chrome.storage.onChanged` (`local`, key `mode`) | page -> background | `'sidepanel' \| 'popup'` | `src/lib/mode.ts` writes (`MODE_KEY`, `parseMode`); `background.js` applies |
 | `chrome.contextMenus.onClicked` | Chrome -> background | menu id `metaspry-open` | `background.js` |
 | `chrome.runtime.onMessage` in the page | none | No-op listener `onRuntimeMessage` ("reserved for future cross-surface coordination") | `src/lib/views/Extension.svelte` |
 
@@ -156,7 +158,10 @@ This is the complete inventory. There are no ports (`runtime.connect`), no conte
 | `docs/` | Store runbooks: `chrome-store-resubmit.md`, `store-screenshots.md`; `qa/qa-log.md` (one entry per full QA pass) |
 | `e2e/` | Playwright suite: `fixtures.ts` (extension context + `openSurface`), `*.e2e.ts`, `server.mjs` + `site/` (the local fixture site the suite scans) |
 | `playwright.config.ts`, `vitest.config.ts` | Test runner config (3.18) |
-| Git-ignored, generated | `build/`, `.svelte-kit/`, `node_modules/`, `metaspry-v*.zip`, `.code-graph/`, `coverage/`, `test-results/`, `playwright-report/`, `blob-report/` |
+| Git-ignored, generated | `build/`, `.svelte-kit/`, `node_modules/`, `metaspry-v*.zip` (+ `.sha256`), `.code-graph/`, `coverage/`, `test-results/`, `playwright-report/`, `blob-report/` |
+| `scripts/stamp-manifest.mjs`, `scripts/package-zip.mjs` | Build step: version from `package.json` into `build/manifest.json`; `npm run package`: reproducible store zip + sha256 (4.1-4.3) |
+| `.github/workflows/ci.yml`, `release.yml`, `.nvmrc` | CI: `npm run qa` on PRs and `main`; a `v*` tag builds the zip onto a draft GitHub release (4.1) |
+| `src/lib/messaging/protocol.ts` | Page <-> background wire protocol: message name, request/reply types and parser, `mode` key, popup path (section 2) |
 
 ### Startup order
 

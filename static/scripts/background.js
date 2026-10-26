@@ -1,5 +1,9 @@
 // Apply action behavior based on user preference (sidepanel vs popup).
 // Source of truth lives in chrome.storage.local under key "mode".
+//
+// Wire protocol: the literals here ('getHTML', the reply shape, 'mode', 'index.html') are defined
+// for the pages in src/lib/messaging/protocol.ts. This file is not bundled and cannot import it;
+// src/lib/messaging/protocol.spec.ts fails when the two drift. Change both together.
 const POPUP_PATH = 'index.html';
 const CONTEXT_MENU_ID = 'metaspry-open';
 const CONTEXT_MENU_TITLE = 'Spy this page with Metaspry';

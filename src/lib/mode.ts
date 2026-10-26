@@ -1,10 +1,11 @@
 import { get, writable } from 'svelte/store';
 import { watchKey } from './storage/watch';
 import { toast } from './components/Toast/toast';
+import { MODE_KEY, parseMode, POPUP_PATH, type Mode } from './messaging/protocol';
 
-export type Mode = 'sidepanel' | 'popup';
+export type { Mode };
 
-const STORAGE_KEY = 'mode';
+const STORAGE_KEY = MODE_KEY;
 const DEFAULT_MODE: Mode = 'sidepanel';
 
 /** Read synchronously by static/scripts/boot.js before first paint. */
@@ -31,8 +32,7 @@ function readStorage(): Promise<Mode> {
       return;
     }
     chrome.storage.local.get(STORAGE_KEY, (result) => {
-      const stored = result[STORAGE_KEY];
-      resolve(stored === 'popup' ? 'popup' : 'sidepanel');
+      resolve(parseMode(result[STORAGE_KEY]));
     });
   });
 }
@@ -49,7 +49,7 @@ export async function initMode(): Promise<void> {
   mode.subscribe(applyAttr);
   // Mode is written by setMode only, so there is no write to suppress here.
   watchKey(STORAGE_KEY, (raw) => {
-    mode.set(raw === 'popup' ? 'popup' : 'sidepanel');
+    mode.set(parseMode(raw));
   });
 }
 
@@ -71,7 +71,7 @@ function openSurface(next: Mode): Promise<void> {
     // branch awaits `windows.getCurrent()` first; Chrome has honoured the gesture across that one hop
     // in practice (AGENTS 3.2 gotcha). Either way a failure is handled by `switchMode`.
     if (next === 'popup') {
-      void chrome.action.setPopup({ popup: 'index.html' }).catch(() => undefined);
+      void chrome.action.setPopup({ popup: POPUP_PATH }).catch(() => undefined);
       return Promise.resolve(chrome.action.openPopup());
     }
     return chrome.windows.getCurrent().then((win) => {
