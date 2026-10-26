@@ -149,8 +149,10 @@ async function fetchText(url: string, pageHost: string): Promise<FetchedDoc> {
   if (!res) return { ok: false, text: '', contentType: '', status: 0, error: 'Request failed or timed out.' };
   // fetch follows redirects without showing the hops; the final URL is all there is. A public
   // site redirecting into the user's network gets nothing read, shown or uploaded.
+  // The final URL passes the same test as a request would (ultra review 2026-10-26, F2): a single-
+  // label host (`http://intranet/`) or a private address other than the page's own was let through.
   const finalHost = hostOf(res.url || url);
-  if (finalHost && isPrivateHost(finalHost) && !isPrivateHost(pageHost)) {
+  if (finalHost && !allowedTarget(res.url || url, pageHost)) {
     return { ok: false, text: '', contentType: '', status: res.status, error: PRIVATE_REDIRECT_ERROR };
   }
   if (!res.ok) return { ok: false, text: '', contentType: res.headers.get('content-type') ?? '', status: res.status, error: `HTTP ${res.status}` };
@@ -385,6 +387,9 @@ async function buildSitemap(baseUrl: string, robotsSitemaps: string[]): Promise<
   if (candidates.length === 0) return emptySitemap('Invalid base URL.');
 
   let lastError = 'No sitemap found at known locations.';
+  // Every candidate answered "not here" (404 / 410, or an HTML fallback page): the sitemap is
+  // missing, not unknown. The Site chip reads this instead of parsing the error text (F3).
+  let allNotFound = true;
   for (const candidate of candidates) {
     const res = await tryParseSitemap(candidate, pageHost);
     if (res.ok) {
@@ -399,11 +404,15 @@ async function buildSitemap(baseUrl: string, robotsSitemaps: string[]): Promise<
       return { ...emptySitemap(res.error), present: true };
     }
     lastError = `${candidate}: ${res.error}`;
+    if (!/^HTTP (404|410)$/.test(res.error) && !/returned HTML/i.test(res.error)) allNotFound = false;
   }
   const skippedNote = skipped.length
     ? ` Skipped ${skipped.length} robots.txt sitemap(s) on a private or local address: ${skipped.slice(0, 3).join(', ')}${skipped.length > 3 ? ', ...' : ''}.`
     : '';
-  return emptySitemap(`Tried ${candidates.length} location(s). Last error — ${lastError}${skippedNote}`);
+  return {
+    ...emptySitemap(`Tried ${candidates.length} location(s). Last error — ${lastError}${skippedNote}`),
+    ...(allNotFound ? { notFound: true } : {}),
+  };
 }
 
 function parseLlms(raw: string, baseUrl: string): LlmsSection[] {

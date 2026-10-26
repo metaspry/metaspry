@@ -35,3 +35,25 @@ describe('probeImage (UX review 2026-10-25, Medium 21)', () => {
     expect(make).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('probeImage does not remember a failure (ultra review F1)', () => {
+  it('a failed URL is probed again later; a loaded one is not', async () => {
+    const failing = vi.fn(() => fakeImage('failed'));
+    await probeImage('https://a.com/late.png', failing);
+    await Promise.resolve();
+    await expect(probeImage('https://a.com/late.png', () => fakeImage('ok'))).resolves.toBe('ok');
+    expect(failing).toHaveBeenCalledTimes(1);
+    const again = vi.fn(() => fakeImage('failed'));
+    await expect(probeImage('https://a.com/late.png', again)).resolves.toBe('ok');
+    expect(again).not.toHaveBeenCalled();
+  });
+
+  it('a host that never answers counts as failed after the timeout', async () => {
+    vi.useFakeTimers();
+    const silent = () => ({ referrerPolicy: '', onload: null, onerror: null, src: '' });
+    const p = probeImage('https://a.com/hang.png', silent, 1000);
+    vi.advanceTimersByTime(1000);
+    await expect(p).resolves.toBe('failed');
+    vi.useRealTimers();
+  });
+});

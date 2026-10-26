@@ -175,6 +175,11 @@ export async function uploadScan(
     const prev = existing.data();
     tx.set(ref, {
       ...payload,
+      // No site files this time (the upload stopped waiting for a slow site, or the fetch failed):
+      // keep the ones the document already has. The whole-document write otherwise erased the
+      // app's Site tab on every slow re-scan (ultra review 2026-10-26, F0). A completed fetch,
+      // including one that found nothing, still replaces them.
+      ...(payload.siteFiles === undefined && prev?.siteFiles !== undefined ? { siteFiles: prev.siteFiles } : {}),
       workspaceId: scope.kind === 'workspace' ? scope.wsId : null,
       starred: prev?.starred ?? false,
       createdAt: prev?.createdAt ?? serverTimestamp(),

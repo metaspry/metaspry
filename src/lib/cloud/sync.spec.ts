@@ -155,3 +155,20 @@ describe('toScanPayload matches what the app renders for a server scan (architec
     expect(SITE_SUMMARY_CAPS).toEqual({ robotGroups: 30, sitemapSample: 10, sitemapChildren: 20, llmsSections: 20, llmsLinks: 20 });
   });
 });
+
+describe('a re-scan without site files keeps the stored ones (ultra review F0)', () => {
+  it('an upload whose site-files wait timed out does not erase the previous summary', async () => {
+    const withFiles = { ...payload('https://acme.com/sf'), siteFiles: { robots: { present: true } } };
+    const first = await uploadScan('u1', withFiles as unknown as ReturnType<typeof toScanPayload>);
+    await uploadScan('u1', payload('https://acme.com/sf'));
+    expect(store.get(`users/u1/scans/${first.id}`)?.siteFiles).toEqual({ robots: { present: true } });
+  });
+
+  it('a completed fetch still replaces them', async () => {
+    const a = { ...payload('https://acme.com/sf2'), siteFiles: { robots: { present: true } } };
+    const b = { ...payload('https://acme.com/sf2'), siteFiles: { robots: { present: false } } };
+    const r = await uploadScan('u1', a as unknown as ReturnType<typeof toScanPayload>);
+    await uploadScan('u1', b as unknown as ReturnType<typeof toScanPayload>);
+    expect(store.get(`users/u1/scans/${r.id}`)?.siteFiles).toEqual({ robots: { present: false } });
+  });
+});

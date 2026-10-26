@@ -29,7 +29,10 @@ export function robotsChip(robots: Pick<RobotsInfo, 'present' | 'error' | 'group
   return couldNotCheck(robots.error) ? { label: "Couldn't check", tone: 'neutral' } : { label: 'Missing', tone: 'fail' };
 }
 
-export function fileChip(file: { present: boolean; error?: string }, absent: SiteChip): SiteChip {
+export function fileChip(file: { present: boolean; error?: string; notFound?: boolean }, absent: SiteChip): SiteChip {
   if (file.present) return { label: 'Found', tone: 'good' };
+  // The sitemap tries several locations and reports a composite error; `notFound` says what they
+  // all answered (ultra review 2026-10-26, F3: its "Missing" chip was unreachable).
+  if (file.notFound) return absent;
   return couldNotCheck(file.error) ? { label: "Couldn't check", tone: 'neutral' } : absent;
 }

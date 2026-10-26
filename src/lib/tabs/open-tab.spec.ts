@@ -30,12 +30,23 @@ describe('openTab', () => {
     expect(create).not.toHaveBeenCalled();
   });
 
-  it('swallows a create that throws or rejects', async () => {
+  it('swallows a create that throws', () => {
     vi.stubGlobal('chrome', { tabs: { create: () => { throw new Error('No window'); } } });
     expect(openTab('https://a.com/', { active: true })).toBe(false);
-    const rejected = Promise.reject(new Error('closing'));
-    vi.stubGlobal('chrome', { tabs: { create: () => rejected } });
-    expect(openTab('https://a.com/', { active: true })).toBe(true);
-    await expect(rejected).rejects.toThrow('closing');
+  });
+
+  it('a create that rejects leaves no unhandled rejection (ultra review F4)', async () => {
+    // The rejecting promise is made inside the stub and observed only by openTab: if openTab did
+    // not attach a handler, the process would report it as unhandled.
+    const unhandled = vi.fn();
+    process.on('unhandledRejection', unhandled);
+    try {
+      vi.stubGlobal('chrome', { tabs: { create: () => Promise.reject(new Error('closing')) } });
+      expect(openTab('https://a.com/', { active: true })).toBe(true);
+      await new Promise((r) => setTimeout(r, 0));
+      expect(unhandled).not.toHaveBeenCalled();
+    } finally {
+      process.off('unhandledRejection', unhandled);
+    }
   });
 });

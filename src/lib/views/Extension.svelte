@@ -239,15 +239,20 @@
       if (cu && pageUrl) {
         const scope = get(syncScope);
         const key = scanKey;
+        // This scan's own values: a second scan can commit while the site files load (up to 8 s)
+        // and reassign `pageUrl` / `pageIcon`; reading them inside the callback filed this scan
+        // under the other page's document (ultra review 2026-10-26, follow-up U0).
+        const url = pageUrl;
+        const icon = pageIcon;
         // Tracked, not swallowed (UX review item 1): the account menu shows Saving / Saved / the
         // reason it failed, and a failure toasts. The menu used to say "Synced" whatever happened.
         const out = await trackUpload(scope.kind === "workspace" ? scope.name : "Personal", async () => {
           // Best-effort: include site files (robots/sitemap/llms) so the app's Site tab populates.
           // The same fetch the Site and AI tabs read (one per scan), but a slow site does not hold
           // the upload: after a few seconds the scan is written without them.
-          const siteFiles = await siteFilesForUpload(pageUrl, key);
-          const payloadMeta: PageMeta = { ...meta, icon: pageIcon ?? meta.icon };
-          return uploadScan(cu.uid, toScanPayload(payloadMeta, finalResult, pageUrl, siteFiles), scope);
+          const siteFiles = await siteFilesForUpload(url, key);
+          const payloadMeta: PageMeta = { ...meta, icon: icon ?? meta.icon };
+          return uploadScan(cu.uid, toScanPayload(payloadMeta, finalResult, url, siteFiles), scope);
         });
         // Also dropped when the user signed out (or switched account) while the write was in flight.
         if (out.ok && id === scrapeId && get(cloudUser)?.uid === cu.uid) cloudScan = out.value;

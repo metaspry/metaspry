@@ -14,7 +14,8 @@ function files(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
     const p = join(dir, name);
     if (statSync(p).isDirectory()) return files(p);
-    return /\.(ts|js)$/.test(name) && !/\.spec\.ts$/.test(name) ? [p] : [];
+    // .svelte too: a component file placed under lib/ outside components/ or views/ is still lib.
+    return /\.(ts|js|svelte)$/.test(name) && !/\.spec\.ts$/.test(name) ? [p] : [];
   });
 }
 
@@ -27,12 +28,28 @@ describe('layering', () => {
       const text = readFileSync(f, 'utf8');
       for (const m of text.matchAll(/(?:from|import\()\s*['"]([^'"]+)['"]/g)) {
         const spec = m[1] ?? '';
-        if (!spec.startsWith('.')) continue;
-        const target = relative(LIB, join(f, '..', spec)).split(sep)[0] ?? '';
+        // Relative imports and SvelteKit's `$lib/` alias (ultra review 2026-10-26, F5: the alias
+        // was skipped, so the most common SvelteKit import style passed unchecked).
+        let resolved: string;
+        if (spec.startsWith('$lib/')) resolved = join(LIB, spec.slice(5));
+        else if (spec.startsWith('.')) resolved = join(f, '..', spec);
+        else continue;
+        const target = relative(LIB, resolved).split(sep)[0] ?? '';
         const hit = `${f.split(sep).join('/')} -> ${spec}`;
         if (UI.has(target) && !ALLOWED.includes(hit)) offenders.push(hit);
       }
     }
     expect(offenders).toEqual([]);
+  });
+});
+
+describe('the layering guard itself (ultra review F5)', () => {
+  it('sees $lib imports and relative ones alike', () => {
+    const resolve = (from: string, spec: string) =>
+      relative(LIB, spec.startsWith('$lib/') ? join(LIB, spec.slice(5)) : join(from, '..', spec)).split(sep)[0];
+    const from = join(LIB, 'cloud', 'settings.ts');
+    expect(resolve(from, '$lib/components/Toast/ToastHost.svelte')).toBe('components');
+    expect(resolve(from, '../components/Toast/ToastHost.svelte')).toBe('components');
+    expect(resolve(from, '$lib/toast')).toBe('toast');
   });
 });

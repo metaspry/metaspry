@@ -7,6 +7,7 @@ import {
   siteFilesForUpload,
 } from './getSiteFiles';
 import type { SiteFiles } from './SiteFiles';
+import { fileChip } from '../components/Site/chip';
 
 type Route = { status?: number; body?: string; type?: string; finalUrl?: string };
 
@@ -140,5 +141,34 @@ describe('siteFilesForUpload', () => {
 
   it('uploads without site files when the fetch fails', async () => {
     await expect(siteFilesForUpload('https://c.com', 103, 50, async () => { throw new Error('x'); })).resolves.toBeUndefined();
+  });
+});
+
+describe('ultra review 2026-10-26 (F2, F3)', () => {
+  it('a redirect to a single-label host is discarded like a request to one', async () => {
+    serve({ 'https://example.com/robots.txt': { body: 'User-agent: *', finalUrl: 'http://intranet/robots.txt' } });
+    const files = await fetchSiteFiles('https://example.com');
+    expect(files.robots.present).toBe(false);
+    expect(files.robots.error).toBe('Redirected to a private network address.');
+  });
+
+  it("a page on a private host may not be redirected to another private host", async () => {
+    serve({ 'http://192.168.1.5/robots.txt': { body: 'User-agent: *', finalUrl: 'http://169.254.169.254/latest' } });
+    const files = await fetchSiteFiles('http://192.168.1.5');
+    expect(files.robots.present).toBe(false);
+  });
+
+  it('a site with no sitemap anywhere reads "Missing", not "Couldn\'t check"', async () => {
+    serve({});
+    const files = await fetchSiteFiles('https://example.com');
+    expect(files.sitemap.notFound).toBe(true);
+    expect(fileChip(files.sitemap, { label: 'Missing', tone: 'fail' })).toEqual({ label: 'Missing', tone: 'fail' });
+  });
+
+  it('a sitemap location that timed out keeps "Couldn\'t check"', async () => {
+    serve({ 'https://example.com/sitemap.xml': { status: 503 } });
+    const files = await fetchSiteFiles('https://example.com');
+    expect(files.sitemap.notFound).toBeUndefined();
+    expect(fileChip(files.sitemap, { label: 'Missing', tone: 'fail' }).label).toBe("Couldn't check");
   });
 });
