@@ -11,6 +11,7 @@ import {
   settings,
   applySettingsWithoutPersisting,
   DEFAULT_SETTINGS,
+  normalizeAuditSettings,
   type Settings,
 } from '../storage/settings';
 
@@ -18,12 +19,9 @@ export async function loadCloudSettings(uid: string): Promise<Settings | null> {
   const { db, doc, getDoc } = await firestoreSdk();
   const snap = await getDoc(doc(db, 'users', uid, 'settings', 'audit'));
   if (!snap.exists()) return null;
-  const d = snap.data() as Partial<Settings>;
-  return {
-    ...DEFAULT_SETTINGS,
-    ...d,
-    weights: { ...DEFAULT_SETTINGS.weights, ...(d.weights ?? {}) },
-  };
+  // The same normaliser as the workspace document and chrome.storage: a legacy all-zero or
+  // non-numeric document scored every page 0 here, and normally in the app.
+  return normalizeAuditSettings(snap.data());
 }
 
 export async function saveCloudSettings(uid: string, s: Settings): Promise<void> {
