@@ -17,9 +17,26 @@ vi.mock('firebase/firestore', () => ({
     lastSetOptions = options;
   },
   serverTimestamp: () => 'server-time',
+  // The transaction runs its body against the same store; `set` records the options like setDoc.
+  runTransaction: async (_db: unknown, body: (tx: unknown) => Promise<unknown>) => {
+    transactions++;
+    return body({
+      get: async (ref: { path: string }) => {
+        const data = store.get(ref.path);
+        return { exists: () => data !== undefined, data: () => data };
+      },
+      set: (ref: { path: string }, data: Record<string, unknown>, options?: unknown) => {
+        store.set(ref.path, data);
+        lastSetOptions = options;
+      },
+    });
+  },
 }));
+let transactions = 0;
 
-import { uploadScan, type toScanPayload } from './sync';
+import { uploadScan, toScanPayload, TAG_MAX, TAG_VALUE_MAX } from './sync';
+import { getMetaTags } from '../scrapers/getMetaTags';
+import { audit } from '../audit/rules';
 
 const payload = (url: string) =>
   ({ url, scannedAt: 2_000, starred: false }) as unknown as ReturnType<typeof toScanPayload>;
@@ -73,5 +90,27 @@ describe('uploadScan', () => {
     const r = await uploadScan('u1', payload('https://acme.com/'));
     expect(r.hadPrevious).toBe(true);
     expect(r.previousScannedAt).toBeNull();
+  });
+});
+
+describe('uploadScan writes atomically (architecture review 2026-10-26, High 5)', () => {
+  it('reads the previous document and writes the new one in one transaction', async () => {
+    const before = transactions;
+    await uploadScan('u1', payload('https://acme.com/tx'));
+    expect(transactions).toBe(before + 1);
+  });
+});
+
+describe('toScanPayload stays under the Firestore document limit', () => {
+  it('cuts long tag values and caps the tag list; tagCount stays true', () => {
+    const big = 'x'.repeat(TAG_VALUE_MAX + 500);
+    const metas = Array.from({ length: TAG_MAX + 50 }, (_, i) => `<meta name="k${i}" content="${big}">`).join('');
+    const html = `<html><head><title>T</title>${metas}</head></html>`;
+    const meta = getMetaTags(new DOMParser().parseFromString(html, 'text/html').documentElement, 'https://a.com/');
+    const p = toScanPayload(meta, audit(meta), 'https://a.com/');
+    expect(p.pageMeta.tagCount).toBe(TAG_MAX + 50);
+    expect(p.pageMeta.tags).toHaveLength(TAG_MAX);
+    expect(p.pageMeta.tags.every((t) => t.value.length <= TAG_VALUE_MAX)).toBe(true);
+    expect(new TextEncoder().encode(JSON.stringify(p)).length).toBeLessThan(1_000_000);
   });
 });

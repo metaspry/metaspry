@@ -12,6 +12,7 @@ import {
   applySettingsWithoutPersisting,
   DEFAULT_SETTINGS,
   normalizeAuditSettings,
+  settingsChangeIsExternal,
   type Settings,
 } from '../storage/settings';
 
@@ -69,6 +70,33 @@ export async function syncSettingsForUser(
   return u.uid;
 }
 
+/**
+ * Follows auth changes and reports, per change, the uid pushes are allowed for. A pull that lands
+ * after a newer auth change is dropped entirely (architecture review 2026-10-26, High 5): an A -> B
+ * switch where A's slow load resolved last applied A's rules to B and unlocked pushes for B with
+ * them. A failed load leaves pushes off and says so, instead of an unhandled rejection.
+ */
+export function makeUserFollower(
+  deps: SettingsSyncDeps & { onAllowed: (uid: string | null) => void; onLoadError?: () => void },
+): (u: { uid: string } | null) => Promise<void> {
+  let generation = 0;
+  return async (u) => {
+    const mine = ++generation;
+    deps.onAllowed(null); // block pushes until this user's pull resolves
+    try {
+      const uid = await syncSettingsForUser(u, {
+        load: deps.load,
+        apply: (s, opts) => {
+          if (mine === generation) deps.apply(s, opts);
+        },
+      });
+      if (mine === generation) deps.onAllowed(uid);
+    } catch {
+      if (mine === generation) deps.onLoadError?.();
+    }
+  };
+}
+
 export function initCloudSettingsSync(): void {
   if (started) return;
   started = true;
@@ -85,15 +113,20 @@ export function initCloudSettingsSync(): void {
     }
   };
 
-  cloudUser.subscribe(async (u) => {
-    pulledUid = null; // block pushes until this user's pull resolves
-    pulledUid = await syncSettingsForUser(u, { load: loadCloudSettings, apply });
+  const follow = makeUserFollower({
+    load: loadCloudSettings,
+    apply,
+    onAllowed: (uid) => (pulledUid = uid),
+    onLoadError: () =>
+      toast("Couldn't load your scoring rules from your account. Edits stay on this device until you reopen Metaspry.", 'error'),
   });
+  cloudUser.subscribe((u) => void follow(u));
 
   settings.subscribe((s) => {
     const u = get(cloudUser);
-    // A failed push used to be swallowed while the drawer said "saved" (UX review item 1).
-    if (u && !suppress && pulledUid === u.uid) {
+    // A failed push used to be swallowed while the drawer said "saved" (UX review item 1). A change
+    // that came from another surface was already pushed there.
+    if (u && !suppress && !settingsChangeIsExternal() && pulledUid === u.uid) {
       void saveCloudSettings(u.uid, s).catch(() =>
         toast("Scoring rules saved on this device, but couldn't sync to your account. Save again to retry.", 'error'),
       );

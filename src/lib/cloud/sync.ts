@@ -26,6 +26,14 @@ function hostnameOf(url: string): string {
   }
 }
 
+/**
+ * Firestore rejects a document over 1 MiB; `pageMeta.tags` copied every tag of a page captured up to
+ * 3 MB (architecture review 2026-10-26, High 5). Each value is cut to TAG_VALUE_MAX characters and
+ * the list to TAG_MAX entries; `tagCount` stays the true count. Real pages are far under both.
+ */
+export const TAG_VALUE_MAX = 2000;
+export const TAG_MAX = 300;
+
 /** Build the cloud payload. Undefined fields are dropped on write (ignoreUndefinedProperties). */
 export function toScanPayload(
   meta: PageMeta,
@@ -92,7 +100,11 @@ export function toScanPayload(
       ogImage: tagValue('og:image') ?? tagValue('twitter:image'),
       favicon: meta.icon ?? undefined,
       tagCount: meta.tags.length,
-      tags: meta.tags.map((t) => ({ key: t.key, value: t.value, category: t.category })),
+      tags: meta.tags.slice(0, TAG_MAX).map((t) => ({
+        key: t.key,
+        value: t.value.length > TAG_VALUE_MAX ? t.value.slice(0, TAG_VALUE_MAX) : t.value,
+        category: t.category,
+      })),
     },
     audit: {
       score: auditResult.score,
@@ -126,7 +138,7 @@ export async function uploadScan(
   scope: SyncScope = { kind: 'personal' }
 ): Promise<UploadResult> {
   const id = scanIdFor(payload.url);
-  const { db, doc, getDoc, setDoc, serverTimestamp } = await firestoreSdk();
+  const { db, doc, runTransaction, serverTimestamp } = await firestoreSdk();
   const ref =
     scope.kind === 'workspace'
       ? doc(db, 'workspaces', scope.wsId, 'scans', id)
@@ -138,17 +150,21 @@ export async function uploadScan(
   // description, canonical, ogImage and favicon — with merge those are DROPPED from the write and
   // the document keeps the previous scan's values, so the web app would show a stale robots/sitemap
   // summary or a description the site has since removed, beside a fresh score and timestamp.
-  const existing = await getDoc(ref);
-  const prev = existing.data();
-  await setDoc(ref, {
-    ...payload,
-    workspaceId: scope.kind === 'workspace' ? scope.wsId : null,
-    starred: prev?.starred ?? false,
-    createdAt: prev?.createdAt ?? serverTimestamp(),
+  // In a transaction (architecture review 2026-10-26, High 5): a read then a separate write let two
+  // surfaces, or two quick re-scans, interleave and drop a `starred` set in between.
+  return runTransaction(db, async (tx) => {
+    const existing = await tx.get(ref);
+    const prev = existing.data();
+    tx.set(ref, {
+      ...payload,
+      workspaceId: scope.kind === 'workspace' ? scope.wsId : null,
+      starred: prev?.starred ?? false,
+      createdAt: prev?.createdAt ?? serverTimestamp(),
+    });
+    return {
+      id,
+      hadPrevious: existing.exists(),
+      previousScannedAt: typeof prev?.scannedAt === 'number' ? prev.scannedAt : null,
+    };
   });
-  return {
-    id,
-    hadPrevious: existing.exists(),
-    previousScannedAt: typeof prev?.scannedAt === 'number' ? prev.scannedAt : null,
-  };
 }

@@ -70,6 +70,8 @@ export async function fetchWorkspaces(uid: string): Promise<void> {
         };
       })
       .filter((w) => w.role === 'owner' || w.role === 'member');
+    // The user changed while this was in flight: their own fetch has (or will) set the list.
+    if (get(cloudUser)?.uid !== uid) return;
     workspaces.set(list);
     // If the saved target workspace is gone / no longer writable, fall back to personal.
     const cur = get(syncScope);
@@ -77,7 +79,7 @@ export async function fetchWorkspaces(uid: string): Promise<void> {
       setSyncScope({ kind: 'personal' });
     }
   } catch {
-    workspaces.set([]);
+    if (get(cloudUser)?.uid === uid) workspaces.set([]);
   }
 }
 
@@ -91,7 +93,10 @@ export function initCloudWorkspaces(): void {
     syncScope.set({ kind: 'personal' });
     if (u) {
       void fetchWorkspaces(u.uid);
-      void loadScope(u.uid).then((s) => syncScope.set(s));
+      // Dropped when another account signed in before it loaded (architecture review 2026-10-26, High 5).
+      void loadScope(u.uid).then((s) => {
+        if (get(cloudUser)?.uid === u.uid) syncScope.set(s);
+      });
     } else {
       workspaces.set([]);
     }

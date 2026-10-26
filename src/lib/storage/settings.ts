@@ -89,6 +89,16 @@ export function applySettingsWithoutPersisting(next: Settings): void {
   guard.applyExternal(() => settings.set(next));
 }
 
+/**
+ * True while the store is being set from outside this surface's own edits: another surface's
+ * write (the watch) or the cloud pull. The cloud push must not fire then (architecture review
+ * 2026-10-26, High 5): every open surface used to re-upload the edit the other surface had already
+ * pushed.
+ */
+export function settingsChangeIsExternal(): boolean {
+  return guard.suppressed;
+}
+
 function writeStorage(next: Settings): void {
   if (guard.suppressed) return;
   if (typeof chrome === 'undefined' || !chrome.storage?.local) return;
