@@ -1,6 +1,6 @@
 <script lang="ts">
   import { pinned, togglePinned, isPinned } from '../../storage/pinned';
-  import { toast } from '../Toast/toast';
+  import { toast } from '../../toast';
   import { tooltip } from '../../actions/tooltip';
   import { bandClasses } from '../../audit/band';
   import { FOCUS_RING } from '../toolbar';

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { fly } from 'svelte/transition';
-  import { toasts, dismissToast, type ToastEntry } from './toast';
+  import { toasts, dismissToast, type ToastEntry } from '../../toast';
   import { dur } from '../../motion';
 
   // Same fills as the web app's toasts (R2-27, V3-12): its Tailwind 4 emerald-700 / rose-700 are

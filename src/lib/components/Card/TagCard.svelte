@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { MetaTag } from '../../scrapers/PageMeta';
-  import { toast } from '../Toast/toast';
+  import { toast } from '../../toast';
   import PinButton from './PinButton.svelte';
   import UrlValue from './UrlValue.svelte';
   import { tooltip } from '../../actions/tooltip';

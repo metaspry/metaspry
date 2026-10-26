@@ -10,11 +10,12 @@
     type RuleWeights,
   } from '../../storage/settings';
   import { validateSettings, type SettingsField } from '../../storage/validate-settings';
-  import { cloudIsPro, APP_URL } from '../../cloud/plan';
+  import { cloudIsPro } from '../../cloud/plan';
+  import { APP_URL } from '../../app-url';
   import { workspaceRules, hasEntitledWorkspace } from '../../cloud/workspace-scoring';
   import { mode, switchMode, type Mode } from '../../mode';
   import { shortcutsEnabled, setShortcutsEnabled } from '../../storage/shortcuts';
-  import { toast } from '../Toast/toast';
+  import { toast } from '../../toast';
   import { tooltip } from '../../actions/tooltip';
   import { cycleTab, focusables } from '../../actions/popover';
   import { isTop, pushLayer, topLayer, type Layer } from '../../layers';

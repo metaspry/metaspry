@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { AuditResult, RuleResult, RuleSeverity } from '../../audit/AuditResult';
   import type { PageMeta } from '../../scrapers/PageMeta';
+  import { openTab } from '../../tabs/open-tab';
   import { bandClasses, bandFor, bandForVerdict, scoreLabel, isCappedBand, CAPPED_BAND_REASON } from '../../audit/band';
   import { tooltip } from '../../actions/tooltip';
   import { FOCUS_RING } from '../toolbar';
@@ -33,13 +34,8 @@
   function openChanged() {
     if (!cloudScan) return;
     const url = compareChangedHref(cloudScan.id);
-    // Guarded like every other chrome.* entry point: `npm run dev` renders this in a plain tab.
-    if (typeof chrome === 'undefined' || !chrome.tabs) {
-      window.open(url, '_blank', 'noopener');
-      return;
-    }
     // `active: true`: the user is deliberately leaving for the web app.
-    chrome.tabs.create({ url, active: true });
+    openTab(url, { active: true });
   }
 
   const RADIUS = 32;

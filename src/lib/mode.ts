@@ -1,6 +1,6 @@
 import { get, writable } from 'svelte/store';
 import { watchKey } from './storage/watch';
-import { toast } from './components/Toast/toast';
+import { toast } from './toast';
 import { MODE_KEY, parseMode, POPUP_PATH, type Mode } from './messaging/protocol';
 
 export type { Mode };

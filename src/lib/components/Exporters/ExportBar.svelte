@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { PageMeta } from '../../scrapers/PageMeta';
   import { toJson, toCsv, download } from '../../exporters/exporters';
-  import { toast } from '../Toast/toast';
+  import { toast } from '../../toast';
   import { tooltip } from '../../actions/tooltip';
   import { FOCUS_RING } from '../toolbar';
 

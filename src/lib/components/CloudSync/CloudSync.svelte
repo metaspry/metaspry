@@ -10,7 +10,9 @@
     cloudSignOut,
   } from "../../cloud/auth";
   import { initCloudSettingsSync } from "../../cloud/settings";
-  import { initCloudPlan, APP_URL } from "../../cloud/plan";
+  import { initCloudPlan } from "../../cloud/plan";
+  import { APP_URL } from "../../app-url";
+  import { openTab } from "../../tabs/open-tab";
   import { initialsFor } from "../../cloud/initials";
   import { signInErrorMessage, googleSignInErrorMessage } from "../../cloud/auth-errors";
   import { tooltip } from "../../actions/tooltip";
@@ -89,12 +91,9 @@
   }
 
   function openApp() {
-    // Guarded like every other chrome.* entry point: `npm run dev` renders this component in a
-    // plain browser, where `chrome` is undefined and the click would throw.
-    if (typeof chrome === "undefined" || !chrome.tabs) return;
     // `active: true` on purpose, unlike History's background tab: the user is deliberately leaving
     // for the web app, so letting the popup close is the wanted behaviour.
-    chrome.tabs.create({ url: `${APP_URL}/dashboard`, active: true });
+    openTab(`${APP_URL}/dashboard`, { active: true });
   }
 
   // The sync-target list is a `role="menu"` of `menuitemradio`s: arrow keys, Home and End move

@@ -2,6 +2,7 @@
   import { fade } from 'svelte/transition';
   import { tick } from 'svelte';
   import { history, clearHistory } from '../../storage/history';
+  import { openTab } from '../../tabs/open-tab';
   import SiteIcon from '../SiteIcon/SiteIcon.svelte';
   import { toolbarButtonClass, FOCUS_RING, FOCUS_RING_INSET } from '../toolbar';
   import { bandClasses, bandFor, scoreLabel, REQUIRED_FAILING } from '../../audit/band';
@@ -40,7 +41,7 @@
     // active: false opens the new tab in the background so the popup retains
     // focus. Without it Chrome immediately closes the popup when the new tab
     // takes focus, leaving the user with an unaudited new page and no UI.
-    chrome.tabs.create({ url, active: false });
+    openTab(url, { active: false });
   }
 
   // Arming swaps the button for the confirm, so focus follows the swap (the Settings drawer's

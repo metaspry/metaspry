@@ -42,7 +42,7 @@
   import { toScanPayload, uploadScan, type UploadResult } from "../cloud/sync";
   import { guardUnload, resetSyncFor, trackUpload } from "../cloud/sync-status";
   import { siteFilesForUpload } from "../scrapers/getSiteFiles";
-  import { toast } from "../components/Toast/toast";
+  import { toast } from "../toast";
   import { modalOpen } from "../layers";
   import { get } from "svelte/store";
 

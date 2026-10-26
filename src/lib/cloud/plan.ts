@@ -14,8 +14,8 @@ import { settings, DEFAULT_SETTINGS } from "../storage/settings";
 import type { Settings } from "../storage/settings";
 import { workspaceRules, resolveEffectiveSettings } from "./workspace-scoring";
 
-/** Where the extension sends users to upgrade. */
-export const APP_URL = "https://app.metaspry.com";
+/** Where the extension sends users to upgrade. Lives in app-url.ts; re-exported for existing importers. */
+export { APP_URL } from "../app-url";
 
 export const cloudIsPro = writable(false);
 
