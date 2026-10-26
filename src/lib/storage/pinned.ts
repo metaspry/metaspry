@@ -1,44 +1,21 @@
-import { writable } from 'svelte/store';
-import { makeWriteGuard, watchKey } from './watch';
+import { persisted } from './persisted';
 
-const STORAGE_KEY = 'pinnedKeys';
-
-export const pinned = writable<Set<string>>(new Set());
-
-function readStorage(): Promise<Set<string>> {
-  return new Promise((resolve) => {
-    if (typeof chrome === 'undefined' || !chrome.storage?.local) {
-      resolve(new Set());
-      return;
-    }
-    chrome.storage.local.get(STORAGE_KEY, (result) => {
-      const stored = result[STORAGE_KEY];
-      if (Array.isArray(stored)) {
-        resolve(new Set(stored.map((s) => String(s).toLowerCase())));
-      } else {
-        resolve(new Set());
-      }
-    });
-  });
+/** Stored as a lower-cased array; anything else is no pins. */
+export function parsePinned(raw: unknown): Set<string> {
+  return Array.isArray(raw) ? new Set(raw.map((s) => String(s).toLowerCase())) : new Set<string>();
 }
 
-const guard = makeWriteGuard();
+const backing = persisted<Set<string>>({
+  key: 'pinnedKeys',
+  fallback: () => new Set(),
+  parse: parsePinned,
+  serialize: (set) => Array.from(set),
+  write: 'on-change',
+});
 
-function writeStorage(next: Set<string>): void {
-  if (guard.suppressed) return;
-  if (typeof chrome === 'undefined' || !chrome.storage?.local) return;
-  chrome.storage.local.set({ [STORAGE_KEY]: Array.from(next) });
-}
+export const pinned = backing.store;
 
-export async function initPinned(): Promise<void> {
-  const initial = await readStorage();
-  pinned.set(initial);
-  pinned.subscribe(writeStorage);
-  watchKey(STORAGE_KEY, (raw) => {
-    const next = Array.isArray(raw) ? new Set(raw.map((s) => String(s).toLowerCase())) : new Set<string>();
-    guard.applyExternal(() => pinned.set(next));
-  });
-}
+export const initPinned = backing.init;
 
 export function togglePinned(key: string): void {
   const lower = key.toLowerCase();

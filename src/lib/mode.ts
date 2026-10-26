@@ -1,11 +1,10 @@
 import { get, writable } from 'svelte/store';
-import { watchKey } from './storage/watch';
+import { persisted } from './storage/persisted';
 import { toast } from './toast';
 import { MODE_KEY, parseMode, POPUP_PATH, type Mode } from './messaging/protocol';
 
 export type { Mode };
 
-const STORAGE_KEY = MODE_KEY;
 const DEFAULT_MODE: Mode = 'sidepanel';
 
 /** Read synchronously by static/scripts/boot.js before first paint. */
@@ -25,38 +24,24 @@ function applyAttr(next: Mode): void {
   }
 }
 
-function readStorage(): Promise<Mode> {
-  return new Promise((resolve) => {
-    if (typeof chrome === 'undefined' || !chrome.storage?.local) {
-      resolve(DEFAULT_MODE);
-      return;
-    }
-    chrome.storage.local.get(STORAGE_KEY, (result) => {
-      resolve(parseMode(result[STORAGE_KEY]));
-    });
-  });
-}
+// Mode is written by setMode only (a user action), so there is no store write to suppress.
+const backing = persisted<Mode>(
+  {
+    key: MODE_KEY,
+    fallback: () => DEFAULT_MODE,
+    parse: parseMode,
+    write: 'explicit',
+    onInit: (store) => store.subscribe(applyAttr),
+  },
+  mode,
+);
 
-function writeStorage(next: Mode): void {
-  if (typeof chrome === 'undefined' || !chrome.storage?.local) return;
-  chrome.storage.local.set({ [STORAGE_KEY]: next });
-}
-
-export async function initMode(): Promise<void> {
-  const initial = await readStorage();
-  applyAttr(initial);
-  mode.set(initial);
-  mode.subscribe(applyAttr);
-  // Mode is written by setMode only, so there is no write to suppress here.
-  watchKey(STORAGE_KEY, (raw) => {
-    mode.set(parseMode(raw));
-  });
-}
+export const initMode = backing.init;
 
 export function setMode(next: Mode): void {
   mode.update((current) => {
     if (current === next) return current;
-    writeStorage(next);
+    backing.write(next);
     return next;
   });
 }

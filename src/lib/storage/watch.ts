@@ -31,13 +31,18 @@ export function makeWriteGuard(): WriteGuard {
   };
 }
 
-/** Call `apply` whenever another surface changes `key` in `chrome.storage.local`. */
-export function watchKey(key: string, apply: (raw: unknown) => void): void {
-  if (typeof chrome === 'undefined' || !chrome.storage?.onChanged) return;
-  chrome.storage.onChanged.addListener((changes, area) => {
+/**
+ * Call `apply` whenever another surface changes `key` in `chrome.storage.local`. Returns a
+ * function that removes the listener (a no-op outside the extension runtime).
+ */
+export function watchKey(key: string, apply: (raw: unknown) => void): () => void {
+  if (typeof chrome === 'undefined' || !chrome.storage?.onChanged) return () => {};
+  const listener = (changes: Record<string, chrome.storage.StorageChange>, area: string): void => {
     if (area !== 'local') return;
     const change = changes[key];
     if (!change) return;
     apply(change.newValue);
-  });
+  };
+  chrome.storage.onChanged.addListener(listener);
+  return () => chrome.storage.onChanged.removeListener(listener);
 }
