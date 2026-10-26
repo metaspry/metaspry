@@ -7,6 +7,7 @@ import { get } from 'svelte/store';
 import { firestoreSdk } from './sdk';
 import { cloudUser } from './auth';
 import { toast } from '../components/Toast/toast';
+import { report } from '../diagnostics';
 import {
   settings,
   applySettingsWithoutPersisting,
@@ -77,7 +78,7 @@ export async function syncSettingsForUser(
  * them. A failed load leaves pushes off and says so, instead of an unhandled rejection.
  */
 export function makeUserFollower(
-  deps: SettingsSyncDeps & { onAllowed: (uid: string | null) => void; onLoadError?: () => void },
+  deps: SettingsSyncDeps & { onAllowed: (uid: string | null) => void; onLoadError?: (err: unknown) => void },
 ): (u: { uid: string } | null) => Promise<void> {
   let generation = 0;
   return async (u) => {
@@ -91,8 +92,8 @@ export function makeUserFollower(
         },
       });
       if (mine === generation) deps.onAllowed(uid);
-    } catch {
-      if (mine === generation) deps.onLoadError?.();
+    } catch (err) {
+      if (mine === generation) deps.onLoadError?.(err);
     }
   };
 }
@@ -117,8 +118,10 @@ export function initCloudSettingsSync(): void {
     load: loadCloudSettings,
     apply,
     onAllowed: (uid) => (pulledUid = uid),
-    onLoadError: () =>
-      toast("Couldn't load your scoring rules from your account. Edits stay on this device until you reopen Metaspry.", 'error'),
+    onLoadError: (err) => {
+      report(err, 'cloud.settings-load');
+      toast("Couldn't load your scoring rules from your account. Edits stay on this device until you reopen Metaspry.", 'error');
+    },
   });
   cloudUser.subscribe((u) => void follow(u));
 
@@ -127,9 +130,10 @@ export function initCloudSettingsSync(): void {
     // A failed push used to be swallowed while the drawer said "saved" (UX review item 1). A change
     // that came from another surface was already pushed there.
     if (u && !suppress && !settingsChangeIsExternal() && pulledUid === u.uid) {
-      void saveCloudSettings(u.uid, s).catch(() =>
-        toast("Scoring rules saved on this device, but couldn't sync to your account. Save again to retry.", 'error'),
-      );
+      void saveCloudSettings(u.uid, s).catch((err) => {
+        report(err, 'cloud.settings-save');
+        toast("Scoring rules saved on this device, but couldn't sync to your account. Save again to retry.", 'error');
+      });
     }
   });
 }

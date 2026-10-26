@@ -44,6 +44,7 @@
   import { siteFilesForUpload } from "../scrapers/getSiteFiles";
   import { toast } from "../toast";
   import { modalOpen } from "../layers";
+  import { report } from "../diagnostics";
   import { get } from "svelte/store";
 
   type View = "landing" | "loading" | "error" | "results";
@@ -255,6 +256,7 @@
         });
         // Also dropped when the user signed out (or switched account) while the write was in flight.
         if (out.ok && id === scrapeId && get(cloudUser)?.uid === cu.uid) cloudScan = out.value;
+        if (!out.ok) report(out.message, "scan.upload");
         if (!out.ok && get(cloudUser)?.uid === cu.uid) toast(out.message, "error");
       }
     } catch (error) {

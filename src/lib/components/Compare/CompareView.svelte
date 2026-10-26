@@ -9,6 +9,7 @@
   import { diffMeta, differenceCount, DIFF_LABEL, type DiffRow } from './diff';
   import { sameUrl } from '../../audit/url-match';
   import { BUTTON_PRIMARY } from '../button';
+  import { report } from '../../diagnostics';
 
   export let leftMeta: PageMeta;
   export let leftUrl: string;
@@ -61,7 +62,9 @@
       if (res.url && !sameUrl(res.url, target)) return null;
       const doc = new DOMParser().parseFromString(text, 'text/html');
       return getMetaTags(doc.documentElement, res.url || target);
-    } catch {
+    } catch (err) {
+      // Falls back to the rendered page (the "mixed sources" note); kept for a bug report.
+      report(err, 'compare.served-html');
       return null;
     }
   }
@@ -124,6 +127,7 @@
         rightRules = resolved.rules;
       }
     } catch (err) {
+      report(err, 'compare.fetch');
       errorMessage = err instanceof Error ? err.message : String(err);
     } finally {
       loading = false;

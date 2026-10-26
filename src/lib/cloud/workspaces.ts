@@ -6,6 +6,7 @@
 import { writable, get } from 'svelte/store';
 import { firestoreSdk } from './sdk';
 import { cloudUser } from './auth';
+import { report } from '../diagnostics';
 
 export interface CloudWorkspace {
   id: string;
@@ -78,7 +79,8 @@ export async function fetchWorkspaces(uid: string): Promise<void> {
     if (cur.kind === 'workspace' && !list.some((w) => w.id === cur.wsId)) {
       setSyncScope({ kind: 'personal' });
     }
-  } catch {
+  } catch (err) {
+    report(err, 'cloud.workspaces');
     if (get(cloudUser)?.uid === uid) workspaces.set([]);
   }
 }

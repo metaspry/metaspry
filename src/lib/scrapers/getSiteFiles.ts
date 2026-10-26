@@ -1,3 +1,4 @@
+import { report } from '../diagnostics';
 import type {
   LlmsInfo,
   LlmsSection,
@@ -537,8 +538,10 @@ export function siteFilesForUpload(
         clearTimeout(timer);
         resolve(files);
       },
-      () => {
+      (err) => {
         clearTimeout(timer);
+        // The scan is still written; the failure is kept for a bug report (diagnostics.ts).
+        report(err, 'scan.site-files');
         resolve(undefined);
       },
     );

@@ -23,6 +23,7 @@
   import { BUTTON_DANGER, BUTTON_PRIMARY, BUTTON_SECONDARY } from '../button';
   import { dur } from '../../motion';
   import { bandClasses } from '../../audit/band';
+  import { diagnosticsText } from '../../diagnostics';
 
   const SURFACES: { value: Mode; label: string; hint: string }[] = [
     { value: 'sidepanel', label: 'Side panel', hint: 'Stays open beside the page while you browse.' },
@@ -229,6 +230,21 @@
     toast('Scoring rules reset to defaults', 'success');
     // Reset is now disabled (defaults, untouched), so focus goes to the first input instead.
     void focusIn();
+  }
+
+  // Architecture review 2026-10-26, Medium 16: the absorbed failures of this surface, for a bug report.
+  async function copyDiagnostics() {
+    const text = diagnosticsText({
+      version,
+      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+      mode: $mode,
+    });
+    try {
+      await navigator.clipboard.writeText(text);
+      toast('Diagnostics copied. Paste them into your bug report.', 'success');
+    } catch {
+      toast("Couldn't copy diagnostics.", 'error');
+    }
   }
 
   // The shared field (`.ms-input`, app.css: `field-edge` border, inset well in dark, R3-24). An
@@ -517,6 +533,7 @@
         {#each ABOUT_LINKS as link (link.href)}
           <a href={link.href} target="_blank" rel="noopener noreferrer" class={linkClass}>{link.label}</a>
         {/each}
+        <button type="button" on:click={copyDiagnostics} class={linkClass}>Copy diagnostics</button>
       </nav>
     </footer>
   </aside>

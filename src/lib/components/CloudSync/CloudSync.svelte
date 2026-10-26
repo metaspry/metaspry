@@ -27,6 +27,8 @@
     type CloudWorkspace,
   } from "../../cloud/workspaces";
   import { initWorkspaceScoring } from "../../cloud/workspace-scoring";
+  import { report } from "../../diagnostics";
+  import { toast } from "../Toast/toast";
 
   let open = false;
   let trigger: HTMLButtonElement | null = null;
@@ -73,8 +75,14 @@
   }
 
   async function out() {
-    await cloudSignOut();
-    open = false;
+    try {
+      await cloudSignOut();
+      open = false;
+    } catch (e) {
+      // Had no catch: a failed sign-out left the menu open with nothing said.
+      report(e, "cloud.sign-out");
+      toast("Couldn't sign out. Check your connection and try again.", "error");
+    }
   }
 
   function close() {
