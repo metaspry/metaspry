@@ -248,3 +248,25 @@ test.describe('header menus and the keyboard (UX review 2026-10-25, Medium 22)',
     await expect(panel).toHaveCount(0);
   });
 });
+
+test.describe('status is announced, duplicates render (UX review 2026-10-25, Mediums 23 and 25)', () => {
+  test('the Site and AI tabs announce what they found; the Tags filter announces its count', async ({ openSurface }) => {
+    const { ext } = await openSurface('/');
+    await scanFromLanding(ext);
+
+    await ext.getByRole('tabpanel').locator('input[data-shortcut="search"]').fill('og:');
+    await expect(ext.getByRole('tabpanel').getByRole('status').filter({ hasText: /^\d+ of \d+ tags shown$/ })).toBeAttached();
+
+    await openTab(ext, 'Site');
+    await expect(ext.getByRole('tabpanel').getByRole('status').filter({ hasText: 'robots.txt found, sitemap found, llms.txt found' })).toBeAttached();
+    await openTab(ext, 'AI');
+    await expect(ext.getByRole('tabpanel').getByRole('status').filter({ hasText: /^AI readiness: / })).toBeAttached();
+  });
+
+  test('a tag repeated with the same value shows twice', async ({ openSurface }) => {
+    const { ext } = await openSurface('/dup.html');
+    await scanFromLanding(ext);
+    await ext.getByRole('tabpanel').locator('input[data-shortcut="search"]').fill('Same twice');
+    await expect(ext.getByRole('tabpanel').getByText('Same twice', { exact: true })).toHaveCount(2);
+  });
+});

@@ -20,7 +20,7 @@
     {#each jsonLd.entities as entity, i (i)}
       <div class="rounded-xl border border-white/40 bg-white/40 px-3 py-2 dark:border-white/10 dark:bg-white/5">
         <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{entity.type}</p>
-        <p class="break-all text-xs ms-muted">{preview(entity.data)}</p>
+        <p class="text-xs ms-muted [overflow-wrap:anywhere]">{preview(entity.data)}</p>
       </div>
     {/each}
   </section>

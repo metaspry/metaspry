@@ -555,6 +555,8 @@ indexed, and "a canonical tag is present" passed it.
 
 **Permissions.** Host `*://*/*`.
 
+**Chips (UX review 2026-10-25, Medium 17; `components/Site/chip.ts`).** Found; Missing only for a real answer (HTTP 404 / 410, or an HTML fallback at the path); "Couldn't check" (neutral) when the fetch timed out, failed, got a 5xx or a refused redirect (it used to show red "Missing"); robots.txt whose `User-agent: *` group disallows `/` without allowing it back reads amber "Blocks all" (it used to be green "Found"). The tab announces its result in a polite status ("robots.txt found, sitemap found, llms.txt not found"), as the AI tab does ("AI readiness: ...") and the Tags filter ("N of M tags shown").
+
 **Tests.** `src/lib/scrapers/getRobots.spec.ts`; `getSiteFiles.spec.ts` (`isPrivateHost`, the 5-sitemap cap against 1000 lines, LAN / loopback / single-label / non-web robots sitemaps never requested, a sitemap on another public host followed, index children in the user's network, private redirects discarded, a local page reading its own files, `siteFilesForUpload` deadline and failure); `getSiteFiles.cache.spec.ts`; `e2e/scan.e2e.ts` (robots.txt and llms.txt fetched live from the fixture site and rendered).
 
 **Gotchas.**

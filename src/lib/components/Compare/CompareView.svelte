@@ -224,8 +224,8 @@
             <span class="shrink-0 text-[0.6875rem] font-semibold {badgeClass(row.status)}">{DIFF_LABEL[row.status]}</span>
           </div>
           <div class="grid grid-cols-2 gap-2 pt-1">
-            <p class="break-all text-slate-700 dark:text-slate-300"><span class="sr-only">Current: </span>{row.left ?? '—'}</p>
-            <p class="break-all text-slate-700 dark:text-slate-300"><span class="sr-only">Compared: </span>{row.right ?? '—'}</p>
+            <p class="text-slate-700 [overflow-wrap:anywhere] dark:text-slate-300"><span class="sr-only">Current: </span>{row.left ?? '—'}</p>
+            <p class="text-slate-700 [overflow-wrap:anywhere] dark:text-slate-300"><span class="sr-only">Compared: </span>{row.right ?? '—'}</p>
           </div>
         </li>
       {/each}
