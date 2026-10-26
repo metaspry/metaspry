@@ -14,7 +14,8 @@
 		"check": "svelte-check --tsconfig ./tsconfig.json",
 		"test:coverage": "vitest --run --coverage",
 		"test:e2e": "npm run build && playwright test",
-		"qa": "npm run check && npm test && npm run test:e2e"
+		"contract:check": "node scripts/check-contract.mjs",
+		"qa": "npm run check && npm run contract:check && npm test && npm run test:e2e"
 	},
 	"devDependencies": {
 		"@playwright/test": "^1.64.1",

@@ -145,6 +145,8 @@ The page side takes every literal and type below from `src/lib/messaging/protoco
 | `src/lib/cloud/` | `firebase.ts` (the only static SDK import), `sdk.ts` (lazy `firestoreSdk()` / `authSdk()`, 3.13), `session.ts` (session probe without the SDK), `sync-status.ts` (last upload state, 3.14), `auth.ts`, `auth-errors.ts` (sign-in failures -> plain messages), `plan.ts`, `settings.ts`, `sync.ts`, `workspaces.ts`, `workspace-scoring.ts` (workspace rules, 3.8), `compare-link.ts` (deep link into the app's `/compare`) |
 | `src/lib/layers.ts` | The open-layer stack (dialogs, drawer, menus): top layer owns Escape/Tab, shortcuts muted, page inert behind a modal (3.17) |
 | `src/lib/audit/explain.ts` | Verdict words, points lost, the score formula (3.7) |
+| `src/lib/contract/` | The scan contract shared with the web app (section 5): `scan-contract.ts` (schema version, bands, `scanIdFor`; the app's names and bodies), `scan-contract.json` (vendored app fixture), `audit-golden.json` and `scan-keys.json` (extension-authored fixtures for the app); `docs/contract/README.md` |
+| `scripts/check-contract.mjs` | `npm run contract:check` (part of `qa`): fails when the vendored contract fixture differs from `../app`'s; skips without a sibling checkout |
 | `src/lib/util/` | `time-ago.ts` (relative time shared by History and the Audit "Last scan" row), `safe-href.ts` |
 | `src/lib/actions/` | Svelte actions: `tooltip.ts` (`use:tooltip`, 3.17) |
 | `src/lib/categorize.ts` | Tag key -> category |
@@ -607,7 +609,7 @@ Checks in `src/lib/audit/aeo.ts`:
 **One indexability verdict (UX review item 5).** `AeoView` receives the Audit `noindex` rule's verdict (`indexing`: meta robots, googlebot and the `X-Robots-Tag` header) and `analyzeAeo(..., indexing)` uses it instead of reading the robots meta tag alone, re-running (without refetching) when the header check resolves.
 
 **Gotchas.**
-- `aeo.ts` mirrors the web app's server analyzer `app/functions/src/aeo.ts` and says "Keep aligned". Change `AI_BOTS` or any check's meaning in both repos.
+- `aeo.ts` mirrors the web app's server analyzer `app/functions/src/aeo.ts` and says "Keep aligned". Change `AI_BOTS` or any check's meaning in both repos. Ported from the server on 2026-10-26: `aeo-author-date` is `info` ("Not an article page...") off articles (og:type article, a JSON-LD Article/BlogPosting/NewsArticle/TechArticle/ScholarlyArticle/Report, or `article:published_time`), and curly quotes count as a quotation lever (`aeo.spec.ts`).
 - No check currently returns `fail`, although the type allows it.
 - The quotation regex is `/["""]/`: three straight ASCII quotes. Typographic quotes (“ ”) are not detected.
 - `aeo-indexable` reads only `meta[name=robots]`; the Audit `noindex` rule also reads `googlebot`.
@@ -882,6 +884,7 @@ Store item ID: `kibedpkbadcofhbcpfigjmjanmdkmaji`. Privacy policy URL: `https://
 
 - Links into the app: "Go Pro" -> `${APP_URL}/upgrade`, "Open in web app" / "Edit in web app" -> `${APP_URL}/settings` (Settings drawer), "Create an account" -> `${APP_URL}/signup` and "Forgot password?" -> `${APP_URL}/login` (sign-in popover; both routes exist in `app/src/routes/(auth)`), "Open Metaspry web app" -> `${APP_URL}/dashboard`, "Open what changed" -> `${APP_URL}/compare?...` (3.7). The sign-in copy tells users their scans go to "your history at app.metaspry.com".
 - Read (never written) from the app's data: `workspaces/{wsId}.plan` (entitlement) and `workspaces/{wsId}/settings/audit` (workspace scoring rules, 3.8); members may read both under `app/firestore.rules`.
+- **Scan contract (`src/lib/contract/`, `docs/contract/README.md`).** The schema version, the bands and `scanIdFor` come from `contract/scan-contract.ts`, which mirrors the app's `functions/src/scan-contract.ts`; the app's fixture is vendored as `scan-contract.json` and checked by `contract.spec.ts` and `npm run contract:check`. The extension authors `audit-golden.json` (rule statuses for the behaviours where the app's engine still differs: noindex `none` / second tag / X-Robots-Tag, canonical elsewhere, hreflang trailing slash, duplicate `<title>`, empty `content`, SVG `<title>`; `serverToday` records the app's current answer) and `scan-keys.json` (the URL a scan is filed under: the app's bulk and monitor paths hash the raw URL, so `/blog/` splits into two documents). Both are handed to the app to converge.
 - Kept in sync by hand across the two repos: `DEFAULT_SETTINGS` and the app's `DEFAULT_AUDIT_SETTINGS`; `aeo.ts` and `app/functions/src/aeo.ts`; `toScanPayload` and the app's `ScanPayload`. A change to any of these is a two-repo change.
 - The app's `ScanPayload` also has optional `note`, `tags` and `aeo` fields. The extension sends none of them.
 

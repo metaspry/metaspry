@@ -1,0 +1,22 @@
+{
+	"_comment": "Shared scan contract fixtures (functions/src/scan-contract.ts). The extension and the website must produce the same outputs; copy this file into their tests.",
+	"schemaVersion": 1,
+	"bands": [
+		{ "score": 100, "rules": [], "band": "good" },
+		{ "score": 80, "rules": [], "band": "good" },
+		{ "score": 79, "rules": [], "band": "warn" },
+		{ "score": 50, "rules": [], "band": "warn" },
+		{ "score": 49, "rules": [], "band": "fail" },
+		{ "score": 0, "rules": [], "band": "fail" },
+		{ "score": 92, "rules": [{ "severity": "required", "status": "fail" }], "band": "warn" },
+		{ "score": 60, "rules": [{ "severity": "required", "status": "fail" }], "band": "warn" },
+		{ "score": 30, "rules": [{ "severity": "required", "status": "fail" }], "band": "fail" },
+		{ "score": 92, "rules": [{ "severity": "recommended", "status": "fail" }], "band": "good" },
+		{ "score": 92, "rules": [{ "severity": "required", "status": "warn" }], "band": "good" }
+	],
+	"scanIds": [
+		{ "url": "https://example.com/", "id": "szuv6rc" },
+		{ "url": "https://metaspry.com/blog/", "id": "s1v8m4yc" },
+		{ "url": "http://127.0.0.1:4599/", "id": "s182c73q" }
+	]
+}

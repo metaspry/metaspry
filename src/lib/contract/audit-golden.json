@@ -1,0 +1,75 @@
+{
+  "_comment": "Golden audit cases authored by the extension (architecture review 2026-10-26, Critical 1). Each case lists the rule statuses the extension's engine produces; every engine (extension, app/functions/src/audit/engine.ts) must produce the same. `html` is a full document, `url` the scanned page, `xRobotsTag` the response header when the case needs one. `serverToday` records what the app engine returned when this file was written, so the app knows which cases it must change. See docs/contract/README.md.",
+  "version": 1,
+  "cases": [
+    {
+      "name": "robots content=none de-indexes",
+      "url": "https://example.com/page",
+      "html": "<html><head><title>A page title that is long enough to pass</title><meta name=\"robots\" content=\"none\"></head><body></body></html>",
+      "expect": { "noindex": "fail" },
+      "serverToday": { "noindex": "pass" }
+    },
+    {
+      "name": "a second robots tag with noindex de-indexes",
+      "url": "https://example.com/page",
+      "html": "<html><head><title>A page title that is long enough to pass</title><meta name=\"robots\" content=\"index, follow\"><meta name=\"robots\" content=\"noindex\"></head><body></body></html>",
+      "expect": { "noindex": "fail" },
+      "serverToday": { "noindex": "pass" }
+    },
+    {
+      "name": "X-Robots-Tag: noindex de-indexes a page whose HTML is clean",
+      "url": "https://example.com/page",
+      "xRobotsTag": "noindex",
+      "html": "<html><head><title>A page title that is long enough to pass</title></head><body></body></html>",
+      "expect": { "noindex": "fail" },
+      "serverToday": { "noindex": "pass" }
+    },
+    {
+      "name": "a canonical pointing at another page warns",
+      "url": "https://example.com/blog/post-1",
+      "html": "<html><head><title>A page title that is long enough to pass</title><link rel=\"canonical\" href=\"https://example.com/\"></head><body></body></html>",
+      "expect": { "canonical": "warn" },
+      "serverToday": { "canonical": "pass" }
+    },
+    {
+      "name": "a self canonical passes",
+      "url": "https://example.com/blog/post-1",
+      "html": "<html><head><title>A page title that is long enough to pass</title><link rel=\"canonical\" href=\"https://example.com/blog/post-1\"></head><body></body></html>",
+      "expect": { "canonical": "pass" }
+    },
+    {
+      "name": "hreflang self-reference matches across a trailing slash",
+      "url": "https://example.com/blog/",
+      "html": "<html><head><title>A page title that is long enough to pass</title><link rel=\"canonical\" href=\"https://example.com/blog/\"><link rel=\"alternate\" hreflang=\"en\" href=\"https://example.com/blog\"><link rel=\"alternate\" hreflang=\"de\" href=\"https://example.com/de/blog\"></head><body></body></html>",
+      "expect": { "hreflang-self": "pass" },
+      "serverToday": { "hreflang-self": "warn" }
+    },
+    {
+      "name": "two <title> elements count as a duplicate",
+      "url": "https://example.com/page",
+      "html": "<html><head><title>A page title that is long enough to pass</title><title>Another title</title></head><body></body></html>",
+      "expect": { "dup-tags": "warn" },
+      "serverToday": { "dup-tags": "pass" }
+    },
+    {
+      "name": "an empty description is a missing description",
+      "url": "https://example.com/page",
+      "html": "<html><head><title>A page title that is long enough to pass</title><meta name=\"description\" content=\"\"></head><body></body></html>",
+      "expect": { "description": "fail" },
+      "serverToday": { "description": "pass" }
+    },
+    {
+      "name": "an SVG <title> in the body is not the page title",
+      "url": "https://example.com/page",
+      "html": "<html><head></head><body><svg><title>Icon</title></svg></body></html>",
+      "expect": { "title": "fail" },
+      "serverToday": { "title": "pass" }
+    },
+    {
+      "name": "not an article: article-og is not applicable",
+      "url": "https://example.com/",
+      "html": "<html><head><title>A page title that is long enough to pass</title><meta property=\"og:type\" content=\"website\"></head><body></body></html>",
+      "expect": { "article-og": "pass" }
+    }
+  ]
+}

@@ -9,15 +9,8 @@ import type { AuditResult, RuleStatus } from '../audit/AuditResult';
 import type { SiteFiles } from '../scrapers/SiteFiles';
 import type { SyncScope } from './workspaces';
 import { bandFor } from '../audit/band';
-
-const SCAN_SCHEMA_VERSION = 1;
-
-/** Stable, Firestore-safe doc id from a URL (djb2 hash). */
-function scanIdFor(url: string): string {
-  let h = 5381;
-  for (let i = 0; i < url.length; i++) h = ((h << 5) + h + url.charCodeAt(i)) >>> 0;
-  return 's' + h.toString(36);
-}
+// The version and the id come from the contract shared with the app (contract/scan-contract.ts).
+import { SCAN_SCHEMA_VERSION, scanIdFor } from '../contract/scan-contract';
 
 function mapStatus(s: RuleStatus): 'pass' | 'warn' | 'fail' {
   if (s === 'pass') return 'pass';

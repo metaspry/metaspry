@@ -120,7 +120,8 @@ export function analyzeAeo(
 
   const text = bodyText(html);
   const hasStats = /\d/.test(text) && /(%|\d[\d,.]{2,})/.test(text);
-  const hasQuotes = /["""]/.test(text);
+  // Straight and curly double quotes (U+201C / U+201D), as the server analyzer counts them.
+  const hasQuotes = /["\u201C\u201D]/.test(text);
   let host = '';
   try {
     host = new URL(baseUrl).hostname;
@@ -181,8 +182,23 @@ export function analyzeAeo(
     !!html.querySelector('time[datetime]') ||
     /datepublished|datemodified/.test(ldText) ||
     !!html.querySelector('meta[property="article:published_time" i]');
+  // Author and date matter on articles and posts; a homepage, pricing page or docs index needs
+  // neither. Same scoping as the server analyzer (app/functions/src/aeo.ts) and the audit's `article-og`.
+  const ogType = html.querySelector('meta[property="og:type" i]')?.getAttribute('content') ?? '';
+  const isArticle =
+    ogType.trim().toLowerCase() === 'article' ||
+    /"@type"\s*:\s*"(article|blogposting|newsarticle|techarticle|scholarlyarticle|report)"/.test(ldText) ||
+    !!html.querySelector('meta[property="article:published_time" i]');
   checks.push(
-    hasAuthor && hasDate
+    !isArticle && !(hasAuthor && hasDate)
+      ? {
+          id: 'aeo-author-date',
+          label: 'Author & freshness',
+          state: 'info',
+          detail: 'Not an article page; author and date are checked on articles and posts.',
+          scope: 'page',
+        }
+      : hasAuthor && hasDate
       ? {
           id: 'aeo-author-date',
           label: 'Author & freshness',
