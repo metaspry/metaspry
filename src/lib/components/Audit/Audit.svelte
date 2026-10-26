@@ -33,7 +33,7 @@
 
   function openChanged() {
     if (!cloudScan) return;
-    const url = compareChangedHref(cloudScan.id);
+    const url = compareChangedHref(cloudScan.id, cloudScan.workspaceId);
     // `active: true`: the user is deliberately leaving for the web app.
     openTab(url, { active: true });
   }

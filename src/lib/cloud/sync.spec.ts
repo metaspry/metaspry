@@ -81,6 +81,7 @@ describe('uploadScan', () => {
       name: 'Acme',
     });
     expect(store.get(`workspaces/ws1/scans/${r.id}`)).toMatchObject({ workspaceId: 'ws1' });
+    expect(r.workspaceId).toBe('ws1');
     expect(r.hadPrevious).toBe(false);
   });
 

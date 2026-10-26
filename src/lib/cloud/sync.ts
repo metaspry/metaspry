@@ -130,6 +130,8 @@ export interface UploadResult {
   hadPrevious: boolean;
   /** That document's `scannedAt`, or null when there was none. */
   previousScannedAt: number | null;
+  /** The workspace the scan was saved to, or null for Personal (the compare link's scope). */
+  workspaceId: string | null;
 }
 
 export async function uploadScan(
@@ -165,6 +167,7 @@ export async function uploadScan(
       id,
       hadPrevious: existing.exists(),
       previousScannedAt: typeof prev?.scannedAt === 'number' ? prev.scannedAt : null,
+      workspaceId: scope.kind === 'workspace' ? scope.wsId : null,
     };
   });
 }
