@@ -232,3 +232,19 @@ test.describe('Compare explains what happened (UX review 2026-10-25, Medium 18)'
     await expect(panel.getByRole('list', { name: 'Tag differences' })).toBeVisible();
   });
 });
+
+test.describe('header menus and the keyboard (UX review 2026-10-25, Medium 22)', () => {
+  test('arrow keys inside History stay in History; Tab out of it closes it', async ({ openSurface }) => {
+    const { ext } = await openSurface('/');
+    await scanFromLanding(ext);
+    await ext.getByRole('button', { name: 'History' }).click();
+    const panel = ext.getByRole('dialog', { name: 'Recent scans' });
+    await expect(panel).toBeVisible();
+    await panel.locator('button').first().focus();
+    await ext.keyboard.press('ArrowRight');
+    expect(await panel.evaluate((el) => el.contains(document.activeElement))).toBe(true);
+
+    for (let i = 0; i < 12 && (await panel.count()) > 0; i++) await ext.keyboard.press('Tab');
+    await expect(panel).toHaveCount(0);
+  });
+});

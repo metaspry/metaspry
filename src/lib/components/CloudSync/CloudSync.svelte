@@ -167,7 +167,7 @@
       bind:this={trigger}
       type="button"
       on:click={() => (open = !open)}
-      aria-label={$scanSync.kind === "error" ? "Account and sync target, last scan not saved" : "Account and sync target"}
+      aria-label={$scanSync.kind === "error" ? `Account, saving to ${targetLabel}, last scan not saved` : `Account, saving to ${targetLabel}`}
       aria-expanded={open}
       use:tooltip={`Signed in as ${$cloudUser.email} - saving scans to ${targetLabel}`}
       class="flex h-9 max-w-[170px] items-center gap-1.5 rounded-xl border border-slate-200/70 bg-white/70 py-0.5 pl-0.5 pr-2 text-xs font-medium text-slate-700 transition hover:bg-white dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 {FOCUS_RING}"

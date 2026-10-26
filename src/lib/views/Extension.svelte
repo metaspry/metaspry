@@ -389,6 +389,9 @@
   function onToolbarKey(event: KeyboardEvent) {
     const keys = ["ArrowLeft", "ArrowRight", "Home", "End"];
     if (!keys.includes(event.key)) return;
+    // The History panel renders inside this toolbar: its own keys are its own (UX review 2026-10-25,
+    // Medium 22: arrows from a history row walked out through the toolbar buttons).
+    if ((event.target as HTMLElement | null)?.closest('[role="dialog"]')) return;
     const group = event.currentTarget as HTMLElement;
     const items = Array.from(group.querySelectorAll<HTMLElement>("button:not([disabled])"));
     const index = items.indexOf(document.activeElement as HTMLElement);
