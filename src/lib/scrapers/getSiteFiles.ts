@@ -24,8 +24,8 @@ const SITEMAP_CONCURRENCY = 6;
 
 /** Marker for a child the budget stopped us reading, so the caller can flag the total. */
 export const BUDGET_ERROR = 'Not read - sitemap fetch budget reached.';
-/** Marker for an index child on another site (or a private address): never requested. */
-export const OFF_SITE_ERROR = 'Not read - not on this site.';
+/** Marker for an index child on a private or local address (or not http(s)): never requested. */
+export const BLOCKED_TARGET_ERROR = 'Not read - private or local address.';
 const PRIVATE_REDIRECT_ERROR = 'Redirected to a private network address.';
 /**
  * robots.txt `Sitemap:` lines tried before the well-known paths. They were all tried, one after
@@ -71,21 +71,12 @@ export function isPrivateHost(hostname: string): boolean {
 }
 
 /**
- * Same site for sitemap purposes: equal hosts, equal after a leading `www.`, or one a subdomain
- * of the other. IP literals must match exactly. Without a public-suffix list, sibling subdomains
- * (`shop.example.com` for `blog.example.com`) do not count; `www.example.com` and
- * `cdn.example.com` do, through `example.com`.
+ * May a sitemap URL the site declared (robots.txt `Sitemap:`, a sitemap index `<loc>`) be fetched
+ * for a page on `pageHost`? http(s) only. Another public host is fine: search engines accept a
+ * sitemap on a CDN or bucket when robots.txt declares it. A private, loopback or local address,
+ * or a single-label name (`http://intranet/`, which DNS search suffixes can resolve inside the
+ * user's network), only when it is the page's own host (a dev server, the e2e fixture site).
  */
-export function isSameSite(a: string, b: string): boolean {
-  const x = a.toLowerCase();
-  const y = b.toLowerCase();
-  if (IPV4.test(x) || IPV4.test(y) || x.startsWith('[') || y.startsWith('[')) return x === y;
-  const bx = x.replace(/^www\./, '');
-  const by = y.replace(/^www\./, '');
-  return bx === by || bx.endsWith(`.${by}`) || by.endsWith(`.${bx}`);
-}
-
-/** May a sitemap URL the site declared be fetched for a page on `pageHost`? */
 function allowedTarget(url: string, pageHost: string): boolean {
   let u: URL;
   try {
@@ -94,8 +85,10 @@ function allowedTarget(url: string, pageHost: string): boolean {
     return false;
   }
   if (u.protocol !== 'https:' && u.protocol !== 'http:') return false;
-  if (!isSameSite(u.hostname, pageHost)) return false;
-  return !isPrivateHost(u.hostname) || u.hostname === pageHost;
+  const host = u.hostname;
+  if (host === pageHost) return true;
+  const singleLabel = !host.includes('.') && !host.startsWith('[');
+  return !singleLabel && !isPrivateHost(host);
 }
 
 function hostOf(url: string): string {
@@ -289,9 +282,9 @@ async function tryParseSitemap(
 }
 
 async function resolveSitemap(url: string, depth: number, budget: Budget, pageHost: string): Promise<SitemapChild> {
-  // An index can list any URL; one on another site or the user's network is never requested.
+  // An index can list any URL; one in the user's network is never requested.
   if (!allowedTarget(url, pageHost)) {
-    return { url, urlCount: 0, isIndex: false, error: OFF_SITE_ERROR };
+    return { url, urlCount: 0, isIndex: false, error: BLOCKED_TARGET_ERROR };
   }
   if (budget.left <= 0) {
     return { url, urlCount: 0, isIndex: false, error: BUDGET_ERROR };
@@ -375,8 +368,8 @@ async function buildSitemap(baseUrl: string, robotsSitemaps: string[]): Promise<
   const pageHost = hostOf(baseUrl);
   const candidates: string[] = [];
   const skipped: string[] = [];
-  // 1. URLs declared in robots.txt — highest priority signal. Only this site's, and only the first
-  // MAX_ROBOTS_SITEMAPS of them: the file is the scanned site's to write, hostile or not.
+  // 1. URLs declared in robots.txt — highest priority signal. Only the first MAX_ROBOTS_SITEMAPS,
+  // and none in the user's network: the file is the scanned site's to write, hostile or not.
   for (const u of robotsSitemaps) {
     if (candidates.length >= MAX_ROBOTS_SITEMAPS) break;
     const resolved = resolvePath(baseUrl, u);
@@ -408,7 +401,7 @@ async function buildSitemap(baseUrl: string, robotsSitemaps: string[]): Promise<
     lastError = `${candidate}: ${res.error}`;
   }
   const skippedNote = skipped.length
-    ? ` Skipped ${skipped.length} robots.txt sitemap(s) not on this site: ${skipped.slice(0, 3).join(', ')}${skipped.length > 3 ? ', ...' : ''}.`
+    ? ` Skipped ${skipped.length} robots.txt sitemap(s) on a private or local address: ${skipped.slice(0, 3).join(', ')}${skipped.length > 3 ? ', ...' : ''}.`
     : '';
   return emptySitemap(`Tried ${candidates.length} location(s). Last error — ${lastError}${skippedNote}`);
 }

@@ -2,9 +2,8 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   fetchSiteFiles,
   isPrivateHost,
-  isSameSite,
   MAX_ROBOTS_SITEMAPS,
-  OFF_SITE_ERROR,
+  BLOCKED_TARGET_ERROR,
   siteFilesForUpload,
 } from './getSiteFiles';
 import type { SiteFiles } from './SiteFiles';
@@ -49,26 +48,7 @@ describe('isPrivateHost', () => {
   );
 });
 
-describe('isSameSite', () => {
-  it.each([
-    ['example.com', 'example.com'],
-    ['example.com', 'www.example.com'],
-    ['www.example.com', 'example.com'],
-    ['example.com', 'sitemaps.example.com'],
-    ['www.example.com', 'cdn.example.com'], // www. dropped: cdn is a subdomain of example.com
-    ['blog.example.com', 'example.com'],
-    ['127.0.0.1', '127.0.0.1'],
-  ])('%s and %s are the same site', (a, b) => expect(isSameSite(a, b)).toBe(true));
-  it.each([
-    ['example.com', 'evil.test'],
-    ['example.com', 'notexample.com'],
-    ['example.com', '192.168.1.1'],
-    ['blog.example.com', 'shop.example.com'], // siblings: no public-suffix list to prove a shared site
-    ['1.2.3.4', '2.3.4'],
-  ])('%s and %s are not', (a, b) => expect(isSameSite(a, b)).toBe(false));
-});
-
-describe('fetchSiteFiles: sitemap discovery is bounded and stays on the site', () => {
+describe('fetchSiteFiles: sitemap discovery is bounded and stays out of the user network', () => {
   it(`tries at most ${MAX_ROBOTS_SITEMAPS} robots.txt Sitemap: URLs, however many are declared`, async () => {
     const lines = Array.from({ length: 1000 }, (_, i) => `Sitemap: https://example.com/s${i}.xml`).join('\n');
     const requested = serve({ 'https://example.com/robots.txt': { body: `User-agent: *\nDisallow:\n${lines}` } });
@@ -80,38 +60,40 @@ describe('fetchSiteFiles: sitemap discovery is bounded and stays on the site', (
     expect(files.robots.sitemaps).toHaveLength(1000);
   });
 
-  it('never requests a LAN or off-site Sitemap: URL, and names it in the not-found error', async () => {
+  it('never requests a LAN, loopback, single-label or non-web Sitemap: URL, and names it in the not-found error', async () => {
     const requested = serve({
-      'https://example.com/robots.txt': { body: 'Sitemap: http://192.168.1.1/sitemap.xml\nSitemap: https://evil.test/s.xml' },
+      'https://example.com/robots.txt': {
+        body: 'Sitemap: http://192.168.1.1/sitemap.xml\nSitemap: http://intranet/s.xml\nSitemap: http://localhost:8080/s.xml\nSitemap: ftp://example.com/s.xml',
+      },
     });
     const files = await fetchSiteFiles('https://example.com/page');
-    expect(requested.some((u) => u.includes('192.168.1.1') || u.includes('evil.test'))).toBe(false);
+    expect(requested.some((u) => /192\.168|intranet|localhost|^ftp:/.test(u))).toBe(false);
     expect(files.sitemap.present).toBe(false);
     expect(files.sitemap.error).toContain('http://192.168.1.1/sitemap.xml');
-    expect(files.sitemap.error).toContain('not on this site');
+    expect(files.sitemap.error).toContain('Skipped 4 robots.txt sitemap(s) on a private or local address');
   });
 
-  it('follows a declared sitemap on the www host or a subdomain', async () => {
+  it('follows a sitemap robots.txt declares on another public host (a CDN, a bucket), as search engines do', async () => {
     serve({
-      'https://www.example.com/robots.txt': { body: 'Sitemap: https://sitemaps.www.example.com/a.xml' },
-      'https://sitemaps.www.example.com/a.xml': { body: urlset('https://www.example.com/1', 'https://www.example.com/2') },
+      'https://shop.example.com/robots.txt': { body: 'Sitemap: https://cdn.example-assets.net/sitemaps/shop.xml' },
+      'https://cdn.example-assets.net/sitemaps/shop.xml': { body: urlset('https://shop.example.com/1', 'https://shop.example.com/2') },
     });
-    const files = await fetchSiteFiles('https://www.example.com');
+    const files = await fetchSiteFiles('https://shop.example.com');
     expect(files.sitemap.present).toBe(true);
     expect(files.sitemap.urlCount).toBe(2);
     expect(files.sitemap.error).toBeUndefined();
   });
 
-  it('a sitemap index child off the site is not fetched and does not spend the budget', async () => {
+  it('a sitemap index child in the user network is not fetched and does not spend the budget', async () => {
     const requested = serve({
-      'https://example.com/sitemap.xml': { body: index('http://10.0.0.5/s.xml', 'https://evil.test/s.xml', 'https://example.com/a.xml') },
+      'https://example.com/sitemap.xml': { body: index('http://10.0.0.5/s.xml', 'http://169.254.169.254/latest/meta-data', 'https://example.com/a.xml') },
       'https://example.com/a.xml': { body: urlset('https://example.com/1') },
     });
     const files = await fetchSiteFiles('https://example.com');
-    expect(requested.some((u) => u.includes('10.0.0.5') || u.includes('evil.test'))).toBe(false);
+    expect(requested.some((u) => u.includes('10.0.0.5') || u.includes('169.254'))).toBe(false);
     expect(files.sitemap.isIndex).toBe(true);
     expect(files.sitemap.urlCount).toBe(1);
-    expect(files.sitemap.children.map((c) => c.error)).toEqual([OFF_SITE_ERROR, OFF_SITE_ERROR, undefined]);
+    expect(files.sitemap.children.map((c) => c.error)).toEqual([BLOCKED_TARGET_ERROR, BLOCKED_TARGET_ERROR, undefined]);
     expect(files.sitemap.budgetExhausted).toBeUndefined();
   });
 

@@ -39,11 +39,16 @@ function loadBackground(tabs: Tab[] | undefined, injected: unknown, opts: { thro
     executeScript,
     query,
     ask(request: object = getHtmlRequest(7)): Promise<Record<string, unknown>> {
-      return new Promise((resolve) => {
+      return new Promise((resolve, reject) => {
         onMessage?.(request, {}, (r) => {
           // Every reply on every path is already a canonical GetHtmlResponse (the typed protocol).
-          expect(parseGetHtmlResponse(r)).toEqual(r);
-          resolve(r as Record<string, unknown>);
+          // Rejected, not thrown: a throw here runs outside the test and would surface as a timeout.
+          try {
+            expect(parseGetHtmlResponse(r)).toEqual(r);
+            resolve(r as Record<string, unknown>);
+          } catch (err) {
+            reject(err);
+          }
         });
       });
     },

@@ -73,6 +73,11 @@ describe('scripts/check-remote-code.mjs', () => {
     ['new Function', 'a.js', 'const f = new Function("return 1")'],
     ['a remote <script src>', 'index.html', '<script src="https://x.example.com/app"></script>'],
     ['an inline <script> the CSP fixer missed', 'index.html', '<body><script>__sveltekit_x = {}</script></body>'],
+    ['a dynamic import of an extensionless CDN URL', 'a.js', 'import("https://esm.sh/lodash@4")'],
+    ['Function() without new', 'a.js', 'var g=Function("return this")()'],
+    ['indirect eval', 'a.js', '(0,eval)("x")'],
+    ['window.eval', 'a.js', 'window.eval("y")'],
+    ['globalThis.eval', 'a.js', 'globalThis.eval ("y")'],
   ])('fails on %s, naming the file', (_label, file, text) => {
     const r = run({ [file]: text });
     expect(r.ok).toBe(false);
@@ -85,6 +90,11 @@ describe('scripts/check-remote-code.mjs', () => {
     ['a repo link that merely ends in "js"', 'a.js', '"https://github.com/le0pard/re2js#readme"'],
     ['method names containing eval', 'a.js', 'x.eval(1);retrieval(2);'],
     ['a feature test for importScripts', 'a.js', 'typeof self.importScripts=="function"'],
+    ['a licence banner naming a .js repo', 'a.js', '/*! license see https://github.com/developit/mitt.js */ var x=1;'],
+    ['a JSON-LD data block', 'index.html', '<script type="application/ld+json">{"@type":"WebPage"}</script>'],
+    ['an import map', 'index.html', '<script type="importmap">{"imports":{}}</script>'],
+    ['a local dynamic import', 'a.js', 'import("./chunks/x.js")'],
+    ['an identifier ending in Function', 'a.js', 'isFunction("x");myFunction("y")'],
   ])('passes %s', (_label, file, text) => {
     expect(run({ [file]: text }).ok).toBe(true);
   });
@@ -95,6 +105,11 @@ describe('scripts/check-remote-code.mjs', () => {
     expect(r.ok).toBe(false);
     expect(r.out).toContain("CSP script-src allows 'unsafe-eval'");
     expect(r.out).toContain('CSP script-src allows https://cdn.example.com');
+  });
+
+  it('ignores the sandbox CSP, where MV3 allows unsafe-eval', () => {
+    const csp = { extension_pages: "script-src 'self'; object-src 'self'", sandbox: "sandbox allow-scripts; script-src 'self' 'unsafe-eval'" };
+    expect(run({ 'manifest.json': JSON.stringify({ content_security_policy: csp }) }).ok).toBe(true);
   });
 
   it('passes a self-only CSP and a manifest without one', () => {

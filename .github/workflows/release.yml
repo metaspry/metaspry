@@ -1,6 +1,9 @@
 # Tagged release: push `vX.Y.Z` (matching package.json) and this builds the store zip from that
 # exact commit, after the full QA pass. The zip and its sha256 land as a workflow artifact and on
 # a DRAFT GitHub release; uploading to the Chrome Web Store stays manual (AGENTS.md section 4.4).
+#
+# Two jobs so the write-scoped token never sits next to `npm ci` and the project's own scripts:
+# `package` runs everything with a read-only token, `draft` only downloads the artifact and calls gh.
 name: release
 
 on:
@@ -8,7 +11,7 @@ on:
     tags: ['v*']
 
 permissions:
-  contents: write # create the draft release
+  contents: read
 
 jobs:
   package:
@@ -48,6 +51,17 @@ jobs:
             metaspry-${{ github.ref_name }}.zip
             metaspry-${{ github.ref_name }}.zip.sha256
           if-no-files-found: error
+
+  draft:
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write # create the draft release
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: metaspry-${{ github.ref_name }}
       - name: Draft GitHub release
         env:
           GH_TOKEN: ${{ github.token }}

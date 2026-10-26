@@ -8,7 +8,8 @@
  * pattern checks catch the same class of problem from any other dependency:
  * - an absolute or protocol-relative URL to a `.js` / `.mjs` / `.wasm` file,
  * - a `<script src>` pointing off-package, or an inline `<script>` the CSP fixer missed,
- * - `importScripts(` of a URL, `eval(`, `new Function(`,
+ * - `import(` or `importScripts(` of a URL, `eval(` (bare, `window.` / `globalThis.` / `self.`, indirect
+ *   `(0,eval)`), `new Function(` and `Function("...")`,
  * - a manifest `content_security_policy` that allows `unsafe-eval`, `unsafe-inline` or a remote host.
  *
  * Run: `node scripts/check-remote-code.mjs [dir]` (default `build`). Part of `npm run build` and
@@ -24,18 +25,26 @@ export const FORBIDDEN = [
   'google.com/recaptcha/enterprise.js',
 ];
 
-/** `[label, regex]` checked in every .js/.mjs/.html file. Regexes are linear (no nested quantifiers). */
+/**
+ * `[label, regex]` checked in every .js/.mjs/.html file. Regexes are linear (no nested quantifiers).
+ * URLs count only inside a string literal (right after a quote), so a licence banner naming a repo
+ * like `github.com/x/chart.js` in a comment does not fail the build.
+ */
 export const PATTERNS = [
-  ['remote script URL', /(?:https?:)?\/\/[a-z0-9.-]+\.[a-z]{2,}(?::\d+)?\/[^\s"'`<>()]*\.(?:m?js|wasm)(?=[?#"'`\s)]|$)/gi],
+  ['remote script URL', /["'`](?:https?:)?\/\/[a-z0-9.-]+\.[a-z]{2,}(?::\d+)?\/[^\s"'`<>()]*\.(?:m?js|wasm)(?=[?#"'`\s)])/gi],
+  // A dynamic import of a URL loads remote code whatever its extension (esm.sh, unpkg, /+esm).
+  ['import() of a URL', /\bimport\(\s*["'`](?:https?:)?\/\//g],
   ['importScripts of a URL', /importScripts\(\s*["'`](?:https?:)?\/\//g],
-  ['eval(', /(?<![\w$.])eval\(/g],
-  ['new Function(', /\bnew\s+Function\(/g],
+  // eval( as a call: bare, through window/globalThis/self, or indirect (0,eval)(.
+  ['eval(', /(?:(?<![\w$.])|\b(?:window|globalThis|self)\.)eval\s*\(|\(\s*0\s*,\s*eval\s*\)/g],
+  ['Function(', /\bnew\s+Function\s*\(|(?<![\w$.])Function\(\s*["'`]/g],
 ];
 
 /** HTML only: a remote `<script src>`, or an inline `<script>` (MV3 CSP blocks it; removeInlineScript.cjs should have moved it). */
 export const HTML_PATTERNS = [
   ['remote <script src>', /<script\b[^>]*\bsrc\s*=\s*["']?(?:https?:)?\/\//gi],
-  ['inline <script>', /<script\b(?![^>]*\bsrc\s*=)[^>]*>\s*[^<\s]/gi],
+  // Data blocks (JSON-LD, import maps) are not executed and CSP allows them.
+  ['inline <script>', /<script\b(?![^>]*\bsrc\s*=)(?![^>]*\btype\s*=\s*["']?(?:application\/(?:ld\+)?json|importmap))[^>]*>\s*[^<\s]/gi],
 ];
 
 const CODE_EXT = new Set(['.js', '.mjs', '.cjs', '.html', '.htm']);
@@ -52,7 +61,10 @@ function* walk(dir) {
 export function checkManifestCsp(manifest, file = 'manifest.json') {
   const csp = manifest?.content_security_policy;
   if (!csp) return [];
-  const policies = typeof csp === 'string' ? [csp] : Object.values(csp).filter((v) => typeof v === 'string');
+  // `sandbox` pages may use 'unsafe-eval' in MV3 (no extension APIs there); check the rest.
+  const policies = typeof csp === 'string'
+    ? [csp]
+    : Object.entries(csp).filter(([k, v]) => k !== 'sandbox' && typeof v === 'string').map(([, v]) => v);
   const hits = [];
   for (const policy of policies) {
     for (const directive of policy.split(';')) {
