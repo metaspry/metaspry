@@ -209,3 +209,26 @@ test.describe('steady, light open (items 11, 12)', () => {
     expect(blurred).toBeLessThanOrEqual(1);
   });
 });
+
+test.describe('Compare explains what happened (UX review 2026-10-25, Medium 18)', () => {
+  test('a missing page reads "Page not found", not a raw status line', async ({ openSurface }) => {
+    const { ext } = await openSurface('/');
+    await scanFromLanding(ext);
+    await openTab(ext, 'Compare');
+    const panel = ext.getByRole('tabpanel');
+    await panel.getByRole('textbox', { name: 'URL to compare' }).fill(`${SITE}/does-not-exist.html`);
+    await panel.getByRole('button', { name: 'Compare' }).click();
+    await expect(panel.getByRole('alert')).toHaveText('Page not found (HTTP 404). Check the URL.');
+  });
+
+  test('a URL that redirects to a sign-in page says so above the rows', async ({ openSurface }) => {
+    const { ext } = await openSurface('/');
+    await scanFromLanding(ext);
+    await openTab(ext, 'Compare');
+    const panel = ext.getByRole('tabpanel');
+    await panel.getByRole('textbox', { name: 'URL to compare' }).fill(`${SITE}/members-only.html`);
+    await panel.getByRole('button', { name: 'Compare' }).click();
+    await expect(panel.getByText(`This URL redirected to ${SITE}/login.html.`, { exact: false })).toBeVisible();
+    await expect(panel.getByRole('list', { name: 'Tag differences' })).toBeVisible();
+  });
+});
