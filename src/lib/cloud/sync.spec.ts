@@ -34,7 +34,8 @@ vi.mock('firebase/firestore', () => ({
 }));
 let transactions = 0;
 
-import { uploadScan, toScanPayload, TAG_MAX, TAG_VALUE_MAX } from './sync';
+import { uploadScan, toScanPayload, TAG_MAX, TAG_VALUE_MAX, SITE_SUMMARY_CAPS } from './sync';
+import type { SiteFiles } from '../scrapers/SiteFiles';
 import { getMetaTags } from '../scrapers/getMetaTags';
 import { audit } from '../audit/rules';
 
@@ -113,5 +114,44 @@ describe('toScanPayload stays under the Firestore document limit', () => {
     expect(p.pageMeta.tags).toHaveLength(TAG_MAX);
     expect(p.pageMeta.tags.every((t) => t.value.length <= TAG_VALUE_MAX)).toBe(true);
     expect(new TextEncoder().encode(JSON.stringify(p)).length).toBeLessThan(1_000_000);
+  });
+});
+
+describe('toScanPayload matches what the app renders for a server scan (architecture review 2026-10-26, Medium 15)', () => {
+  const meta = getMetaTags(
+    new DOMParser().parseFromString(
+      '<html><head><title>T</title><meta property="og:title" content="x"><meta property="article:section" content="y"><meta name="twitter:card" content="summary"><meta name="description" content="d"><meta name="viewport" content="w"><meta name="fb:app_id" content="1"></head></html>',
+      'text/html',
+    ).documentElement,
+    'https://a.com/',
+  );
+
+  it('tag categories use the server labels the app shows as headings', () => {
+    const p = toScanPayload(meta, audit(meta), 'https://a.com/');
+    const cat = Object.fromEntries(p.pageMeta.tags.map((t) => [t.key, t.category]));
+    expect(cat).toMatchObject({
+      'og:title': 'Open Graph',
+      'article:section': 'Open Graph',
+      'twitter:card': 'Twitter',
+      description: 'SEO',
+      viewport: 'Basic',
+      'fb:app_id': 'Other',
+    });
+  });
+
+  it('site-file summaries use the server caps', () => {
+    const many = <T>(n: number, f: (i: number) => T): T[] => Array.from({ length: n }, (_, i) => f(i));
+    const siteFiles = {
+      robots: { present: true, groups: many(40, (i) => ({ userAgents: [`bot${i}`], disallow: [], allow: [] })), sitemaps: [] },
+      sitemap: { present: true, isIndex: true, urlCount: 0, childCount: 30, children: many(30, (i) => ({ url: `u${i}`, urlCount: 1, isIndex: false })), sample: many(15, (i) => `s${i}`), truncated: false },
+      llms: { present: true, sections: many(25, (i) => ({ heading: `h${i}`, links: many(25, (j) => ({ label: `l${j}`, url: `x${j}` })) })) },
+    } as unknown as SiteFiles;
+    const s = toScanPayload(meta, audit(meta), 'https://a.com/', siteFiles).siteFiles!;
+    expect(s.robots.groups).toHaveLength(SITE_SUMMARY_CAPS.robotGroups);
+    expect(s.sitemap.children).toHaveLength(SITE_SUMMARY_CAPS.sitemapChildren);
+    expect(s.sitemap.sample).toHaveLength(SITE_SUMMARY_CAPS.sitemapSample);
+    expect(s.llms.sections).toHaveLength(SITE_SUMMARY_CAPS.llmsSections);
+    expect(s.llms.sections[0]!.links).toHaveLength(SITE_SUMMARY_CAPS.llmsLinks);
+    expect(SITE_SUMMARY_CAPS).toEqual({ robotGroups: 30, sitemapSample: 10, sitemapChildren: 20, llmsSections: 20, llmsLinks: 20 });
   });
 });

@@ -353,7 +353,7 @@ those articles into one history row and one overwritten cloud document. `normali
 fragment and a trailing slash so `/blog`, `/blog/` and `/blog#comments` are one scan; `og:url` stays
 in the payload as metadata.
 
-**Key files.** `src/lib/views/Extension.svelte`; `src/lib/scrapers/getHTML.ts`, `getMetaTags.ts`, `icon.ts`, `getJsonLd.ts`, `getHreflang.ts`, `getRobots.ts`, `PageMeta.ts`; `src/lib/categorize.ts`; `static/scripts/background.js`; components `Grid`, `Skeleton`, `EmptyState`, `ErrorState`, `Screen`.
+**Key files.** `src/lib/views/Extension.svelte`; `src/lib/scrapers/getHTML.ts`, `getMetaTags.ts`, `icon.ts`, `getJsonLd.ts`, `getHreflang.ts`, `getRobots.ts`, `PageMeta.ts`; `src/lib/categorize.ts`; `static/scripts/background.js`; components `Grid`, `Skeleton`, `ErrorState`, `Screen`.
 
 **Data.** In memory only (`pageMeta`, `pageHtml`, `auditResult`, `scannedUrl`, `activeUrl`).
 
@@ -368,7 +368,7 @@ in the payload as metadata.
 - Same URL = not stale: a reload after editing the page's tags, or the same URL in a logged-in and a logged-out tab, shows no banner; the user presses Re-scan.
 - Tag values in `PageMeta.tags` are raw; only title, canonical, icon and hreflang hrefs are resolved. Consumers resolve `og:image` themselves.
 - `getRobots.ts` exports a `RobotsInfo` for meta robots that is unrelated to `SiteFiles.ts`'s `RobotsInfo` for robots.txt. Import the right one.
-- `categorize.ts`: `og:*` -> `og`, `twitter:*` -> `twitter`, a fixed SEO set (`description`, `keywords`, `robots`, `canonical`, `author`, `googlebot`) -> `seo`, a fixed basic set (`viewport`, `theme-color`, `generator`, ...) -> `basic`, everything else -> `other`.
+- `categorize.ts` (`categorize.spec.ts`): `og:*` and `article:*` -> `og` (the server engine's grouping), `twitter:*` -> `twitter`, a fixed SEO set (`description`, `keywords`, `robots`, `canonical`, `author`, `googlebot`) -> `seo`, a fixed basic set (`viewport`, `theme-color`, `generator`, ...) -> `basic`, everything else -> `other`.
 
 **Everything scraped belongs to someone else.** URLs out of robots.txt, sitemaps and llms.txt render
 through `safeHref` (`src/lib/util/safe-href.ts`): a non-http(s) scheme renders as text, never as a
@@ -877,7 +877,7 @@ Store item ID: `kibedpkbadcofhbcpfigjmjanmdkmaji`. Privacy policy URL: `https://
 |---|---|---|---|
 | `users/{uid}` | Live read of `plan` | `cloud/plan.ts` | Written only by the server (rules deny client writes) |
 | `users/{uid}/settings/audit` | Read at sign-in; merge-write on local change | `cloud/settings.ts` | The app's personal scoring settings; its server scorer reads `<scope>/settings/audit` |
-| `users/{uid}/scans/{id}` | Whole-document write per scan, read + write in one `runTransaction` (keeps `starred` / `createdAt`); `pageMeta.tags` capped at `TAG_MAX` 300 entries of `TAG_VALUE_MAX` 2000 characters for the 1 MiB document limit | `cloud/sync.ts` | Rendered from `ScanPayload` (`app/src/lib/scan/types.ts`) |
+| `users/{uid}/scans/{id}` | Whole-document write per scan (tag `category` written as the server's labels `Open Graph` / `Twitter` / `SEO` / `Basic` / `Other`, `CATEGORY_LABEL`, because the app shows it as the group heading; site-file summary capped like the server, `SITE_SUMMARY_CAPS` 30 robots groups, 20 sitemap children, 10 sample URLs, 20 x 20 llms), read + write in one `runTransaction` (keeps `starred` / `createdAt`); `pageMeta.tags` capped at `TAG_MAX` 300 entries of `TAG_VALUE_MAX` 2000 characters for the 1 MiB document limit | `cloud/sync.ts` | Rendered from `ScanPayload` (`app/src/lib/scan/types.ts`) |
 | `workspaces` (query `memberUids` array-contains uid) | Read | `cloud/workspaces.ts` | Workspace documents with `name`, `memberUids`, `roles`, `plan` |
 | `workspaces/{wsId}/settings/audit` | Live read while an entitled workspace is the sync target | `cloud/workspace-scoring.ts` | The app's workspace scoring rules |
 | `workspaces/{wsId}/scans/{id}` | Whole-document write per scan | `cloud/sync.ts` | Writable by owners and members under `app/firestore.rules` |

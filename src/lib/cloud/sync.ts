@@ -4,7 +4,7 @@
  * (deterministic id) so history shows the latest state per URL, not duplicates.
  */
 import { firestoreSdk } from './sdk';
-import type { PageMeta } from '../scrapers/PageMeta';
+import type { PageMeta, TagCategory } from '../scrapers/PageMeta';
 import type { AuditResult, RuleStatus } from '../audit/AuditResult';
 import type { SiteFiles } from '../scrapers/SiteFiles';
 import type { SyncScope } from './workspaces';
@@ -34,6 +34,22 @@ function hostnameOf(url: string): string {
 export const TAG_VALUE_MAX = 2000;
 export const TAG_MAX = 300;
 
+/**
+ * The site-files summary caps, the server's (`app/functions/src/site-files.ts` MAX_*), so the app's
+ * Site tab shows the same for an extension scan as for a bulk or monitor scan (architecture review
+ * 2026-10-26, Medium 15; the extension cut robots groups at 8 and llms at 15 x 15).
+ */
+export const SITE_SUMMARY_CAPS = { robotGroups: 30, sitemapSample: 10, sitemapChildren: 20, llmsSections: 20, llmsLinks: 20 } as const;
+
+/** The app renders `category` as the group heading; these are the server engine's labels. */
+export const CATEGORY_LABEL: Record<TagCategory, string> = {
+  og: 'Open Graph',
+  twitter: 'Twitter',
+  seo: 'SEO',
+  basic: 'Basic',
+  other: 'Other',
+};
+
 /** Build the cloud payload. Undefined fields are dropped on write (ignoreUndefinedProperties). */
 export function toScanPayload(
   meta: PageMeta,
@@ -49,7 +65,7 @@ export function toScanPayload(
     ? {
         robots: {
           present: siteFiles.robots.present,
-          groups: siteFiles.robots.groups.slice(0, 8).map((g) => ({
+          groups: siteFiles.robots.groups.slice(0, SITE_SUMMARY_CAPS.robotGroups).map((g) => ({
             userAgents: g.userAgents,
             disallow: g.disallow.length,
             allow: g.allow.length,
@@ -61,20 +77,20 @@ export function toScanPayload(
           isIndex: siteFiles.sitemap.isIndex,
           urlCount: siteFiles.sitemap.urlCount,
           childCount: siteFiles.sitemap.childCount,
-          children: siteFiles.sitemap.children.slice(0, 20).map((c) => ({
+          children: siteFiles.sitemap.children.slice(0, SITE_SUMMARY_CAPS.sitemapChildren).map((c) => ({
             url: c.url,
             urlCount: c.urlCount,
             isIndex: c.isIndex,
             error: c.error,
           })),
-          sample: siteFiles.sitemap.sample.slice(0, 10),
+          sample: siteFiles.sitemap.sample.slice(0, SITE_SUMMARY_CAPS.sitemapSample),
           truncated: siteFiles.sitemap.truncated,
         },
         llms: {
           present: siteFiles.llms.present,
-          sections: siteFiles.llms.sections.slice(0, 15).map((s) => ({
+          sections: siteFiles.llms.sections.slice(0, SITE_SUMMARY_CAPS.llmsSections).map((s) => ({
             heading: s.heading,
-            links: s.links.slice(0, 15),
+            links: s.links.slice(0, SITE_SUMMARY_CAPS.llmsLinks),
           })),
         },
       }
@@ -103,7 +119,7 @@ export function toScanPayload(
       tags: meta.tags.slice(0, TAG_MAX).map((t) => ({
         key: t.key,
         value: t.value.length > TAG_VALUE_MAX ? t.value.slice(0, TAG_VALUE_MAX) : t.value,
-        category: t.category,
+        category: CATEGORY_LABEL[t.category],
       })),
     },
     audit: {
