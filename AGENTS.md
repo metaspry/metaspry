@@ -24,7 +24,7 @@ It is one of three sibling repositories:
 |---|---|
 | UI | Svelte `^4.0.5`; components use `<script lang="ts">` |
 | App shell | SvelteKit `^1.27.4` + `@sveltejs/adapter-static` `^2.0.3`, `appDir: 'app'`, `prerender = true` |
-| Build | Vite `^4.4.2`, then `removeInlineScript.cjs` (MV3 CSP fix-up), then `scripts/check-remote-code.mjs` (remote-code guard) |
+| Build | Vite `^4.4.2`, then `removeInlineScript.cjs` (MV3 CSP fix-up), `scripts/stamp-manifest.mjs` (version from `package.json`), `scripts/check-remote-code.mjs` (remote-code guard) |
 | Styling | Tailwind CSS `^3.3.5` (`darkMode: 'class'`), PostCSS, Autoprefixer |
 | Cloud | Firebase JS SDK `^12.15.0` (Auth + Firestore) |
 | Tooltips | `@floating-ui/dom` `^1.8.0` (bundled by Vite; positions the `use:tooltip` element, 3.17) |
@@ -32,13 +32,14 @@ It is one of three sibling repositories:
 | Asset scripts | `sharp` (icons, promo tiles, store screenshots), `tiny-glob` (CSP fixer) |
 | Declared but unused | `@sveltejs/adapter-auto` (commented out in `svelte.config.js`), `onchange` |
 
-`.npmrc` sets `engine-strict=true`, but `package.json` has no `engines` field.
+`.npmrc` sets `engine-strict=true` and `package.json` `engines.node` is `>=20`; `.nvmrc` pins CI to Node 22.
 
 ### Commands
 
 | Task | Command | Notes |
 |---|---|---|
-| Build | `npm run build` | `vite build && node removeInlineScript.cjs && node scripts/check-remote-code.mjs`; output in `build/` |
+| Build | `npm run build` | `vite build && node removeInlineScript.cjs && node scripts/stamp-manifest.mjs && node scripts/check-remote-code.mjs`; output in `build/` |
+| Package | `npm run package` | Build, then `scripts/package-zip.mjs` writes `metaspry-v<version>.zip` + `.sha256` (section 4.3) |
 | Run it | `chrome://extensions` -> Developer mode -> Load unpacked -> `build/` | The only way to exercise the extension end to end |
 | Rebuild on change | `npm run watch-src` | nodemon watches `src` with `--ext svelte` only; editing a `.ts` file does not trigger a rebuild |
 | Dev server | `npm run dev` | Runs in a normal tab with no `chrome.*` APIs: scraping fails and storage-backed stores use defaults. Layout work only. |
@@ -50,7 +51,7 @@ It is one of three sibling repositories:
 | Test | `npm test` | Vitest, co-located `src/**/*.spec.ts`, happy-dom (section 3.18) |
 | Coverage | `npm run test:coverage` | Vitest v8 coverage of every file under `src/lib`; text summary + `coverage/index.html` |
 | E2E | `npm run test:e2e` | Builds, then Playwright loads `build/` unpacked in Chromium and runs `e2e/*.e2e.ts` (section 3.18). `HEADED=1` to watch |
-| Full QA pass | `npm run qa` | `check` + `test` + `test:e2e`; non-zero on any failure. Log each run in `docs/qa/qa-log.md` (hard rule 13) |
+| Full QA pass | `npm run qa` | `check` + `test` + `test:e2e`; non-zero on any failure. CI runs it on every PR and push to `main` (section 4.1). Log each run in `docs/qa/qa-log.md` (hard rule 13) |
 | Lint, format | Not configured | |
 
 ### Hard rules
@@ -149,7 +150,7 @@ This is the complete inventory. There are no ports (`runtime.connect`), no conte
 | `src/lib/components/` | One folder per UI feature: `Aeo`, `Audit`, `Card`, `Categories`, `CloudSync`, `Compare`, `ErrorState`, `Exporters`, `Grid`, `History`, `Preview`, `Previews`, `Screen`, `Settings`, `Shortcuts`, `Site`, `SiteIcon`, `Skeleton`, `Tabs`, `Toast` |
 | `src/lib/index.js` | Empty `$lib` barrel placeholder |
 | `removeInlineScript.cjs` | Post-build CSP fixer |
-| `scripts/check-remote-code.mjs` | Post-build guard: fails the build if `build/` references a remote script loader (4.1) |
+| `scripts/check-remote-code.mjs` | Post-build guard: fails the build if `build/` references remote or dynamic code, or the manifest CSP allows it (4.1) |
 | `scripts/` | Node asset generators |
 | `promo/` | Store promo tiles and screenshots (`raw-screenshots/` holds the unprocessed captures) |
 | `docs/` | Store runbooks: `chrome-store-resubmit.md`, `store-screenshots.md`; `qa/qa-log.md` (one entry per full QA pass) |
@@ -205,7 +206,7 @@ Each feature lists: purpose and user flow, key files, data and storage, permissi
 
 ### 3.1 Manifest and permissions
 
-**Purpose.** `static/manifest.json` declares the extension: MV3, name `Metaspry`, version `1.0.31`, `minimum_chrome_version: "114"`, `offline_enabled: true`.
+**Purpose.** `static/manifest.json` declares the extension: MV3, name `Metaspry`, no `version` (the build stamps `package.json`'s into `build/manifest.json`, 4.2), `minimum_chrome_version: "114"`, `offline_enabled: true`.
 
 - `background.service_worker`: `scripts/background.js` (classic script; no `"type": "module"`).
 - `side_panel.default_path`: `index.html`.
@@ -750,7 +751,7 @@ The help modal (`ShortcutsHelp.svelte`) is `role="dialog" aria-modal="true"`, la
 | --- | --- |
 | `npm test` | Vitest, co-located `*.spec.ts` (`--run` for one pass, `npm run test:watch` to watch). |
 | `npm run check` | `svelte-check` against `tsconfig.json`. |
-| `npm run build` | `vite build` + `removeInlineScript.cjs` + `scripts/check-remote-code.mjs` (fails on remote script loaders). Does not type-check on its own. |
+| `npm run build` | `vite build` + `removeInlineScript.cjs` + `scripts/stamp-manifest.mjs` + `scripts/check-remote-code.mjs` (fails on remote or dynamic code). Does not type-check on its own. |
 | `npm run test:coverage` | The Vitest run with v8 coverage over all of `src/lib` (`all: true`, so untested files show as 0 %). `.svelte` files read 0 % here; e2e covers them. |
 | `npm run test:e2e` | `npm run build`, then `playwright test`. One worker, a fresh persistent Chromium profile per test, new headless (`channel: 'chromium'`); `HEADED=1` shows the browser. Report in `playwright-report/`, traces of failures in `test-results/`. |
 | `npm run qa` | The full pass (hard rule 13): `check` + `test` + `test:e2e`. |
@@ -767,7 +768,7 @@ The help modal (`ShortcutsHelp.svelte`) is `role="dialog" aria-modal="true"`, la
 
 Gotchas: the suite tests `build/` as built, so `npx playwright test` alone runs against a stale build (use `npm run test:e2e`). `site/` hardcodes port 4319 in canonical/og:url. Chromium extension tests run one at a time on purpose.
 
-- Covered by unit tests: `cloud/sync.ts` (`sync.spec.ts`, in-memory Firestore mock), `cloud/compare-link.ts`, `cloud/auth-errors.ts`, `cloud/workspace-scoring.ts` (resolution, normalisation, entitlement), `scrapers/scan-error.ts`, `components/Shortcuts/keyboard.ts` (`shortcutFor`), `audit/band.ts` (bands, the required-fail cap table, labels, light hues, `fill` / `ink`, `bandForVerdict`), `components/Toast/toast.ts` (`toast.spec.ts`: `toastDuration` at the app's 3.5 s base, per-toast expiry, dismiss, the cap of 3), `util/time-ago.ts`, `actions/tooltip.ts` (`tooltip.spec.ts`: options and listener wiring in node with a fake element; `tooltip.dom.spec.ts`: show/hide, owner hand-off, `aria-describedby`, Escape propagation, nested hover, the hover grace and the bubble bridge, `is-open`, update/destroy in happy-dom with floating-ui mocked), `actions/popover.ts` (`popover.spec.ts`: listener wiring, Escape, outside press, focus in / return, trigger swap, Tab cycling in node with a fake element and document; `popover.dom.spec.ts`: the same against real elements in happy-dom), `motion.ts` (`motion.spec.ts`), the auth entry and `scripts/check-remote-code.mjs` (`cloud/auth-entry.spec.ts`), `audit/rules.ts`, `audit/asyncRules.ts`, `audit/url-match.ts`,
+- Covered by unit tests: `cloud/sync.ts` (`sync.spec.ts`, in-memory Firestore mock), `cloud/compare-link.ts`, `cloud/auth-errors.ts`, `cloud/workspace-scoring.ts` (resolution, normalisation, entitlement), `scrapers/scan-error.ts`, `components/Shortcuts/keyboard.ts` (`shortcutFor`), `audit/band.ts` (bands, the required-fail cap table, labels, light hues, `fill` / `ink`, `bandForVerdict`), `components/Toast/toast.ts` (`toast.spec.ts`: `toastDuration` at the app's 3.5 s base, per-toast expiry, dismiss, the cap of 3), `util/time-ago.ts`, `actions/tooltip.ts` (`tooltip.spec.ts`: options and listener wiring in node with a fake element; `tooltip.dom.spec.ts`: show/hide, owner hand-off, `aria-describedby`, Escape propagation, nested hover, the hover grace and the bubble bridge, `is-open`, update/destroy in happy-dom with floating-ui mocked), `actions/popover.ts` (`popover.spec.ts`: listener wiring, Escape, outside press, focus in / return, trigger swap, Tab cycling in node with a fake element and document; `popover.dom.spec.ts`: the same against real elements in happy-dom), `motion.ts` (`motion.spec.ts`), the auth entry and `scripts/check-remote-code.mjs` (`cloud/auth-entry.spec.ts`: literals, remote-script / eval / inline-script patterns and their false positives, manifest CSP), `scripts/stamp-manifest.mjs` and `scripts/package-zip.mjs` (`release/release-scripts.spec.ts`: version stamp and validation, zip round-trip, byte-reproducibility, no overwrite, refusal on version mismatch or remote code), the built manifest version (`load.e2e.ts`), `audit/rules.ts`, `audit/asyncRules.ts`, `audit/url-match.ts`,
   `cloud/scan-identity.ts`, `cloud/settings.ts`, `scrapers/getHTML.ts` (`unscriptableMessage`, `restrictedKind`, the `windowId` request), `tabs/follow-tab.ts`, `scrapers/getRobots.ts`,
   `scrapers/getHeaderRobots.ts`, `storage/watch.ts` and its key helper, `cloud/sync-status.ts` (states, stale-result guard, error sentences, unload guard), `cloud/session.ts` (hint, IndexedDB probe that never creates the DB), `cloud/sdk.ts` (no static SDK import, `sdk.spec.ts`), `audit/explain.ts`, `audit/aeo.ts` (indexability), `components/Compare/diff.ts`, `layers.ts` (stack, shortcuts muted, Escape to the top popover only), `mode.ts` (`switchMode` closes only after the other surface opened; failure keeps the window and the mode), `scrapers/getSiteFiles.ts` (`fetchSiteFilesCached`).
 - Still manual (not automatable in the harness, or not yet covered): the real side panel and popup
@@ -783,7 +784,12 @@ Gotchas: the suite tests `build/` as built, so `npx playwright test` alone runs 
 
 1. `vite build`: SvelteKit with `adapter-static` prerenders `src/routes/+page.svelte` into `build/index.html`, emits JS and CSS under `build/app/immutable/`, and copies `static/` into `build/`.
 2. `node removeInlineScript.cjs`: MV3 extension pages forbid inline scripts, so for every `build/**/*.html` it moves the first inline `<script>` (SvelteKit's bootstrap) into `build/script-<hash>.js` and replaces it with `<script type="module" src="/script-<hash>.js">`. While moving it, it rewrites `__sveltekit` to `const __sveltekit` and `document.currentScript.parentElement` to `document.body.firstElementChild`, which is the `display: contents` wrapper in `src/app.html`.
-3. `node scripts/check-remote-code.mjs`: walks `build/` and exits 1, naming file and URL, if any file contains `apis.google.com/js/api.js`, `google.com/recaptcha/api.js` or `google.com/recaptcha/enterprise.js` (remote script loaders that store review treats as remotely hosted code). `node scripts/check-remote-code.mjs <dir>` checks another folder, for example an unpacked zip.
+3. `node scripts/stamp-manifest.mjs`: writes `package.json`'s `version` into `build/manifest.json` (right after `description`) and fails on a version Chrome rejects (1-4 dot-separated integers, each 0-65535, no leading zeros).
+4. `node scripts/check-remote-code.mjs`: walks `build/` and exits 1, naming file and match, on: the literals `apis.google.com/js/api.js`, `google.com/recaptcha/api.js`, `google.com/recaptcha/enterprise.js` (firebase/auth's loaders); any absolute or protocol-relative URL to a `.js` / `.mjs` / `.wasm` file; `importScripts(` of a URL; `eval(`; `new Function(`; in HTML, a remote `<script src>` or an inline `<script>` (`removeInlineScript.cjs` missed it); and a `manifest.json` `content_security_policy` whose `script-src` / `object-src` / `worker-src` / `default-src` allows `'unsafe-eval'`, `'unsafe-inline'` or a remote host. `node scripts/check-remote-code.mjs <dir>` checks another folder, for example an unpacked zip (it fails on the unpacked `metaspry-v1.0.27.zip`, 4.4).
+
+**CI** (`.github/workflows/`, force-added: `.github/` is in the maintainer's global gitignore).
+- `ci.yml`: every PR and push to `main`: `npm ci`, Playwright Chromium, `npm run qa`; the Playwright report is uploaded on failure.
+- `release.yml`: on a pushed `v*` tag: fails unless the tag is `v` + `package.json` version, runs `npm run qa`, then `scripts/package-zip.mjs`, uploads the zip + `.sha256` as an artifact and attaches them to a **draft** GitHub release. Store upload stays manual.
 
 **Gotchas.**
 - Keep the wrapper `<div>` as the first element child of `<body>` in `src/app.html`, or the app mounts into the wrong node.
@@ -794,14 +800,16 @@ Gotchas: the suite tests `build/` as built, so `npx playwright test` alone runs 
 
 ### 4.2 Versioning
 
-- The version lives in two files that must match: `version` in `static/manifest.json` and in `package.json` (both `1.0.31` on this branch; the v1.0.26 to v1.0.30 zips are built, none submitted yet, so the store serves `1.0.25`; the 1.0.31 zip is built after merge). No script syncs them.
+- The version lives only in `package.json` (`1.0.31`; the v1.0.26 to v1.0.30 zips are built, none submitted yet, so the store serves `1.0.25`). `static/manifest.json` has no `version`; `npm run build` stamps it into `build/manifest.json` (4.1). Bump `package.json` only (`npm version patch --no-git-tag-version` also updates `package-lock.json`).
 - Convention from the git history: each shipped change bumps the patch version and gets a new zip (commit messages like "v1.0.22 + zip").
-- The repo has no git tags, although the README checklist ends with "tag the commit `vX.Y.Z`".
+- Releases are tagged `vX.Y.Z` on the merged commit; pushing the tag runs `release.yml` (4.1), which refuses a tag that is not the `package.json` version. Releases up to 1.0.31 have no tags.
 
 ### 4.3 Packaging: `metaspry-v*.zip`
 
 - Zips are named `metaspry-v<version>.zip`, live at the repo root and are git-ignored (`.gitignore`: "regenerable from build/ via Compress-Archive"). Every earlier zip is kept locally. Never delete or overwrite one without asking.
-- Zip the contents of a fresh `build/`, so that `manifest.json` sits at the zip root. No script automates this. The PowerShell equivalent:
+- `npm run package` builds, then `scripts/package-zip.mjs` zips `build/` into `metaspry-v<package.json version>.zip` with `manifest.json` at the root, and writes `<zip>.sha256`. Before writing it checks that `build/manifest.json` carries the package version and re-runs the remote-code guard. It refuses to overwrite an existing zip (the safety net for the rule above). `node scripts/package-zip.mjs <buildDir> <outFile>` writes elsewhere.
+- The zip is reproducible: sorted entries, forward-slash paths, UTF-8 names, a fixed 1980-01-01 timestamp, deflate level 9 (stored when deflate does not shrink). The same `build/` gives the same bytes and sha256 on any OS. Pure Node `zlib`, no dependency.
+- Zips up to 1.0.31 were made by hand with `Compress-Archive`; kept here for reference only:
 
   ```powershell
   npm run build
@@ -810,12 +818,12 @@ Gotchas: the suite tests `build/` as built, so `npx playwright test` alone runs 
 
   `Compress-Archive` refuses to overwrite an existing file unless you pass `-Force`; that refusal is the safety net for the rule above.
 - Expected contents: `manifest.json`, `index.html`, `script-<hash>.js`, `app/version.json`, `app/immutable/**`, `scripts/background.js`, `icons/*`, `favicon.png`. The v1.0.24 zip has 25 entries.
-- Windows PowerShell 5.1's `Compress-Archive` writes backslash path separators (visible in the v1.0.24 zip). PowerShell 7+ writes forward slashes.
+- Windows PowerShell 5.1's `Compress-Archive` wrote backslash path separators (visible in the v1.0.24 zip); `package-zip.mjs` does not.
 - The zip also carries `icons/icon-512.png`, `icons/icon.svg` and `icons/promo-440x280.png`, which the manifest does not reference.
 
 ### 4.4 Release checklist and store submission
 
-The README's "Version bump checklist": bump the version, build, load unpacked and smoke-test every tab, zip the contents of `build/`, upload in the Developer Dashboard (Package -> Upload new package), refresh screenshots if the UI changed, submit (1-3 business days), then tag.
+The README's "Version bump checklist": bump `package.json`, `npm run qa`, load unpacked and smoke-test every tab, after merge tag `vX.Y.Z` (CI attaches the zip to a draft GitHub release, 4.1-4.3), upload in the Developer Dashboard (Package -> Upload new package), refresh screenshots if the UI changed, submit (1-3 business days), then publish the draft release.
 
 | Where | What |
 |---|---|
@@ -834,7 +842,7 @@ Store item ID: `kibedpkbadcofhbcpfigjmjanmdkmaji`. Privacy policy URL: `https://
 - **1.0.30 (auth web-extension entry, 2026-10-01) replaces 1.0.29 in the queue**, still only after 1.0.27 is live. Release note: "Sign-in uses Firebase's extension build; no change for users." `metaspry-v1.0.30.zip` is built and carries every 1.0.28 and 1.0.29 change. Keep the 1.0.29 zip.
 - **1.0.31 (side panel follows the tab, 2026-10-23) replaces 1.0.30 in the queue**, still only after 1.0.27 is live. Release note: "The side panel now shows which page its results are for and tells you when you have switched tabs or navigated away, with a one-click Scan this tab. Scans always target the tab in the panel's own window. A scan that fails no longer wipes the results you were looking at, and a page that never answers (an open dialog) times out after 15 seconds." No permission change. Build `metaspry-v1.0.31.zip` from a fresh `build/` after merge; keep the 1.0.30 zip.
 - The README's listing copy, permission justifications and privacy answers were reconciled with sign-in and upload for v1.0.26, carried into v1.0.27 (six tabs, 19 rules, `identity` row, "Authentication info: Yes, only when signed in", Free 10 / Pro 50 + 20 versions). Re-read `static/manifest.json` the day you submit. The v1.0.26 landing changed the store screenshots' first frame: refresh them with this release.
-- **Resolved in 1.0.30:** bundles up to 1.0.29 contain `https://apis.google.com/js/api.js` and `https://www.google.com/recaptcha/api.js` (and `recaptcha/enterprise.js`) from the default `firebase/auth` entry, a commonly reported MV3 remote-code rejection trigger. 1.0.30 imports `firebase/auth/web-extension`, its bundle has none of them, and `npm run build` now fails if one comes back (4.1). 1.0.27 (the next submission) still carries the strings.
+- **Resolved in 1.0.30:** bundles up to 1.0.29 contain `https://apis.google.com/js/api.js` and `https://www.google.com/recaptcha/api.js` (and `recaptcha/enterprise.js`) from the default `firebase/auth` entry, a commonly reported MV3 remote-code rejection trigger. 1.0.30 imports `firebase/auth/web-extension`, its bundle has none of them, and `npm run build` now fails if one comes back (4.1). 1.0.27 (the next submission) still carries the strings: `node scripts/check-remote-code.mjs` on the unpacked `metaspry-v1.0.27.zip` fails on all three. Whether to submit 1.0.27 anyway or skip to a clean build is the founder's call (open, 2026-10-26).
 - `docs/chrome-store-resubmit.md` is a record from the v1.0.5 era; its version numbers are historical.
 
 ### 4.5 UI vocabulary
@@ -881,7 +889,7 @@ Store item ID: `kibedpkbadcofhbcpfigjmjanmdkmaji`. Privacy policy URL: `https://
 
 | If you change | Update |
 |---|---|
-| `static/manifest.json` (permissions, keys, version) | 3.1, 4.2 |
+| `static/manifest.json` (permissions, keys), the `package.json` version | 3.1, 4.2 |
 | `background.js`, or any `chrome.runtime` or `chrome.storage.onChanged` channel | Section 2 (messaging map), 3.2, 3.3, 3.4 |
 | A `chrome.storage` key, IndexedDB use, or Firestore path | Section 2 (storage map), the feature section, section 5 |
 | A tab, header control or view | Section 2, the feature section, 3.16, 3.17 |
@@ -889,7 +897,7 @@ Store item ID: `kibedpkbadcofhbcpfigjmjanmdkmaji`. Privacy policy URL: `https://
 | `audit/aeo.ts` | 3.11 |
 | Anything in `src/lib/cloud/` | 3.8, 3.13, 3.14, section 5 |
 | Keyboard shortcuts | 3.16 |
-| `removeInlineScript.cjs`, npm scripts, packaging, store docs or assets | Section 4 |
+| `removeInlineScript.cjs`, `scripts/*.mjs` build and release steps, npm scripts, `.github/workflows/`, packaging, store docs or assets | Section 4 |
 | Test or lint tooling | 1 (commands), 3.18 |
 
 Also:

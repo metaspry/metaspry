@@ -4,7 +4,8 @@
 	"private": true,
 	"scripts": {
 		"dev": "vite dev",
-		"build": "vite build && node removeInlineScript.cjs && node scripts/check-remote-code.mjs",
+		"build": "vite build && node removeInlineScript.cjs && node scripts/stamp-manifest.mjs && node scripts/check-remote-code.mjs",
+		"package": "npm run build && node scripts/package-zip.mjs",
 		"preview": "vite preview",
 		"watch-src": "nodemon --watch src --ext svelte --exec \"npm run build\"",
 		"gen-icons": "node scripts/gen-icons.mjs",
@@ -35,6 +36,9 @@
 		"vitest": "^0.34.6"
 	},
 	"type": "module",
+	"engines": {
+		"node": ">=20"
+	},
 	"dependencies": {
 		"@floating-ui/dom": "^1.8.0",
 		"@types/chrome": "^0.0.251",

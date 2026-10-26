@@ -242,10 +242,10 @@ node scripts/process-screenshots.mjs
 
 ### Version bump checklist (every release)
 
-1. Bump `version` in `static/manifest.json` **and** `package.json` (semver; they must match).
-2. `npm test`, `npm run check`, `npm run build`, then load `build/` as unpacked. Smoke-test all six tabs, both surfaces, sign-in, and one scan on a `chrome://` page (the error card).
-3. Zip the contents of `build/` (not the folder itself) to `metaspry-v<version>.zip`; keep every earlier zip.
-4. Upload zip in Developer Dashboard → Package → "Upload new package".
+1. Bump `version` in `package.json` only (`npm version patch --no-git-tag-version`). The build writes it into `build/manifest.json`; `static/manifest.json` has no version.
+2. `npm run qa` (type-check, unit, build, e2e; CI runs the same on the PR), then load `build/` as unpacked. Smoke-test all six tabs, both surfaces, sign-in, and one scan on a `chrome://` page (the error card).
+3. After merge, tag the merged commit `vX.Y.Z` and push the tag. The `release` workflow re-runs QA and attaches `metaspry-vX.Y.Z.zip` + `.sha256` to a draft GitHub release. (Locally: `npm run package` builds the same zip; it never overwrites an existing one, so every earlier zip is kept.)
+4. Upload that zip in Developer Dashboard → Package → "Upload new package".
 5. Update screenshots if the UI changed.
 6. Submit for review. Typical turnaround: 1-3 business days.
-7. After approval, tag the commit `vX.Y.Z` and push.
+7. After approval, publish the draft GitHub release.

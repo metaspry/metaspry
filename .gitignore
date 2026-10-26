@@ -16,8 +16,9 @@ vite.config.ts.timestamp-*
 # Coograph (local session logs)
 .coograph/
 
-# Release zips (regenerable from build/ via Compress-Archive)
+# Release zips (npm run package; reproducible from build/)
 metaspry-v*.zip
+metaspry-v*.zip.sha256
 
 # Test output (Vitest coverage, Playwright)
 /coverage

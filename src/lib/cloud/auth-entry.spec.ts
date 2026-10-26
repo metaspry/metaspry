@@ -63,4 +63,44 @@ describe('scripts/check-remote-code.mjs', () => {
     rmSync(dir, { recursive: true, force: true });
     expect(run({ 'b.js': 'https://www.google.com/recaptcha/enterprise.js?render=' }).ok).toBe(false);
   });
+
+  it.each([
+    ['a URL to a remote script', 'a.js', 's.src="https://cdn.example.com/lib/x.min.js"'],
+    ['a protocol-relative module URL', 'a.js', 'import("//cdn.example.com/m.mjs?v=2")'],
+    ['a remote wasm file', 'a.js', 'fetch("https://cdn.example.com/re2.wasm")'],
+    ['importScripts of a URL', 'background.js', "importScripts('https://x.example.com/sw')"],
+    ['eval', 'a.js', 'var r=eval("1+1")'],
+    ['new Function', 'a.js', 'const f = new Function("return 1")'],
+    ['a remote <script src>', 'index.html', '<script src="https://x.example.com/app"></script>'],
+    ['an inline <script> the CSP fixer missed', 'index.html', '<body><script>__sveltekit_x = {}</script></body>'],
+  ])('fails on %s, naming the file', (_label, file, text) => {
+    const r = run({ [file]: text });
+    expect(r.ok).toBe(false);
+    expect(r.out).toContain(file);
+  });
+
+  it.each([
+    ['packaged module scripts', 'index.html', '<script type="module" src="/script-1yi006m.js"></script><script type="module" src="./app/a.js"></script>'],
+    ['API endpoints and JSON URLs', 'a.js', 'fetch("https://firestore.googleapis.com/v1/x");fetch("https://example.com/data.json")'],
+    ['a repo link that merely ends in "js"', 'a.js', '"https://github.com/le0pard/re2js#readme"'],
+    ['method names containing eval', 'a.js', 'x.eval(1);retrieval(2);'],
+    ['a feature test for importScripts', 'a.js', 'typeof self.importScripts=="function"'],
+  ])('passes %s', (_label, file, text) => {
+    expect(run({ [file]: text }).ok).toBe(true);
+  });
+
+  it('fails on a manifest CSP that allows eval or a remote script host', () => {
+    const csp = "script-src 'self' 'unsafe-eval' https://cdn.example.com; object-src 'self'";
+    const r = run({ 'manifest.json': JSON.stringify({ content_security_policy: { extension_pages: csp } }) });
+    expect(r.ok).toBe(false);
+    expect(r.out).toContain("CSP script-src allows 'unsafe-eval'");
+    expect(r.out).toContain('CSP script-src allows https://cdn.example.com');
+  });
+
+  it('passes a self-only CSP and a manifest without one', () => {
+    const csp = "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'";
+    expect(run({ 'manifest.json': JSON.stringify({ content_security_policy: { extension_pages: csp } }) }).ok).toBe(true);
+    rmSync(dir, { recursive: true, force: true });
+    expect(run({ 'manifest.json': '{"manifest_version":3}' }).ok).toBe(true);
+  });
 });

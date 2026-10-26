@@ -1,16 +1,21 @@
 #!/usr/bin/env node
 /**
- * Fail the build if the bundle references a remotely hosted script loader.
+ * Fail the build if the bundle could load or run code that is not in the package.
  *
- * Chrome Web Store review rejects MV3 extensions that load remote code, and these URLs (from the
- * default `firebase/auth` entry's gapi / reCAPTCHA loaders) are a commonly reported trigger.
- * The extension imports `firebase/auth/web-extension`, which ships without them; this check keeps
- * a stray `firebase/auth` import from bringing them back.
+ * Chrome Web Store review rejects MV3 extensions that load remote code. The literal URLs below
+ * (from the default `firebase/auth` entry's gapi / reCAPTCHA loaders) are a commonly reported
+ * trigger; the extension imports `firebase/auth/web-extension`, which ships without them. The
+ * pattern checks catch the same class of problem from any other dependency:
+ * - an absolute or protocol-relative URL to a `.js` / `.mjs` / `.wasm` file,
+ * - a `<script src>` pointing off-package, or an inline `<script>` the CSP fixer missed,
+ * - `importScripts(` of a URL, `eval(`, `new Function(`,
+ * - a manifest `content_security_policy` that allows `unsafe-eval`, `unsafe-inline` or a remote host.
  *
- * Run: `node scripts/check-remote-code.mjs [dir]` (default `build`). Part of `npm run build`.
+ * Run: `node scripts/check-remote-code.mjs [dir]` (default `build`). Part of `npm run build` and
+ * `npm run package`; point it at an unpacked zip to check one already built.
  */
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { extname, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 export const FORBIDDEN = [
@@ -18,6 +23,22 @@ export const FORBIDDEN = [
   'google.com/recaptcha/api.js',
   'google.com/recaptcha/enterprise.js',
 ];
+
+/** `[label, regex]` checked in every .js/.mjs/.html file. Regexes are linear (no nested quantifiers). */
+export const PATTERNS = [
+  ['remote script URL', /(?:https?:)?\/\/[a-z0-9.-]+\.[a-z]{2,}(?::\d+)?\/[^\s"'`<>()]*\.(?:m?js|wasm)(?=[?#"'`\s)]|$)/gi],
+  ['importScripts of a URL', /importScripts\(\s*["'`](?:https?:)?\/\//g],
+  ['eval(', /(?<![\w$.])eval\(/g],
+  ['new Function(', /\bnew\s+Function\(/g],
+];
+
+/** HTML only: a remote `<script src>`, or an inline `<script>` (MV3 CSP blocks it; removeInlineScript.cjs should have moved it). */
+export const HTML_PATTERNS = [
+  ['remote <script src>', /<script\b[^>]*\bsrc\s*=\s*["']?(?:https?:)?\/\//gi],
+  ['inline <script>', /<script\b(?![^>]*\bsrc\s*=)[^>]*>\s*[^<\s]/gi],
+];
+
+const CODE_EXT = new Set(['.js', '.mjs', '.cjs', '.html', '.htm']);
 
 function* walk(dir) {
   for (const name of readdirSync(dir)) {
@@ -27,15 +48,49 @@ function* walk(dir) {
   }
 }
 
+/** Problems with the manifest's CSP, as `{ file, needle }`. */
+export function checkManifestCsp(manifest, file = 'manifest.json') {
+  const csp = manifest?.content_security_policy;
+  if (!csp) return [];
+  const policies = typeof csp === 'string' ? [csp] : Object.values(csp).filter((v) => typeof v === 'string');
+  const hits = [];
+  for (const policy of policies) {
+    for (const directive of policy.split(';')) {
+      const [name, ...sources] = directive.trim().split(/\s+/);
+      if (!name || !/^(script-src|object-src|worker-src|default-src)$/.test(name)) continue;
+      for (const s of sources) {
+        if (/^'unsafe-(eval|inline)'$/.test(s) || /^(https?:|\*|\/\/)/.test(s) || /^[a-z0-9.-]+\.[a-z]{2,}/i.test(s)) {
+          hits.push({ file, needle: `CSP ${name} allows ${s}` });
+        }
+      }
+    }
+  }
+  return hits;
+}
+
 /** Every `{ file, needle }` hit under `dir`. */
 export function findRemoteCode(dir) {
   const hits = [];
   for (const file of walk(dir)) {
+    const rel = relative(dir, file);
     const text = readFileSync(file, 'latin1');
     for (const needle of FORBIDDEN) {
-      if (text.includes(needle)) hits.push({ file: relative(dir, file), needle });
+      if (text.includes(needle)) hits.push({ file: rel, needle });
+    }
+    const ext = extname(file).toLowerCase();
+    if (!CODE_EXT.has(ext)) continue;
+    const patterns = ext.startsWith('.htm') ? [...PATTERNS, ...HTML_PATTERNS] : PATTERNS;
+    for (const [label, re] of patterns) {
+      // First match the literal list has not already reported; one hit per pattern per file.
+      for (const m of text.matchAll(re)) {
+        if (FORBIDDEN.some((f) => m[0].includes(f))) continue;
+        hits.push({ file: rel, needle: `${label}: ${m[0].slice(0, 120)}` });
+        break;
+      }
     }
   }
+  const manifest = join(dir, 'manifest.json');
+  if (existsSync(manifest)) hits.push(...checkManifestCsp(JSON.parse(readFileSync(manifest, 'utf8'))));
   return hits;
 }
 
@@ -46,8 +101,8 @@ if (isMain) {
   if (hits.length) {
     console.error(`Remote-code check FAILED: ${hits.length} hit(s) in ${dir}/`);
     for (const h of hits) console.error(`  ${h.file}: ${h.needle}`);
-    console.error('Import auth from firebase/auth/web-extension, never firebase/auth.');
+    console.error('Import auth from firebase/auth/web-extension, never firebase/auth; bundle every script; no eval.');
     process.exit(1);
   }
-  console.log(`Remote-code check passed: no remote script loaders in ${dir}/`);
+  console.log(`Remote-code check passed: no remote or dynamic code in ${dir}/`);
 }
