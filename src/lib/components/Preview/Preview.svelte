@@ -4,6 +4,7 @@
   import SlackPreview from '../Previews/SlackPreview.svelte';
   import SerpPreview from '../Previews/SerpPreview.svelte';
   import MessagingPreview from '../Previews/MessagingPreview.svelte';
+  import { probeImage, type ImageState } from './image-probe';
 
   export let meta: PageMeta;
   export let pageUrl: string = '';
@@ -57,11 +58,32 @@
   $: serpHost = hostnameOf(meta.canonical, pageUrl).toLowerCase();
   $: serpCanonical = meta.canonical ?? pageUrl;
 
+  // One probe per URL (image-probe.ts): a dead image is said to be dead, not drawn as a placeholder.
+  let states: Record<string, ImageState> = {};
+  function watch(url: string | null) {
+    if (!url || states[url]) return;
+    states = { ...states, [url]: 'loading' };
+    void probeImage(url).then((s) => (states = { ...states, [url]: s }));
+  }
+  $: watch(ogImage);
+  $: watch(twitterImage);
+  $: ogFailed = !!ogImage && states[ogImage] === 'failed';
+  $: twitterFailed = !!twitterImage && states[twitterImage] === 'failed';
+  $: ogShown = ogFailed ? null : ogImage;
+  $: twitterShown = twitterFailed ? null : twitterImage;
+
   $: missingOgImage = !ogImage;
   $: missingOgDesc = !ogDescription;
 </script>
 
 <div class="flex flex-col gap-4">
+  {#if ogFailed || (twitterFailed && twitterImage !== ogImage)}
+    <div class="ms-note-warn" role="status">
+      <p class="min-w-0 [overflow-wrap:anywhere]">
+        {ogFailed ? 'og:image' : 'twitter:image'} didn't load ({ogFailed ? ogImage : twitterImage}). Platforms that can't fetch it show the card without an image.
+      </p>
+    </div>
+  {/if}
   {#if missingOgImage || missingOgDesc}
     <div class="rounded-2xl border border-amber-300/60 bg-amber-50/60 px-3 py-2 text-xs text-amber-800 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-300">
       {#if missingOgImage}<p>Add <code class="rounded bg-amber-100/60 px-1 dark:bg-amber-500/10">og:image</code> to render images in previews.</p>{/if}
@@ -78,10 +100,10 @@
       Facebook
     </header>
     <div class="aspect-[1.91/1] w-full bg-gradient-to-br from-indigo-200 to-violet-200 dark:from-indigo-900/40 dark:to-violet-900/40">
-      {#if ogImage}
-        <img src={ogImage} alt="" class="h-full w-full object-cover" loading="lazy" />
+      {#if ogShown}
+        <img src={ogShown} alt="" class="h-full w-full object-cover" loading="lazy" referrerpolicy="no-referrer" />
       {:else}
-        <div class="flex h-full w-full items-center justify-center text-xs text-slate-600 dark:text-slate-300">no og:image</div>
+        <div class="flex h-full w-full items-center justify-center text-xs text-slate-600 dark:text-slate-300">{ogFailed ? 'og:image failed to load' : 'no og:image'}</div>
       {/if}
     </div>
     <div class="space-y-1 bg-slate-50/80 px-4 py-3 dark:bg-slate-900/40">
@@ -102,8 +124,8 @@
     {#if twitterCard === 'summary'}
       <div class="flex">
         <div class="h-24 w-24 flex-shrink-0 bg-gradient-to-br from-sky-200 to-indigo-200 dark:from-sky-900/40 dark:to-indigo-900/40">
-          {#if twitterImage}
-            <img src={twitterImage} alt="" class="h-full w-full object-cover" loading="lazy" />
+          {#if twitterShown}
+            <img src={twitterImage} alt="" class="h-full w-full object-cover" loading="lazy" referrerpolicy="no-referrer" />
           {:else}
             <div class="flex h-full w-full items-center justify-center text-[0.6875rem] text-slate-600 dark:text-slate-300">no image</div>
           {/if}
@@ -116,8 +138,8 @@
       </div>
     {:else}
       <div class="aspect-[2/1] w-full bg-gradient-to-br from-sky-200 to-indigo-200 dark:from-sky-900/40 dark:to-indigo-900/40">
-        {#if twitterImage}
-          <img src={twitterImage} alt="" class="h-full w-full object-cover" loading="lazy" />
+        {#if twitterShown}
+          <img src={twitterImage} alt="" class="h-full w-full object-cover" loading="lazy" referrerpolicy="no-referrer" />
         {:else}
           <div class="flex h-full w-full items-center justify-center text-xs text-slate-600 dark:text-slate-300">no twitter/og image</div>
         {/if}
@@ -139,10 +161,10 @@
       LinkedIn
     </header>
     <div class="aspect-[1.91/1] w-full bg-gradient-to-br from-sky-200 to-indigo-200 dark:from-sky-900/40 dark:to-indigo-900/40">
-      {#if ogImage}
-        <img src={ogImage} alt="" class="h-full w-full object-cover" loading="lazy" />
+      {#if ogShown}
+        <img src={ogShown} alt="" class="h-full w-full object-cover" loading="lazy" referrerpolicy="no-referrer" />
       {:else}
-        <div class="flex h-full w-full items-center justify-center text-xs text-slate-600 dark:text-slate-300">no og:image</div>
+        <div class="flex h-full w-full items-center justify-center text-xs text-slate-600 dark:text-slate-300">{ogFailed ? 'og:image failed to load' : 'no og:image'}</div>
       {/if}
     </div>
     <div class="space-y-1 bg-slate-50/80 px-4 py-3 dark:bg-slate-900/40">
@@ -152,8 +174,8 @@
     </div>
   </section>
 
-  <DiscordPreview title={ogTitle} description={ogDescription} image={ogImage} host={ogHost} />
-  <SlackPreview title={ogTitle} description={ogDescription} image={ogImage} host={ogHost} />
+  <DiscordPreview title={ogTitle} description={ogDescription} image={ogShown} host={ogHost} />
+  <SlackPreview title={ogTitle} description={ogDescription} image={ogShown} host={ogHost} />
   <SerpPreview title={meta.title ?? ogTitle} description={val('description') ?? ogDescription} host={serpHost} canonical={serpCanonical} icon={icon ?? meta.icon} />
-  <MessagingPreview title={ogTitle} description={ogDescription} image={ogImage} host={ogHost} />
+  <MessagingPreview title={ogTitle} description={ogDescription} image={ogShown} host={ogHost} />
 </div>

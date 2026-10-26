@@ -17,7 +17,7 @@
     <div class="ml-auto max-w-[85%] overflow-hidden rounded-2xl bg-emerald-700 text-white shadow">
       {#if image}
         <div class="aspect-[1.91/1] w-full">
-          <img src={image} alt="" class="h-full w-full object-cover" loading="lazy" />
+          <img src={image} alt="" class="h-full w-full object-cover" loading="lazy" referrerpolicy="no-referrer" />
         </div>
       {/if}
       <div class="space-y-0.5 px-3 py-2">

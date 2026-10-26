@@ -270,3 +270,13 @@ test.describe('status is announced, duplicates render (UX review 2026-10-25, Med
     await expect(ext.getByRole('tabpanel').getByText('Same twice', { exact: true })).toHaveCount(2);
   });
 });
+
+test('a dead og:image is called out, not drawn as a placeholder (UX review 2026-10-25, Medium 21)', async ({ openSurface }) => {
+  const { ext } = await openSurface('/broken-image.html');
+  await scanFromLanding(ext);
+  await openTab(ext, 'Previews');
+  const panel = ext.getByRole('tabpanel');
+  await expect(panel.getByText("og:image didn't load", { exact: false })).toBeVisible();
+  await expect(panel.getByText('og:image failed to load').first()).toBeVisible();
+  await expect(panel.locator('img[src$="missing-image.png"]')).toHaveCount(0);
+});

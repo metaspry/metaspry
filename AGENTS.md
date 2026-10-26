@@ -424,7 +424,9 @@ Fallback chains (`Preview.svelte`):
 
 **Key files.** `src/lib/components/Preview/Preview.svelte`; `src/lib/components/Previews/DiscordPreview.svelte`, `SlackPreview.svelte`, `SerpPreview.svelte`, `MessagingPreview.svelte`; `src/lib/components/SiteIcon/SiteIcon.svelte`.
 
-**Data.** None. **Permissions.** None (images load as `<img>`). **Tests.** None.
+**Data.** None. **Permissions.** None (images load as `<img>`). **Image check (UX review 2026-10-25, Medium 21; `components/Preview/image-probe.ts`).** Each og:image / twitter:image URL is probed once (no referrer) and shared by every card. A dead image shows an amber note naming the URL ("og:image didn't load ... Platforms that can't fetch it show the card without an image.") and the cards show "og:image failed to load" instead of the empty gradient that looked like a placeholder. Every preview `<img>` loads with `referrerpolicy="no-referrer"`.
+
+**Tests.** None.
 
 **Gotchas.**
 - These are Tailwind approximations, not platform renderers.
