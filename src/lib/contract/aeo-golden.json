@@ -1,0 +1,78 @@
+{
+  "_comment": "Golden AI-readiness (AEO) cases authored by the extension (architecture review 2026-10-26, Medium 9): page-level checks only (site-level ones need robots.txt / llms.txt parsing, kept for later). Each case lists the check states the extension's analyzeAeo produces; the server analyzer (app/functions/src/aeo.ts) must produce the same. `serverToday` records the server's answer when it differed. See docs/contract/README.md.",
+  "version": 1,
+  "cases": [
+    {
+      "name": "homepage without author or date: author/date is not asked",
+      "url": "https://example.com/",
+      "html": "<html><head><title>Home</title><meta property=\"og:type\" content=\"website\"></head><body><h1>Home</h1><p>Welcome.</p></body></html>",
+      "expect": {
+        "aeo-author-date": "info"
+      }
+    },
+    {
+      "name": "article without author: needs work",
+      "url": "https://example.com/blog/post",
+      "html": "<html><head><title>Post</title><meta property=\"og:type\" content=\"article\"><meta property=\"article:published_time\" content=\"2026-10-01\"></head><body><h1>Post</h1><p>Body.</p></body></html>",
+      "expect": {
+        "aeo-author-date": "warn"
+      }
+    },
+    {
+      "name": "article with author and date: pass",
+      "url": "https://example.com/blog/post",
+      "html": "<html><head><title>Post</title><meta property=\"og:type\" content=\"article\"><meta name=\"author\" content=\"Ada\"><meta property=\"article:published_time\" content=\"2026-10-01\"></head><body><h1>Post</h1><p>Body.</p></body></html>",
+      "expect": {
+        "aeo-author-date": "pass"
+      }
+    },
+    {
+      "name": "a JSON-LD BlogPosting is an article",
+      "url": "https://example.com/blog/post",
+      "html": "<html><head><title>Post</title><script type=\"application/ld+json\">{\"@type\": \"BlogPosting\", \"headline\": \"x\"}</script></head><body><h1>Post</h1><p>Body.</p></body></html>",
+      "expect": {
+        "aeo-author-date": "warn"
+      }
+    },
+    {
+      "name": "robots meta noindex: not indexable",
+      "url": "https://example.com/page",
+      "html": "<html><head><title>P</title><meta name=\"robots\" content=\"noindex\"></head><body><h1>P</h1></body></html>",
+      "expect": {
+        "aeo-indexable": "warn"
+      }
+    },
+    {
+      "name": "no robots meta: indexable",
+      "url": "https://example.com/page",
+      "html": "<html><head><title>P</title></head><body><h1>P</h1></body></html>",
+      "expect": {
+        "aeo-indexable": "pass"
+      }
+    },
+    {
+      "name": "one H1, plain headings: info with a tip",
+      "url": "https://example.com/page",
+      "html": "<html><head><title>P</title></head><body><h1>P</h1><h2>Section</h2><p>Text.</p></body></html>",
+      "expect": {
+        "aeo-headings": "info"
+      }
+    },
+    {
+      "name": "valid JSON-LD: structured data passes",
+      "url": "https://example.com/page",
+      "html": "<html><head><title>P</title><script type=\"application/ld+json\">{\"@type\": \"WebSite\", \"name\": \"x\"}</script></head><body><h1>P</h1></body></html>",
+      "expect": {
+        "aeo-jsonld": "pass"
+      }
+    },
+    {
+      "name": "one H1 and a question heading: headings pass",
+      "url": "https://example.com/page",
+      "html": "<html><head><title>P</title></head><body><h1>P</h1><h2>How does it work?</h2><p>Text.</p></body></html>",
+      "expect": {
+        "aeo-headings": "pass"
+      }
+    }
+  ]
+}
