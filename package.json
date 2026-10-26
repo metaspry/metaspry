@@ -19,13 +19,13 @@
 	},
 	"devDependencies": {
 		"@playwright/test": "^1.64.1",
-		"@sveltejs/adapter-auto": "^2.0.0",
 		"@sveltejs/adapter-static": "^2.0.3",
 		"@sveltejs/kit": "^1.27.4",
+		"@types/chrome": "^0.0.251",
 		"@vitest/coverage-v8": "^0.34.6",
 		"autoprefixer": "^10.4.16",
 		"happy-dom": "^20.14.5",
-		"onchange": "^7.1.0",
+		"nodemon": "^3.0.1",
 		"postcss": "^8.4.31",
 		"sharp": "^0.34.5",
 		"svelte": "^4.0.5",
@@ -42,8 +42,6 @@
 	},
 	"dependencies": {
 		"@floating-ui/dom": "^1.8.0",
-		"@types/chrome": "^0.0.251",
-		"firebase": "^12.15.0",
-		"nodemon": "^3.0.1"
+		"firebase": "^12.15.0"
 	}
 }

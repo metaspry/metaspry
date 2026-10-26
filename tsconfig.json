@@ -9,7 +9,7 @@
      "noImplicitThis": true,
      "noFallthroughCasesInSwitch": true,
      "noUncheckedIndexedAccess": true,
-     "target": "es5",
-    "lib": ["es2017", "dom"],
+     "target": "es2020",
+    "lib": ["es2020", "dom"],
   }
 }

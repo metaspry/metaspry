@@ -28,9 +28,9 @@ It is one of three sibling repositories:
 | Styling | Tailwind CSS `^3.3.5` (`darkMode: 'class'`), PostCSS, Autoprefixer |
 | Cloud | Firebase JS SDK `^12.15.0` (Auth + Firestore) |
 | Tooltips | `@floating-ui/dom` `^1.8.0` (bundled by Vite; positions the `use:tooltip` element, 3.17) |
-| Types | `@types/chrome`; `tsconfig.json` is strict (`strict`, `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`, `noImplicit*`) |
+| Types | `@types/chrome` (dev dependency); `tsconfig.json` is strict (`strict`, `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`, `noImplicit*`), `target` / `lib` `es2020` (type-check only; Vite does the emit) |
 | Asset scripts | `sharp` (icons, promo tiles, store screenshots), `tiny-glob` (CSP fixer) |
-| Declared but unused | `@sveltejs/adapter-auto` (commented out in `svelte.config.js`), `onchange` |
+| Runtime dependencies | `firebase`, `@floating-ui/dom` only; everything else (`nodemon` for `watch-src`, `@types/chrome`, build and test tooling) is a dev dependency. `@sveltejs/adapter-auto` and `onchange` were removed as unused (2026-10-26). |
 
 `.npmrc` sets `engine-strict=true` and `package.json` `engines.node` is `>=20`; `.nvmrc` pins CI to Node 22.
 
