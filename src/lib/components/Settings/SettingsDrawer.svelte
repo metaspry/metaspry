@@ -25,6 +25,7 @@
   import { bandClasses } from '../../audit/band';
   import { diagnosticsText } from '../../diagnostics';
   import { closeIntent } from './close-intent';
+  import { DIGIT_TABS } from '../../tabs/registry';
 
   const SURFACES: { value: Mode; label: string; hint: string }[] = [
     { value: 'sidepanel', label: 'Side panel', hint: 'Stays open beside the page while you browse.' },
@@ -369,7 +370,7 @@
         />
         <span class="flex flex-col gap-0.5">
           <span class="text-xs font-semibold text-slate-800 dark:text-slate-100">Single-key shortcuts</span>
-          <span id="shortcuts-pref-hint" class="ms-muted text-[0.6875rem] leading-snug">/ search, r re-scan, 1-6 tabs. Off: only ? and Esc work.</span>
+          <span id="shortcuts-pref-hint" class="ms-muted text-[0.6875rem] leading-snug">/ search, r re-scan, 1-{DIGIT_TABS} tabs. Off: only ? and Esc work.</span>
         </span>
       </label>
     </fieldset>

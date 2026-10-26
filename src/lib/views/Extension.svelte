@@ -20,6 +20,7 @@
   import { describeScanError } from "../scrapers/scan-error";
   import { normalizeScanUrl, scanUrlFor } from "../cloud/scan-identity";
   import { displayUrl, followActiveTab, getHostWindowId, hostOf, tabState } from "../tabs/follow-tab";
+  import { RESULT_TABS, isResultTab, type ResultTabId } from "../tabs/registry";
   import { getMetaTags } from "../scrapers/getMetaTags";
   import { resolveIcon } from "../scrapers/icon";
   import type { PageMeta } from "../scrapers/PageMeta";
@@ -48,7 +49,7 @@
   import { get } from "svelte/store";
 
   type View = "landing" | "loading" | "error" | "results";
-  type ActiveTab = "tags" | "previews" | "audit" | "site" | "aeo" | "compare";
+  type ActiveTab = ResultTabId;
 
   let view: View = "landing";
   let pageMeta: PageMeta | null = null;
@@ -117,14 +118,8 @@
         ? `This tab changed. Results are for ${scannedLabel}.`
         : "This tab changed.";
 
-  const tabs: TabDef[] = [
-    { id: "tags", label: "Tags" },
-    { id: "previews", label: "Previews" },
-    { id: "audit", label: "Audit" },
-    { id: "site", label: "Site" },
-    { id: "aeo", label: "AI" },
-    { id: "compare", label: "Compare" },
-  ];
+  // The one tab list (tabs/registry.ts): the strip, the digit shortcuts and the help read it.
+  const tabs: TabDef[] = RESULT_TABS.map((t) => ({ id: t.id, label: t.label }));
 
   function isPageEmpty(meta: PageMeta): boolean {
     return meta.tags.length === 0 && !meta.title && !meta.canonical && !meta.icon;
@@ -336,16 +331,7 @@
   $: noindexRule = auditResult?.rules.find((r) => r.id === "noindex") ?? null;
   $: documentTitle = view === "results" && activeTabLabel ? `Metaspry - ${activeTabLabel}` : "Metaspry";
 
-  function isActiveTab(v: string): v is ActiveTab {
-    return (
-      v === "tags" ||
-      v === "previews" ||
-      v === "audit" ||
-      v === "site" ||
-      v === "aeo" ||
-      v === "compare"
-    );
-  }
+  const isActiveTab = isResultTab;
 
   function onTabChange(event: CustomEvent<string>) {
     if (isActiveTab(event.detail)) {

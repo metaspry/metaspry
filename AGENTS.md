@@ -765,7 +765,7 @@ The help modal (`ShortcutsHelp.svelte`) is `role="dialog" aria-modal="true"`, la
 
 **Gotchas.**
 - `Tabs` renders `tab.icon` with `{@html}`. Pass only static trusted markup there, never page data. No tab uses an icon today.
-- Tabs are keyed by id in `Extension.svelte` (`ActiveTab` union and `isActiveTab`). Adding a tab means updating the `tabs` array, the union, the guard, the `{#if}` chain and the shortcut help.
+- Tabs come from one registry, `src/lib/tabs/registry.ts` (`RESULT_TABS`, `ResultTabId`, `isResultTab`; architecture review 2026-10-26, High 6): the strip, the digit shortcuts (`DIGIT_TABS`, up to 9), the shortcuts help and the Settings hint read it. Adding a tab means adding it there and rendering its panel in `Extension.svelte` (`registry.spec.ts` fails when a registered tab has no `panel-<id>`).
 
 ### 3.18 Tests and quality gates
 

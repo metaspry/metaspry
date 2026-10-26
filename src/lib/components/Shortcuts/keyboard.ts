@@ -1,6 +1,7 @@
 import { writable, get } from 'svelte/store';
 import { shortcutsEnabled } from '../../storage/shortcuts';
 import { layerOpen } from '../../layers';
+import { DIGIT_TABS } from '../../tabs/registry';
 
 export interface ShortcutEvents {
   focusSearch?: () => void;
@@ -35,8 +36,8 @@ export function shortcutFor(key: string, shiftKey: boolean, enabled: boolean): S
   if (!enabled) return null;
   if (key === '/') return { kind: 'search' };
   if (key === 'r' || key === 'R') return { kind: 'rescan' };
-  // Six tabs (Tags, Previews, Audit, Site, AI, Compare).
-  if (key.length === 1 && key >= '1' && key <= '6') return { kind: 'tab', index: Number(key) - 1 };
+  // One digit per results tab (tabs/registry.ts), up to 9.
+  if (key.length === 1 && key >= '1' && key <= String(DIGIT_TABS)) return { kind: 'tab', index: Number(key) - 1 };
   return null;
 }
 
