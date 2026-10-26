@@ -530,18 +530,18 @@
           <circle cx="12" cy="12" r="10" stroke-width="1.5" />
         </svg>
         <span class="flex-1">
-          Popup closes when you switch tabs.
+          Popup closes when you click away or switch tabs.
           <button
             type="button"
             on:click={() => switchMode('sidepanel')}
-            class="font-semibold underline underline-offset-2 hover:opacity-80"
+            class="inline-flex min-h-[1.5rem] items-center rounded font-semibold underline underline-offset-2 hover:opacity-80 {FOCUS_RING}"
           >Use side panel</button>
         </span>
         <button
           type="button"
           aria-label="Dismiss"
           on:click={dismissPopupHint}
-          class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full transition hover:bg-amber-200/60 dark:hover:bg-amber-500/20"
+          class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full transition hover:bg-amber-200/60 dark:hover:bg-amber-500/20 {FOCUS_RING}"
         >
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-3 w-3">
             <path d="M18 6L6 18M6 6l12 12" />
@@ -622,31 +622,37 @@
         {#key scanKey}
         {#if visited.has("tags")}
           <div role="tabpanel" id="panel-tags" aria-labelledby="tab-tags" hidden={activeTab !== "tags"}>
+            <h2 class="sr-only">{RESULT_TABS.find((t) => t.id === "tags")?.label}</h2>
             <TagsView meta={pageMeta} />
           </div>
         {/if}
         {#if visited.has("previews")}
           <div role="tabpanel" id="panel-previews" aria-labelledby="tab-previews" hidden={activeTab !== "previews"}>
+            <h2 class="sr-only">{RESULT_TABS.find((t) => t.id === "previews")?.label}</h2>
             <Preview meta={pageMeta} {pageUrl} icon={pageIcon} />
           </div>
         {/if}
         {#if visited.has("audit")}
           <div role="tabpanel" id="panel-audit" aria-labelledby="tab-audit" hidden={activeTab !== "audit"}>
+            <h2 class="sr-only">{RESULT_TABS.find((t) => t.id === "audit")?.label}</h2>
             <Audit result={auditResult} meta={pageMeta} {cloudScan} weights={$effectiveSettings.weights} />
           </div>
         {/if}
         {#if visited.has("site")}
           <div role="tabpanel" id="panel-site" aria-labelledby="tab-site" hidden={activeTab !== "site"}>
+            <h2 class="sr-only">{RESULT_TABS.find((t) => t.id === "site")?.label}</h2>
             <SiteView baseUrl={pageUrl} {scanKey} />
           </div>
         {/if}
         {#if visited.has("aeo")}
           <div role="tabpanel" id="panel-aeo" aria-labelledby="tab-aeo" hidden={activeTab !== "aeo"}>
+            <h2 class="sr-only">{RESULT_TABS.find((t) => t.id === "aeo")?.label}</h2>
             <AeoView html={pageHtml} baseUrl={pageUrl} {scanKey} indexing={noindexRule ? { blocked: noindexRule.status === "fail", detail: noindexRule.detail } : null} />
           </div>
         {/if}
         {#if visited.has("compare")}
           <div role="tabpanel" id="panel-compare" aria-labelledby="tab-compare" hidden={activeTab !== "compare"}>
+            <h2 class="sr-only">{RESULT_TABS.find((t) => t.id === "compare")?.label}</h2>
             <CompareView leftMeta={pageMeta} leftUrl={pageUrl} leftScore={auditResult.score} leftRules={auditResult.rules} />
           </div>
         {/if}

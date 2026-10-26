@@ -1,5 +1,6 @@
 <script lang="ts">
   import { safeHref } from '../../util/safe-href';
+  import { FOCUS_RING } from '../toolbar';
   import { tooltip } from '../../actions/tooltip';
   import type { SitemapInfo } from '../../scrapers/SiteFiles';
   import { bandClasses, CHIP_NEUTRAL } from '../../audit/band';
@@ -31,7 +32,7 @@
         </p>
         {#if sitemap.children.length > 0}
           <div class="space-y-1">
-            <button type="button" on:click={() => (showChildren = !showChildren)} class="text-[0.6875rem] font-medium text-indigo-600 hover:underline dark:text-indigo-300">
+            <button type="button" on:click={() => (showChildren = !showChildren)} aria-expanded={showChildren} class="inline-flex min-h-[1.5rem] items-center rounded text-[0.6875rem] font-medium text-indigo-700 hover:underline dark:text-indigo-300 {FOCUS_RING}">
               {showChildren ? 'Hide child sitemaps' : `Show ${sitemap.children.length} child sitemap${sitemap.children.length === 1 ? '' : 's'}`}
             </button>
             {#if showChildren}

@@ -205,7 +205,7 @@
       <p class="text-xs text-slate-700 dark:text-slate-200" role="status">
         {diffCount === 0 ? 'No differences.' : `${diffCount} of ${rows.length} tags differ.`}
       </p>
-      <label class="inline-flex min-h-6 cursor-pointer items-center gap-2 text-xs text-slate-700 dark:text-slate-200">
+      <label class="inline-flex min-h-[1.5rem] cursor-pointer items-center gap-2 text-xs text-slate-700 dark:text-slate-200">
         <input type="checkbox" bind:checked={onlyDifferences} class="h-4 w-4 accent-indigo-600" />
         Show differences only
       </label>

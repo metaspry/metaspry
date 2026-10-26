@@ -1,5 +1,6 @@
 <script lang="ts">
   import { safeHref } from '../../util/safe-href';
+  import { FOCUS_RING } from '../toolbar';
   import { tooltip } from '../../actions/tooltip';
   import { bandClasses, CHIP_NEUTRAL } from '../../audit/band';
   import type { RobotsInfo } from '../../scrapers/SiteFiles';
@@ -57,7 +58,7 @@
         </div>
       {/if}
       {#if robots.raw}
-        <button type="button" on:click={() => (showRaw = !showRaw)} class="text-[0.6875rem] font-medium text-indigo-600 hover:underline dark:text-indigo-300">
+        <button type="button" on:click={() => (showRaw = !showRaw)} aria-expanded={showRaw} class="inline-flex min-h-[1.5rem] items-center rounded text-[0.6875rem] font-medium text-indigo-700 hover:underline dark:text-indigo-300 {FOCUS_RING}">
           {showRaw ? 'Hide raw' : 'Show raw'}
         </button>
         {#if showRaw}

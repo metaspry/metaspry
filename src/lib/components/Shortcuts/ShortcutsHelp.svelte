@@ -17,7 +17,7 @@
   const rows: { key: string; label: string; single: boolean }[] = [
     { key: '/', label: 'Focus search', single: true },
     { key: DIGIT_RANGE, label: `Switch to ${TAB_NAMES}`, single: true },
-    { key: 'r', label: 'Re-scan current page', single: true },
+    { key: 'r', label: 'Re-scan this page', single: true },
     { key: '?', label: 'Toggle this help', single: false },
     { key: 'Esc', label: 'Close drawers and modals', single: false },
   ];
