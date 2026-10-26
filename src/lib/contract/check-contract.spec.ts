@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -51,5 +51,23 @@ describe('scripts/check-contract.mjs', () => {
   it('CONTRACT_REQUIRED=1 fails without an app checkout (for a CI job that checks it out)', () => {
     const r = run('{"a":1}', null, { explicit: false, required: true });
     expect(r.code).toBe(1);
+  });
+});
+
+describe('CI runs the comparison when the app token is configured (ultra review delta 1)', () => {
+  const ci = readFileSync('.github/workflows/ci.yml', 'utf8');
+
+  it('checks out the app fixture and requires the comparison, gated on the secret existing', () => {
+    expect(ci).toContain('repository: metaspry/app');
+    expect(ci).toContain("CONTRACT_REQUIRED: '1'");
+    expect(ci).toContain('--theirs .app-contract/functions/test/fixtures/scan-contract.json');
+    expect(ci.match(/if: steps\.contract\.outputs\.enabled == 'true'/g)).toHaveLength(2);
+  });
+
+  it('the token never lands in a step environment (npm ci runs install scripts)', () => {
+    const uses = ci.split(String.fromCharCode(10)).filter((l) => l.includes('secrets.APP_CONTRACT_TOKEN'));
+    expect(uses).toHaveLength(2);
+    expect(uses.some((l) => /enabled=\$\{\{ secrets\.APP_CONTRACT_TOKEN != '' \}\}/.test(l))).toBe(true);
+    expect(uses.some((l) => /^\s+token: \$\{\{ secrets\.APP_CONTRACT_TOKEN \}\}/.test(l))).toBe(true);
   });
 });

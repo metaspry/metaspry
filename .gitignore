@@ -25,3 +25,6 @@ metaspry-v*.zip.sha256
 /test-results
 /playwright-report
 /blob-report
+
+# CI: the app's contract fixture checked out for scripts/check-contract.mjs
+/.app-contract

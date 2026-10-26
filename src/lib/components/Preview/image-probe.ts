@@ -30,7 +30,11 @@ export function probeImage(
   if (hit) return hit;
   const p = new Promise<'ok' | 'failed'>((resolve) => {
     const img = make();
-    const timer = setTimeout(() => done('failed'), timeoutMs);
+    const timer = setTimeout(() => {
+      done('failed');
+      // Stop the download too (delta review nit): the next scan probes again from scratch.
+      img.src = '';
+    }, timeoutMs);
     function done(state: 'ok' | 'failed') {
       clearTimeout(timer);
       img.onload = null;

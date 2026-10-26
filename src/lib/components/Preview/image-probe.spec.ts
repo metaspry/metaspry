@@ -50,10 +50,12 @@ describe('probeImage does not remember a failure (ultra review F1)', () => {
 
   it('a host that never answers counts as failed after the timeout', async () => {
     vi.useFakeTimers();
-    const silent = () => ({ referrerPolicy: '', onload: null, onerror: null, src: '' });
-    const p = probeImage('https://a.com/hang.png', silent, 1000);
+    const img = { referrerPolicy: '', onload: null, onerror: null, src: '' };
+    const p = probeImage('https://a.com/hang.png', () => img, 1000);
+    expect(img.src).toBe('https://a.com/hang.png');
     vi.advanceTimersByTime(1000);
     await expect(p).resolves.toBe('failed');
+    expect(img.src).toBe('');
     vi.useRealTimers();
   });
 });

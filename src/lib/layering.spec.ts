@@ -19,37 +19,59 @@ function files(dir: string): string[] {
   });
 }
 
+/**
+ * The imports in `text` (the file at `path`, under src/lib) that reach components/ or views/.
+ * Relative imports and SvelteKit's `$lib/` alias (ultra review 2026-10-26, F5). One function for
+ * the guard below and its own fixture tests, so the tests fail when the guard regresses.
+ */
+export function offendersIn(path: string, text: string): string[] {
+  const top = relative(LIB, path).split(sep)[0] ?? '';
+  if (UI.has(top)) return [];
+  const out: string[] = [];
+  for (const m of text.matchAll(/(?:from|import\()\s*['"]([^'"]+)['"]/g)) {
+    const spec = m[1] ?? '';
+    let resolved: string;
+    if (spec.startsWith('$lib/')) resolved = join(LIB, spec.slice(5));
+    else if (spec.startsWith('.')) resolved = join(path, '..', spec);
+    else continue;
+    const target = relative(LIB, resolved).split(sep)[0] ?? '';
+    const hit = `${path.split(sep).join('/')} -> ${spec}`;
+    if (UI.has(target) && !ALLOWED.includes(hit)) out.push(hit);
+  }
+  return out;
+}
+
 describe('layering', () => {
   it('no module under src/lib outside components/ and views/ imports from them', () => {
-    const offenders: string[] = [];
-    for (const f of files(LIB)) {
-      const top = relative(LIB, f).split(sep)[0] ?? '';
-      if (UI.has(top)) continue;
-      const text = readFileSync(f, 'utf8');
-      for (const m of text.matchAll(/(?:from|import\()\s*['"]([^'"]+)['"]/g)) {
-        const spec = m[1] ?? '';
-        // Relative imports and SvelteKit's `$lib/` alias (ultra review 2026-10-26, F5: the alias
-        // was skipped, so the most common SvelteKit import style passed unchecked).
-        let resolved: string;
-        if (spec.startsWith('$lib/')) resolved = join(LIB, spec.slice(5));
-        else if (spec.startsWith('.')) resolved = join(f, '..', spec);
-        else continue;
-        const target = relative(LIB, resolved).split(sep)[0] ?? '';
-        const hit = `${f.split(sep).join('/')} -> ${spec}`;
-        if (UI.has(target) && !ALLOWED.includes(hit)) offenders.push(hit);
-      }
-    }
+    const offenders = files(LIB).flatMap((f) => offendersIn(f, readFileSync(f, 'utf8')));
     expect(offenders).toEqual([]);
+  });
+
+  it('the guard walks .svelte files under lib (ultra review delta 1)', () => {
+    // A lib .svelte file would be skipped by a walk that only reads .ts/.js.
+    expect(/\.(ts|js|svelte)$/.test('x.svelte')).toBe(true);
+    expect(files(LIB).some((f) => f.endsWith('.svelte'))).toBe(true);
   });
 });
 
-describe('the layering guard itself (ultra review F5)', () => {
-  it('sees $lib imports and relative ones alike', () => {
-    const resolve = (from: string, spec: string) =>
-      relative(LIB, spec.startsWith('$lib/') ? join(LIB, spec.slice(5)) : join(from, '..', spec)).split(sep)[0];
-    const from = join(LIB, 'cloud', 'settings.ts');
-    expect(resolve(from, '$lib/components/Toast/ToastHost.svelte')).toBe('components');
-    expect(resolve(from, '../components/Toast/ToastHost.svelte')).toBe('components');
-    expect(resolve(from, '$lib/toast')).toBe('toast');
+describe('offendersIn (the guard itself)', () => {
+  const at = (p: string) => join(LIB, ...p.split('/'));
+
+  it.each([
+    ['cloud/a.ts', "import { t } from '$lib/components/Toast/ToastHost.svelte';"],
+    ['cloud/a.ts', "import { t } from '../components/Toast/ToastHost.svelte';"],
+    ['cloud/a.svelte', "<script>import X from '$lib/views/Extension.svelte';</script>"],
+    ['storage/b.ts', "const m = await import('../views/Extension.svelte');"],
+  ])('%s importing UI code is reported (%s)', (file, text) => {
+    expect(offendersIn(at(file), text)).toHaveLength(1);
+  });
+
+  it.each([
+    ['cloud/a.ts', "import { toast } from '$lib/toast';"],
+    ['cloud/a.ts', "import { get } from 'svelte/store';"],
+    ['components/Toast/ToastHost.svelte', "import { toast } from '../../toast';"],
+    ['views/Extension.svelte', "import Tabs from '../components/Tabs/Tabs.svelte';"],
+  ])('%s is fine (%s)', (file, text) => {
+    expect(offendersIn(at(file), text)).toEqual([]);
   });
 });
