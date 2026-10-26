@@ -41,7 +41,7 @@
   import { syncScope } from "../cloud/workspaces";
   import { toScanPayload, uploadScan, type UploadResult } from "../cloud/sync";
   import { guardUnload, resetSyncFor, trackUpload } from "../cloud/sync-status";
-  import { fetchSiteFilesCached } from "../scrapers/getSiteFiles";
+  import { siteFilesForUpload } from "../scrapers/getSiteFiles";
   import { toast } from "../components/Toast/toast";
   import { modalOpen } from "../layers";
   import { get } from "svelte/store";
@@ -247,13 +247,9 @@
         // reason it failed, and a failure toasts. The menu used to say "Synced" whatever happened.
         const out = await trackUpload(scope.kind === "workspace" ? scope.name : "Personal", async () => {
           // Best-effort: include site files (robots/sitemap/llms) so the app's Site tab populates.
-          // The same fetch the Site and AI tabs read (one per scan).
-          let siteFiles;
-          try {
-            siteFiles = await fetchSiteFilesCached(new URL(pageUrl).origin, key);
-          } catch {
-            siteFiles = undefined;
-          }
+          // The same fetch the Site and AI tabs read (one per scan), but a slow site does not hold
+          // the upload: after a few seconds the scan is written without them.
+          const siteFiles = await siteFilesForUpload(pageUrl, key);
           const payloadMeta: PageMeta = { ...meta, icon: pageIcon ?? meta.icon };
           return uploadScan(cu.uid, toScanPayload(payloadMeta, finalResult, pageUrl, siteFiles), scope);
         });

@@ -530,8 +530,9 @@ indexed, and "a canonical tag is present" passed it.
 
 `fetchSiteFiles(baseUrl)` in `src/lib/scrapers/getSiteFiles.ts`:
 - Fetches robots.txt and llms.txt in parallel, then the sitemap.
-- Sitemap candidates: every `Sitemap:` line from robots.txt, then `/sitemap.xml`, `/sitemap_index.xml`, `/sitemap-index.xml`, `/wp-sitemap.xml`, `/sitemaps.xml`, `/sitemap/sitemap.xml`, `/sitemaps/sitemap.xml`. It tries them one at a time until one parses.
-- A sitemap index resolves up to 20 children in parallel; nested indexes recurse to depth 2, 20 children per level.
+- Sitemap candidates: the first `MAX_ROBOTS_SITEMAPS` (5) same-site `Sitemap:` lines from robots.txt (the rest are never fetched), then `/sitemap.xml`, `/sitemap_index.xml`, `/sitemap-index.xml`, `/wp-sitemap.xml`, `/sitemaps.xml`, `/sitemap/sitemap.xml`, `/sitemaps/sitemap.xml`. It tries them one at a time until one parses. Off-site `Sitemap:` URLs are skipped without a request and named in the not-found error ("Skipped N robots.txt sitemap(s) not on this site: ...").
+- Fetch policy (architecture review High 4: robots.txt is the scanned site's to write): a declared sitemap or index child is fetched only if http(s) and `isSameSite` with the page (same host, equal after a leading `www.`, or one a subdomain of the other; IP literals exact; no public-suffix list, so `shop.example.com` is not `blog.example.com`'s site). A private target (`isPrivateHost`: loopback, 10/8, 172.16/12, 192.168/16, 169.254/16, 100.64/10, 0/8, `::1`, `fc00::/7`, `fe80::/10`, IPv4-mapped, `localhost`, `.local`, `.internal`, `.lan`, `.home.arpa`) is allowed only when it is the page's own host (a dev server, the e2e fixture site). Off-site index children get `error: 'Not read - not on this site.'` (`OFF_SITE_ERROR`) and do not spend the fetch budget. A response whose final URL (after redirects) is private while the page is not is discarded: `error: 'Redirected to a private network address.'` (the request has gone out; nothing from it is read, shown or uploaded). A public name that resolves to a private IP is not detectable here.
+- A sitemap index resolves up to 20 children, 6 at a time; nested indexes recurse to depth 2, 20 children per level, 40 fetches per scan in total (`BUDGET_ERROR` marks the unread ones).
 - Limits: 4 s timeout per request, body cut at 2,000,000 characters, `credentials: 'omit'`, redirects followed. An HTML response (a single-page-app fallback) counts as missing.
 - robots.txt parser: consecutive `User-agent` lines form a group; `Allow` and `Disallow` values are collected; `Crawl-delay` is accepted but not stored; `#` comments are stripped.
 - llms.txt parser: `#` to `###` headings start sections; `- [label](url)` lines become links.
@@ -542,10 +543,10 @@ indexed, and "a canonical tag is present" passed it.
 
 **Permissions.** Host `*://*/*`.
 
-**Tests.** `src/lib/scrapers/getRobots.spec.ts`; `e2e/scan.e2e.ts` (robots.txt and llms.txt fetched live from the fixture site and rendered).
+**Tests.** `src/lib/scrapers/getRobots.spec.ts`; `getSiteFiles.spec.ts` (`isPrivateHost`, `isSameSite`, the 5-sitemap cap against 1000 lines, LAN and off-site robots sitemaps never requested, www/subdomain sitemaps followed, off-site index children, private redirects discarded, a local page reading its own files, `siteFilesForUpload` deadline and failure); `getSiteFiles.cache.spec.ts`; `e2e/scan.e2e.ts` (robots.txt and llms.txt fetched live from the fixture site and rendered).
 
 **Gotchas.**
-- Nothing is cached. The Site tab, the AI tab and the cloud upload each call `fetchSiteFiles` separately, and leaving a tab and coming back fetches again.
+- One fetch per origin per scan: the Site tab, the AI tab and the cloud upload share `fetchSiteFilesCached(baseUrl, scanKey)`. The upload reads it through `siteFilesForUpload`, which gives up after `UPLOAD_SITE_FILES_WAIT_MS` (8 s) or on an error and uploads without site files.
 - `SitemapInfo.error` doubles as a notice: a sitemap found at a fallback path has `present: true` and `error: 'Found at fallback location: ...'`.
 - The parser helpers are module-private (not exported).
 
@@ -677,7 +678,7 @@ Checks in `src/lib/audit/aeo.ts`:
 **Gotchas.**
 - The payload must stay compatible with the app's `ScanPayload` (`app/src/lib/scan/types.ts`) and `app/firestore.rules`. Change `SCAN_SCHEMA_VERSION` only together with the app.
 - `setDoc` without `merge` replaces the whole document on a re-scan, including `createdAt` and any field another client added.
-- The upload waits for the image check (up to 5 s) and a fresh `fetchSiteFiles` (several 4 s timeouts are possible). Closing the popup before it finishes drops the upload without any message.
+- The upload waits for the image check (up to 5 s) and at most 8 s for the site files (`siteFilesForUpload`, 3.9; after that the scan is written without them). Closing the popup before it finishes drops the upload without any message.
 - From reading the code (not tested at runtime): `initCloudWorkspaces()` subscribes to `cloudUser` while it is still `null`, which immediately calls `setSyncScope({ kind: 'personal' })` and stores `personal` over the saved choice. The earlier storage read still restores the workspace in memory for that session, but the stored value is now `personal`, so a workspace choice does not survive the next reopen.
 - Links into the app: "Open Metaspry web app" in the signed-in account dropdown (3.13), "Create an account" / "Forgot password?" in the signed-out popover (3.13), "Open in web app" on the Settings sync line, "Edit in web app" on the workspace-rules card and the Pro upsell (3.8).
 
