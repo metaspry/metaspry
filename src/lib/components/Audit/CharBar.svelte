@@ -18,7 +18,8 @@
   <div class="relative h-1.5 w-full overflow-hidden rounded-full bg-slate-200/60 dark:bg-slate-700/40">
     <div class="absolute inset-y-0 left-0 {barClass} motion-safe:transition-all" style="width: {pct}%" />
     {#if max > 0}
-      <span class="pointer-events-none absolute inset-y-0" style="left: {Math.min(100, (min / max) * 100)}%; width: 1px; background: rgba(0,0,0,0.2);" />
+      <!-- The minimum marker: slate-700 / slate-200, >= 3:1 on the track in both themes (it was 1.59 / 1.19:1). -->
+      <span data-min-marker class="pointer-events-none absolute inset-y-0 w-0.5 bg-slate-700 dark:bg-slate-200" style="left: {Math.min(100, (min / max) * 100)}%;" />
     {/if}
   </div>
   <span class="tabular-nums text-[0.6875rem] ms-muted">{length}/{max}</span>

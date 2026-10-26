@@ -51,7 +51,7 @@
       {/if}
     {:else}
       <p class="ms-muted">
-        {llms.error ?? 'No /llms.txt at this host.'} <a href="https://llmstxt.org" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:underline dark:text-indigo-300">What is llms.txt?</a>
+        {llms.error ?? 'No /llms.txt at this host.'} <a href="https://llmstxt.org" target="_blank" rel="noopener noreferrer" class="text-indigo-700 underline underline-offset-2 dark:text-indigo-300">What is llms.txt?</a>
       </p>
     {/if}
   </div>

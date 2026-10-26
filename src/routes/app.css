@@ -60,6 +60,15 @@
   .ms-note-warn {
     @apply flex items-center gap-2 rounded-xl border border-amber-300/60 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/60 dark:text-amber-200;
   }
+  /* The selected tab (UX review 2026-10-25, Medium 14): hue alone was 1.21:1 against the other
+   * tabs and invisible in forced colours. The 2 px bar under the label (an inset shadow utility in
+   * Tabs.svelte) is the non-colour cue; forced colours drop shadows, so they get an outline. */
+  @media (forced-colors: active) {
+    .ms-tab-selected {
+      outline: 2px solid Highlight;
+      outline-offset: -2px;
+    }
+  }
   .ms-note-error {
     @apply rounded-xl border border-rose-300/60 bg-rose-50 px-3 py-2 text-xs text-rose-800 dark:border-rose-500/30 dark:bg-rose-950/60 dark:text-rose-200;
   }

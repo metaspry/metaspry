@@ -67,7 +67,7 @@
       bind:this={refs[tab.id]}
       on:click={() => select(tab.id)}
       class="flex h-8 flex-1 basis-16 items-center justify-center gap-1.5 rounded-xl px-2 transition {tab.id === active
-        ? 'bg-white text-indigo-600 shadow-sm dark:bg-slate-900 dark:text-indigo-300'
+        ? 'ms-tab-selected bg-white font-semibold text-indigo-700 shadow-[inset_0_-2px_0_currentColor] dark:bg-slate-900 dark:text-indigo-200'
         : 'ms-muted hover:text-slate-900 dark:hover:text-slate-100'}"
     >
       {#if tab.icon}

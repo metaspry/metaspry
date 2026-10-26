@@ -254,7 +254,7 @@
               on:click={() => pickWorkspace(w)}
               class="ms-menu-item {FOCUS_RING}"
             >
-              <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[0.6875rem] font-bold text-white" style="background: linear-gradient(135deg,#6a55e0,#9b8bff)">{(w.name[0] ?? "W").toUpperCase()}</span>
+              <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[0.6875rem] font-bold text-white" style="background: linear-gradient(135deg,#4f46e5,#6d28d9)">{(w.name[0] ?? "W").toUpperCase()}</span>
               <span class="min-w-0 flex-1 truncate">{w.name}</span>
               {#if checked}<span class="text-indigo-600 dark:text-indigo-300" aria-hidden="true">✓</span>{/if}
             </button>

@@ -61,14 +61,14 @@
       href="https://metaspry.com/docs/"
       target="_blank"
       rel="noopener noreferrer"
-      class="rounded text-indigo-600 hover:underline dark:text-indigo-300 {FOCUS_RING}"
+      class="rounded text-indigo-700 underline underline-offset-2 dark:text-indigo-300 {FOCUS_RING}"
     >metaspry.com/docs</a>
     ·
     <a
       href="https://github.com/metaspry/metaspry/issues/new/choose"
       target="_blank"
       rel="noopener noreferrer"
-      class="rounded text-indigo-600 hover:underline dark:text-indigo-300 {FOCUS_RING}"
+      class="rounded text-indigo-700 underline underline-offset-2 dark:text-indigo-300 {FOCUS_RING}"
     >Report a bug</a>
   </p>
 </div>
