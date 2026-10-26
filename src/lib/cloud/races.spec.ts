@@ -20,9 +20,12 @@ vi.mock('./sdk', () => ({
   }),
 }));
 
+const toastSpy = vi.fn();
+vi.mock('../toast', () => ({ toast: (...a: unknown[]) => toastSpy(...a) }));
+
 import { cloudUser } from './auth';
 import { makeUserFollower } from './settings';
-import { fetchWorkspaces, workspaces } from './workspaces';
+import { fetchWorkspaces, workspaces, syncScope } from './workspaces';
 import { settingsChangeIsExternal, applySettingsWithoutPersisting, settings } from '../storage/settings';
 
 const tagged = (tag: string) => ({ ...DEFAULT_SETTINGS, titleMin: tag.length } as Settings);
@@ -89,5 +92,20 @@ describe('workspaces across a fast account switch', () => {
     resolveA!([{ id: 'wa', data: () => ({ name: 'A team', roles: { a: 'owner' }, plan: 'team' }) }]);
     await forA;
     expect(get(workspaces).map((w) => w.id)).toEqual(['wb']);
+  });
+});
+
+describe('a saved workspace target that is gone (UX review 2026-10-25, Medium 20)', () => {
+  it('falls back to Personal and says so', async () => {
+    pendingWorkspaceFetches = [];
+    toastSpy.mockReset();
+    cloudUser.set({ uid: 'c' } as never);
+    syncScope.set({ kind: 'workspace', wsId: 'gone', name: 'Old team' });
+    const done = fetchWorkspaces('c');
+    await new Promise((r) => setTimeout(r, 0));
+    pendingWorkspaceFetches[0]!([{ id: 'other', data: () => ({ name: 'Other', roles: { c: 'member' }, plan: 'team' }) }]);
+    await done;
+    expect(get(syncScope)).toEqual({ kind: 'personal' });
+    expect(toastSpy).toHaveBeenCalledWith('You no longer have access to Old team. New scans save to Personal.', 'default');
   });
 });

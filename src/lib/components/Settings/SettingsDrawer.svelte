@@ -24,6 +24,7 @@
   import { dur } from '../../motion';
   import { bandClasses } from '../../audit/band';
   import { diagnosticsText } from '../../diagnostics';
+  import { closeIntent } from './close-intent';
 
   const SURFACES: { value: Mode; label: string; hint: string }[] = [
     { value: 'sidepanel', label: 'Side panel', hint: 'Stays open beside the page while you browse.' },
@@ -162,7 +163,31 @@
   });
 
   function close() {
+    confirmDiscard = false;
     dispatch('close');
+  }
+
+  // UX review 2026-10-25, Medium 19: a click on the backdrop (or Esc, or the close button) threw away
+  // a half-edited form without a word. With unsaved edits, closing asks first; "Keep editing" is the
+  // focused default, so a stray Enter keeps the work.
+  let confirmDiscard = false;
+  let keepEditingBtn: HTMLButtonElement | null = null;
+  async function requestClose(via: 'escape' | 'backdrop' | 'button') {
+    const intent = closeIntent(dirty, confirmDiscard, via);
+    if (intent === 'close') {
+      close();
+      return;
+    }
+    if (intent === 'keep-editing') {
+      keepEditing();
+      return;
+    }
+    confirmDiscard = true;
+    await tick();
+    keepEditingBtn?.focus();
+  }
+  function keepEditing() {
+    confirmDiscard = false;
   }
 
   // Esc closes; Tab and Shift+Tab stay inside the dialog. `cycleTab` is shared with the shortcuts
@@ -172,7 +197,7 @@
     if (!open || event.defaultPrevented || !isTop(layer)) return;
     if (event.key === 'Escape') {
       event.preventDefault();
-      close();
+      void requestClose('escape');
       return;
     }
     if (drawerEl) cycleTab(event, drawerEl);
@@ -258,7 +283,7 @@
 <svelte:window on:keydown={onKey} />
 
 {#if open}
-  <div transition:fade={{ duration: dur(120) }} class="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm" on:click={close} role="presentation" />
+  <div transition:fade={{ duration: dur(120) }} class="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm" on:click={() => requestClose('backdrop')} role="presentation" />
   <aside
     bind:this={drawerEl}
     inert={($topLayer !== null && $topLayer !== layer) || undefined}
@@ -277,12 +302,24 @@
         type="button"
         aria-label="Close settings"
         use:tooltip={'Close settings (Esc)'}
-        on:click={close}
+        on:click={() => requestClose('button')}
         class="flex h-8 w-8 items-center justify-center rounded-lg ms-muted transition hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-50 {FOCUS_RING}"
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
       </button>
     </header>
+
+    <!-- One polite region for the form's first problem (UX review Medium 19): each field's message is
+         linked by aria-describedby; the old role="alert" on every message interrupted on each keystroke. -->
+    <p class="sr-only" aria-live="polite">{problems.length > 0 ? problems[0]?.message ?? '' : ''}</p>
+
+    {#if confirmDiscard}
+      <div role="group" aria-label="Discard unsaved changes?" class="ms-note-warn flex-wrap">
+        <p class="min-w-0 flex-1">You have unsaved scoring changes.</p>
+        <button bind:this={keepEditingBtn} type="button" on:click={keepEditing} class={BUTTON_SECONDARY}>Keep editing</button>
+        <button type="button" on:click={close} class={BUTTON_DANGER}>Discard changes</button>
+      </div>
+    {/if}
 
     <fieldset class="flex flex-col gap-2">
       <legend class="mb-2 text-xs font-semibold uppercase tracking-wider ms-muted">Preferences</legend>
@@ -425,10 +462,10 @@
               </label>
             </div>
             {#if minProblem}
-              <p id="settings-problem-{row.min}" class="text-xs text-rose-600 dark:text-rose-300" role="alert">{minProblem}</p>
+              <p id="settings-problem-{row.min}" class="text-xs text-rose-600 dark:text-rose-300">{minProblem}</p>
             {/if}
             {#if maxProblem}
-              <p id="settings-problem-{row.max}" class="text-xs text-rose-600 dark:text-rose-300" role="alert">{maxProblem}</p>
+              <p id="settings-problem-{row.max}" class="text-xs text-rose-600 dark:text-rose-300">{maxProblem}</p>
             {/if}
           </div>
         {/each}
@@ -458,7 +495,7 @@
           {/each}
         </div>
         {#if weightProblem}
-          <p id="settings-problem-weights" class="text-xs text-rose-600 dark:text-rose-300" role="alert">{weightProblem}</p>
+          <p id="settings-problem-weights" class="text-xs text-rose-600 dark:text-rose-300">{weightProblem}</p>
         {/if}
       </fieldset>
 

@@ -7,6 +7,7 @@ import { writable, get } from 'svelte/store';
 import { firestoreSdk } from './sdk';
 import { cloudUser } from './auth';
 import { report } from '../diagnostics';
+import { toast } from '../toast';
 
 export interface CloudWorkspace {
   id: string;
@@ -78,6 +79,9 @@ export async function fetchWorkspaces(uid: string): Promise<void> {
     const cur = get(syncScope);
     if (cur.kind === 'workspace' && !list.some((w) => w.id === cur.wsId)) {
       setSyncScope({ kind: 'personal' });
+      // It used to switch silently, so a team member's scans started landing in Personal unnoticed
+      // (UX review 2026-10-25, Medium 20).
+      toast(`You no longer have access to ${cur.name}. New scans save to Personal.`, 'default');
     }
   } catch (err) {
     report(err, 'cloud.workspaces');
