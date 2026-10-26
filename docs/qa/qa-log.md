@@ -16,6 +16,18 @@ Template:
 
 ---
 
+## 2026-10-26 - `03058bb` (architecture-review backlog stack: both backlog branches combined) - PASS (automated part)
+
+- `npm run qa` exit 0 on `78d2030` (check + contract:check + test + test:e2e), re-run green after the tooling commit on a clean `npm ci`. check: 0 errors, 1 warning (`Tabs.svelte` tablist tabindex, pre-existing). unit/integration: 61 files, 540 tests. build: manifest version stamped from `package.json` (1.0.31), remote-code check (now pattern-based) passed. e2e: 31 passed (~35 s). `contract:check` skipped in this worktree (no `../app` fixture beside it).
+- Mutation checks: renaming the getHTML literal in `background.js` fails `protocol.spec.ts`; an `import` of `components/` from `mode.ts` fails `layering.spec.ts`; the new `getSiteFiles.spec.ts` failed against the pre-fix module; the unpacked `metaspry-v1.0.27.zip` fails `check-remote-code.mjs` on all three loader URLs.
+- `npm run package` (to a temp name): byte-identical zip on two runs, round-trips through `tar` and `Expand-Archive` to the same 30 files as `build/`.
+- Coverage (Vitest): lines 49.24 % (was 37.92 %), branches 82.93 %, functions 75.51 %. `storage/history.ts`, `pinned.ts`, `shortcuts.ts`, `persisted.ts`, `theme.ts`, `toast.ts`, `messaging/protocol.ts`, `tabs/open-tab.ts` 100 % lines; `mode.ts` 96 %; `scrapers/getSiteFiles.ts` 88 %.
+- E2E caveat: two worktrees ran Playwright against the shared fixture port 4319 with `reuseExistingServer`; runs were serialised by hand. A run can be served by the other checkout's `e2e/server.mjs` (filed below).
+- Manual list: not walked. Needs a real browser: signed-in scan on a site with a large sitemap index (upload no longer waits more than 8 s on site files), Site tab on a site whose robots.txt declares an off-site sitemap (the not-found error names it), History click opens a background tab, popup <-> side panel switch.
+- Gaps / follow-ups: the CI workflows have not run yet (first push); `playwright.config.ts` could pick a free port per checkout; High #6 (scan-session module / tab registry), #7 (Kit -> plain Vite, typed background), #8 (dev Firebase project) open.
+
+---
+
 ## 2026-10-25 - `cff4df7` + the ux-critical-high changes (committed next as "fix(ext): critical and high UI/UX review findings") - PASS (automated part)
 
 - `npm run qa` exit 0. check: 0 errors, 1 warning (`Tabs.svelte` tablist tabindex, pre-existing). unit/integration: 44 files, 331 tests. build: remote-code check passed. e2e: 25 passed (~44 s).
