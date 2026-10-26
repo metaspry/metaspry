@@ -60,6 +60,8 @@ export function analyzeAeo(
   siteFiles: SiteFiles | null,
   baseUrl: string,
   indexing?: IndexingVerdict,
+  /** robots.txt / llms.txt could not be fetched: say so instead of silently dropping those checks. */
+  siteFilesFailed = false,
 ): AeoResult {
   const checks: AeoCheck[] = [];
 
@@ -140,7 +142,8 @@ export function analyzeAeo(
     id: 'aeo-geo-levers',
     label: 'Citation levers (stats / quotes / sources)',
     state: 'info',
-    detail: `${leverCount}/3 present (statistics, quotations, outbound citations) - linked to higher AI-answer inclusion.`,
+    // "experimentally linked", as the server analyzer says: an observed correlation, not a promise.
+    detail: `${leverCount}/3 present (statistics, quotations, outbound citations) - experimentally linked to higher AI-answer inclusion.`,
     scope: 'page',
   });
 
@@ -210,12 +213,23 @@ export function analyzeAeo(
           id: 'aeo-author-date',
           label: 'Author & freshness',
           state: 'warn',
-          detail: `Missing ${!hasAuthor ? 'author' : ''}${!hasAuthor && !hasDate ? ' and ' : ''}${!hasDate ? 'date' : ''} metadata - attribution and freshness correlate with AI citations.`,
+          detail: `Missing ${!hasAuthor ? 'author' : ''}${!hasAuthor && !hasDate ? ' and ' : ''}${!hasDate ? 'date' : ''} metadata - attribution and freshness are associated with AI citations.`,
           scope: 'page',
         },
   );
 
   // --- Site-level (already-parsed SiteFiles) ---
+  // UX review 2026-10-25, Medium 16: a failed fetch used to drop the crawler checks without a word,
+  // and with nothing left to warn about the chip said "AI-ready". Unknown is not ready.
+  if (siteFilesFailed) {
+    checks.push({
+      id: 'aeo-site-files',
+      label: 'robots.txt and llms.txt',
+      state: 'warn',
+      detail: "Couldn't fetch this site's robots.txt or llms.txt, so the AI crawler checks were skipped. Re-scan to try again.",
+      scope: 'site',
+    });
+  }
   if (siteFiles?.robots.present) {
     const groups = siteFiles.robots.groups;
     const blockedRetrieval = AI_BOTS.retrieval.filter((b) => isBotBlocked(groups, b));
@@ -270,7 +284,8 @@ export function analyzeAeo(
     id: 'aeo-raw-html',
     label: 'Content in raw HTML',
     state: 'info',
-    detail: 'AI crawlers read the raw HTML and do not run JavaScript. Run a cloud scan to check whether your content is in the raw HTML (not JS-only).',
+    // It used to say "Run a cloud scan", an action the extension does not have (Medium 16).
+    detail: "AI crawlers read the raw HTML and do not run JavaScript. The extension sees the rendered page, so it can't tell; scanning this URL from the Metaspry web app's Scan box checks the served HTML.",
     scope: 'page',
   });
 

@@ -61,3 +61,20 @@ describe('analyzeAeo parity with the server analyzer (architecture review 2026-1
     expect(levers('<p>She said "ship it" today</p>')).toMatch(/^1\/3/);
   });
 });
+
+describe('analyzeAeo honesty (UX review 2026-10-25, Medium 16)', () => {
+  it('site files that could not be fetched are reported, and the chip is not "ready"', () => {
+    const page = doc('<meta property="og:type" content="website">', '<h1>How it works?</h1>');
+    expect(analyzeAeo(page, null, 'https://a.com/').chip).toBe('ready');
+    const r = analyzeAeo(page, null, 'https://a.com/', undefined, true);
+    expect(check(r, 'aeo-site-files').state).toBe('warn');
+    expect(r.chip).toBe('needs-work');
+  });
+
+  it('no dead-end "Run a cloud scan"; the lever claim is hedged', () => {
+    const r = analyzeAeo(doc('', '<h1>x</h1>'), null, 'https://a.com/');
+    expect(check(r, 'aeo-raw-html').detail).not.toContain('cloud scan');
+    expect(check(r, 'aeo-raw-html').detail).toContain("web app's Scan box");
+    expect(check(r, 'aeo-geo-levers').detail).toContain('experimentally linked');
+  });
+});

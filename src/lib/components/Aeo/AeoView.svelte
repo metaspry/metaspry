@@ -4,6 +4,7 @@
   import type { SiteFiles } from '../../scrapers/SiteFiles';
   import { analyzeAeo, type AeoResult, type AeoState, type IndexingVerdict } from '../../audit/aeo';
   import { bandClasses } from '../../audit/band';
+  import { report } from '../../diagnostics';
 
   export let html: HTMLElement | null;
   export let baseUrl: string;
@@ -20,6 +21,7 @@
   let errorMessage = '';
   let result: AeoResult | null = null;
   let siteFiles: SiteFiles | null = null;
+  let siteFilesFailed = false;
   let loaded = false;
 
   // Band tokens (R2-29; the -500 dots had no dark variant and were 1.9-2.25:1 in light). Info is not
@@ -47,8 +49,11 @@
     errorMessage = '';
     try {
       siteFiles = baseUrl ? await fetchSiteFilesCached(baseUrl, scanKey) : null;
-    } catch {
-      siteFiles = null; // site checks just get skipped
+    } catch (err) {
+      // The site checks are skipped, and the result says so (`aeo-site-files`).
+      report(err, 'ai.site-files');
+      siteFiles = null;
+      siteFilesFailed = true;
     }
     loaded = true;
     loading = false;
@@ -59,7 +64,7 @@
   function analyze(verdict: IndexingVerdict | null) {
     if (!html) return;
     try {
-      result = analyzeAeo(html, siteFiles, baseUrl, verdict ?? undefined);
+      result = analyzeAeo(html, siteFiles, baseUrl, verdict ?? undefined, siteFilesFailed);
       errorMessage = '';
     } catch (err) {
       errorMessage = err instanceof Error ? err.message : String(err);
