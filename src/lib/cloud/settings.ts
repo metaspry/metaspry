@@ -6,7 +6,7 @@
 import { get } from 'svelte/store';
 import { firestoreSdk } from './sdk';
 import { cloudUser } from './auth';
-import { toast } from '../components/Toast/toast';
+import { toast } from '../toast';
 import { report } from '../diagnostics';
 import {
   settings,

@@ -28,7 +28,7 @@
   } from "../../cloud/workspaces";
   import { initWorkspaceScoring } from "../../cloud/workspace-scoring";
   import { report } from "../../diagnostics";
-  import { toast } from "../Toast/toast";
+  import { toast } from "../../toast";
 
   let open = false;
   let trigger: HTMLButtonElement | null = null;

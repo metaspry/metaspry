@@ -7,10 +7,8 @@ import { join, relative, sep } from 'node:path';
 
 const LIB = join('src', 'lib');
 const UI = new Set(['components', 'views']);
-// Known, scheduled to go: cloud/settings.ts still imports the toast store through the re-export
-// shim in components/Toast/toast.ts; it switches to '../toast' with the parallel settings branch,
-// then this entry and the shim are deleted (AGENTS.md 3.17). Do not add to this list.
-const ALLOWED = ['src/lib/cloud/settings.ts -> ../components/Toast/toast'];
+// Do not add exceptions: move the dependency into lib instead.
+const ALLOWED: string[] = [];
 
 function files(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
