@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { test, expect } from './fixtures';
 
 test.describe('extension load', () => {
@@ -12,5 +13,10 @@ test.describe('extension load', () => {
     // background.js ran its top-level setup (mode + context menu) without logging an error.
     await expect.poll(() => background.evaluate(() => chrome.action.getPopup({}))).toBe('');
     expect(backgroundErrors).toEqual([]);
+  });
+
+  test('the loaded extension reports the package.json version (stamped at build)', async ({ background }) => {
+    const { version } = JSON.parse(readFileSync('package.json', 'utf8')) as { version: string };
+    expect(await background.evaluate(() => chrome.runtime.getManifest().version)).toBe(version);
   });
 });

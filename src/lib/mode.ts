@@ -1,10 +1,10 @@
 import { get, writable } from 'svelte/store';
-import { watchKey } from './storage/watch';
-import { toast } from './components/Toast/toast';
+import { persisted } from './storage/persisted';
+import { toast } from './toast';
+import { MODE_KEY, parseMode, POPUP_PATH, type Mode } from './messaging/protocol';
 
-export type Mode = 'sidepanel' | 'popup';
+export type { Mode };
 
-const STORAGE_KEY = 'mode';
 const DEFAULT_MODE: Mode = 'sidepanel';
 
 /** Read synchronously by static/scripts/boot.js before first paint. */
@@ -24,39 +24,24 @@ function applyAttr(next: Mode): void {
   }
 }
 
-function readStorage(): Promise<Mode> {
-  return new Promise((resolve) => {
-    if (typeof chrome === 'undefined' || !chrome.storage?.local) {
-      resolve(DEFAULT_MODE);
-      return;
-    }
-    chrome.storage.local.get(STORAGE_KEY, (result) => {
-      const stored = result[STORAGE_KEY];
-      resolve(stored === 'popup' ? 'popup' : 'sidepanel');
-    });
-  });
-}
+// Mode is written by setMode only (a user action), so there is no store write to suppress.
+const backing = persisted<Mode>(
+  {
+    key: MODE_KEY,
+    fallback: () => DEFAULT_MODE,
+    parse: parseMode,
+    write: 'explicit',
+    onInit: (store) => store.subscribe(applyAttr),
+  },
+  mode,
+);
 
-function writeStorage(next: Mode): void {
-  if (typeof chrome === 'undefined' || !chrome.storage?.local) return;
-  chrome.storage.local.set({ [STORAGE_KEY]: next });
-}
-
-export async function initMode(): Promise<void> {
-  const initial = await readStorage();
-  applyAttr(initial);
-  mode.set(initial);
-  mode.subscribe(applyAttr);
-  // Mode is written by setMode only, so there is no write to suppress here.
-  watchKey(STORAGE_KEY, (raw) => {
-    mode.set(raw === 'popup' ? 'popup' : 'sidepanel');
-  });
-}
+export const initMode = backing.init;
 
 export function setMode(next: Mode): void {
   mode.update((current) => {
     if (current === next) return current;
-    writeStorage(next);
+    backing.write(next);
     return next;
   });
 }
@@ -71,7 +56,7 @@ function openSurface(next: Mode): Promise<void> {
     // branch awaits `windows.getCurrent()` first; Chrome has honoured the gesture across that one hop
     // in practice (AGENTS 3.2 gotcha). Either way a failure is handled by `switchMode`.
     if (next === 'popup') {
-      void chrome.action.setPopup({ popup: 'index.html' }).catch(() => undefined);
+      void chrome.action.setPopup({ popup: POPUP_PATH }).catch(() => undefined);
       return Promise.resolve(chrome.action.openPopup());
     }
     return chrome.windows.getCurrent().then((win) => {

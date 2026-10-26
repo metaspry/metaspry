@@ -9,6 +9,8 @@
   import { diffMeta, differenceCount, DIFF_LABEL, type DiffRow } from './diff';
   import { sameUrl } from '../../audit/url-match';
   import { BUTTON_PRIMARY } from '../button';
+  import { report } from '../../diagnostics';
+  import { fetchServedHtml } from './fetch-page';
 
   export let leftMeta: PageMeta;
   export let leftUrl: string;
@@ -16,8 +18,6 @@
   /** The left side's rule results: a failing required rule caps its band at warn (band.ts). */
   export let leftRules: readonly BandRule[] = [];
 
-  /** Every fetch in this tab is bounded; a host that never answers used to hang it forever. */
-  const FETCH_TIMEOUT_MS = 6000;
 
   // Pre-fill with the audited page's own URL so first-success is one click
   // away — user typically wants to compare against a previous version or a
@@ -33,6 +33,8 @@
   let rightRules: readonly BandRule[] = [];
   /** True when the left side is the rendered DOM and the right side is served HTML. */
   let mixedSources = false;
+  /** The compared URL redirected (often to a sign-in page): the diff is against where it landed. */
+  let redirectedTo = '';
   let onlyDifferences = false;
   $: shownRows = onlyDifferences ? rows.filter((r) => r.status !== 'same') : rows;
   $: diffCount = differenceCount(rows);
@@ -61,32 +63,10 @@
       if (res.url && !sameUrl(res.url, target)) return null;
       const doc = new DOMParser().parseFromString(text, 'text/html');
       return getMetaTags(doc.documentElement, res.url || target);
-    } catch {
-      return null;
-    }
-  }
-
-  /** GET as served HTML, bounded by `FETCH_TIMEOUT_MS` (the body read included). */
-  async function fetchServedHtml(target: string): Promise<{ res: Response; text: string }> {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-    try {
-      const res = await fetch(target, { credentials: 'omit', redirect: 'follow', signal: controller.signal });
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status} ${res.statusText}`);
-      }
-      const ct = res.headers.get('content-type') ?? '';
-      if (!ct.toLowerCase().includes('text/html')) {
-        throw new Error(`Not an HTML page (content-type: ${ct || 'unknown'}).`);
-      }
-      return { res, text: await res.text() };
     } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') {
-        throw new Error(`Timed out after ${FETCH_TIMEOUT_MS / 1000} s - the site did not answer.`);
-      }
-      throw err;
-    } finally {
-      clearTimeout(timer);
+      // Falls back to the rendered page (the "mixed sources" note); kept for a bug report.
+      report(err, 'compare.served-html');
+      return null;
     }
   }
 
@@ -102,6 +82,7 @@
     errorMessage = '';
     rightMeta = null;
     rows = [];
+    redirectedTo = '';
     try {
       const { res, text } = await fetchServedHtml(target);
       const finalUrl = res.url || target;
@@ -109,6 +90,9 @@
       const meta = getMetaTags(doc.documentElement, finalUrl);
       rightMeta = meta;
       rightUrl = finalUrl;
+      // The left side already refuses a redirected fetch (`fetchSourceMeta`); the compared side used
+      // to diff a login page against the user's page without a word (UX review 2026-10-25, Medium 18).
+      if (res.url && !sameUrl(res.url, target)) redirectedTo = res.url;
       // Left is the RENDERED DOM of the open tab, right is served HTML. On any SPA that alone
       // produces a wall of false differences, because the framework injects tags after load. Fetch
       // the left page's source too so both sides are the same kind of thing.
@@ -124,6 +108,7 @@
         rightRules = resolved.rules;
       }
     } catch (err) {
+      report(err, 'compare.fetch');
       errorMessage = err instanceof Error ? err.message : String(err);
     } finally {
       loading = false;
@@ -177,6 +162,11 @@
   {/if}
 
   {#if rightMeta}
+    {#if redirectedTo}
+      <p class="ms-note-warn" role="status">
+        This URL redirected to {redirectedTo}. If that is a sign-in page, the rows below compare against it, not the page you meant.
+      </p>
+    {/if}
     {#if mixedSources}
       <p
         class="rounded-xl border border-amber-400/40 bg-amber-50/70 px-3 py-2 text-[0.6875rem] text-amber-800 dark:border-amber-300/20 dark:bg-amber-500/10 dark:text-amber-200"
@@ -215,7 +205,7 @@
       <p class="text-xs text-slate-700 dark:text-slate-200" role="status">
         {diffCount === 0 ? 'No differences.' : `${diffCount} of ${rows.length} tags differ.`}
       </p>
-      <label class="inline-flex min-h-6 cursor-pointer items-center gap-2 text-xs text-slate-700 dark:text-slate-200">
+      <label class="inline-flex min-h-[1.5rem] cursor-pointer items-center gap-2 text-xs text-slate-700 dark:text-slate-200">
         <input type="checkbox" bind:checked={onlyDifferences} class="h-4 w-4 accent-indigo-600" />
         Show differences only
       </label>
@@ -234,8 +224,8 @@
             <span class="shrink-0 text-[0.6875rem] font-semibold {badgeClass(row.status)}">{DIFF_LABEL[row.status]}</span>
           </div>
           <div class="grid grid-cols-2 gap-2 pt-1">
-            <p class="break-all text-slate-700 dark:text-slate-300"><span class="sr-only">Current: </span>{row.left ?? '—'}</p>
-            <p class="break-all text-slate-700 dark:text-slate-300"><span class="sr-only">Compared: </span>{row.right ?? '—'}</p>
+            <p class="text-slate-700 [overflow-wrap:anywhere] dark:text-slate-300"><span class="sr-only">Current: </span>{row.left ?? '—'}</p>
+            <p class="text-slate-700 [overflow-wrap:anywhere] dark:text-slate-300"><span class="sr-only">Compared: </span>{row.right ?? '—'}</p>
           </div>
         </li>
       {/each}

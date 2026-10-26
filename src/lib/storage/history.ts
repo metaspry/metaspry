@@ -1,5 +1,4 @@
-import { writable } from 'svelte/store';
-import { makeWriteGuard, watchKey } from './watch';
+import { persisted } from './persisted';
 
 export interface HistoryEntry {
   url: string;
@@ -13,42 +12,24 @@ export interface HistoryEntry {
   requiredFailing?: boolean;
 }
 
-const STORAGE_KEY = 'history';
 const CAP = 10;
 
-export const history = writable<HistoryEntry[]>([]);
-
-function readStorage(): Promise<HistoryEntry[]> {
-  return new Promise((resolve) => {
-    if (typeof chrome === 'undefined' || !chrome.storage?.local) {
-      resolve([]);
-      return;
-    }
-    chrome.storage.local.get(STORAGE_KEY, (result) => {
-      const stored = result[STORAGE_KEY];
-      resolve(Array.isArray(stored) ? (stored as HistoryEntry[]).slice(0, CAP) : []);
-    });
-  });
+/** A stored list, capped; anything else (missing, corrupt, cleared) is an empty history. */
+export function parseHistory(raw: unknown): HistoryEntry[] {
+  return Array.isArray(raw) ? (raw as HistoryEntry[]).slice(0, CAP) : [];
 }
 
-const guard = makeWriteGuard();
+const backing = persisted<HistoryEntry[]>({
+  key: 'history',
+  fallback: () => [],
+  parse: parseHistory,
+  serialize: (list) => list.slice(0, CAP),
+  write: 'on-change',
+});
 
-function writeStorage(next: HistoryEntry[]): void {
-  // Don't echo a value another surface just wrote back at it.
-  if (guard.suppressed) return;
-  if (typeof chrome === 'undefined' || !chrome.storage?.local) return;
-  chrome.storage.local.set({ [STORAGE_KEY]: next.slice(0, CAP) });
-}
+export const history = backing.store;
 
-export async function initHistory(): Promise<void> {
-  const initial = await readStorage();
-  history.set(initial);
-  history.subscribe(writeStorage);
-  watchKey(STORAGE_KEY, (raw) => {
-    const next = Array.isArray(raw) ? (raw as HistoryEntry[]).slice(0, CAP) : [];
-    guard.applyExternal(() => history.set(next));
-  });
-}
+export const initHistory = backing.init;
 
 export function pushHistory(entry: HistoryEntry): void {
   history.update((list) => {

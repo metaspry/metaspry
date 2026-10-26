@@ -13,16 +13,17 @@
     iMessage / WhatsApp
   </header>
   <div class="bg-emerald-50 p-3 dark:bg-emerald-950/30">
-    <div class="ml-auto max-w-[85%] overflow-hidden rounded-2xl bg-emerald-500/90 text-white shadow">
+    <!-- emerald-700: white text was 2.34:1 on emerald-500/90 (UX review 2026-10-25, Medium 15). -->
+    <div class="ml-auto max-w-[85%] overflow-hidden rounded-2xl bg-emerald-700 text-white shadow">
       {#if image}
         <div class="aspect-[1.91/1] w-full">
-          <img src={image} alt="" class="h-full w-full object-cover" loading="lazy" />
+          <img src={image} alt="" class="h-full w-full object-cover" loading="lazy" referrerpolicy="no-referrer" />
         </div>
       {/if}
       <div class="space-y-0.5 px-3 py-2">
         <p class="line-clamp-2 text-sm font-semibold">{title}</p>
-        <p class="line-clamp-2 text-[0.6875rem] opacity-90">{description}</p>
-        <p class="text-[0.6875rem] opacity-80">{host}</p>
+        <p class="line-clamp-2 text-[0.6875rem]">{description}</p>
+        <p class="text-[0.6875rem] text-emerald-50">{host}</p>
       </div>
     </div>
   </div>

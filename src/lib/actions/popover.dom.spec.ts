@@ -102,3 +102,33 @@ describe('popover action (DOM)', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('focus leaving a non-modal panel (UX review 2026-10-25, Medium 22)', () => {
+  it('Tab to a control outside closes it; focus moving inside or to the trigger does not', () => {
+    const t = trigger();
+    const outside = document.createElement('button');
+    document.body.appendChild(outside);
+    const panel = panelWith('<button id="a">A</button><button id="b">B</button>');
+    const onClose = vi.fn();
+    const action = popover(panel, { onClose, trigger: t });
+    const a = panel.querySelector<HTMLElement>('#a')!;
+    a.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: panel.querySelector('#b') }));
+    a.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: t }));
+    a.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: null }));
+    expect(onClose).not.toHaveBeenCalled();
+    a.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: outside }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    action.destroy();
+  });
+
+  it('a modal panel ignores focus-out (it keeps focus with cycleTab)', () => {
+    const outside = document.createElement('button');
+    document.body.appendChild(outside);
+    const panel = panelWith('<button id="a">A</button>');
+    const onClose = vi.fn();
+    const action = popover(panel, { onClose, modal: true });
+    panel.querySelector('#a')!.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: outside }));
+    expect(onClose).not.toHaveBeenCalled();
+    action.destroy();
+  });
+});

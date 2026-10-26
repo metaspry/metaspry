@@ -1,0 +1,15 @@
+{
+  "_comment": "Settings normaliser vectors authored by the extension (architecture review 2026-10-26, Medium 10). `raw` is a stored settings value (chrome.storage, users/{uid}/settings/audit, workspaces/{id}/settings/audit); `expected` is what scoring must use. The extension's normalizeAuditSettings (storage/settings.ts) passes all of them; the app's mergeAuditSettings (src/lib/scan/auditSettings.ts) and the server's sanitizeSettings (functions/src/audit/shared.ts) should too.",
+  "version": 1,
+  "defaults": { "titleMin": 30, "titleMax": 60, "descMin": 70, "descMax": 160, "ogDescMin": 50, "ogDescMax": 200, "weights": { "required": 10, "recommended": 5, "best-practice": 3 } },
+  "vectors": [
+    { "name": "missing document", "raw": null, "expected": "defaults" },
+    { "name": "empty object", "raw": {}, "expected": "defaults" },
+    { "name": "partial override keeps the rest", "raw": { "titleMin": 20, "weights": { "required": 20 } }, "expected": { "titleMin": 20, "titleMax": 60, "descMin": 70, "descMax": 160, "ogDescMin": 50, "ogDescMax": 200, "weights": { "required": 20, "recommended": 5, "best-practice": 3 } } },
+    { "name": "all-zero weights fall back to the default weights", "raw": { "weights": { "required": 0, "recommended": 0, "best-practice": 0 } }, "expected": "defaults" },
+    { "name": "one zero weight is kept", "raw": { "weights": { "required": 10, "recommended": 0, "best-practice": 3 } }, "expected": { "titleMin": 30, "titleMax": 60, "descMin": 70, "descMax": 160, "ogDescMin": 50, "ogDescMax": 200, "weights": { "required": 10, "recommended": 0, "best-practice": 3 } } },
+    { "name": "non-numbers and negatives fall back per field", "raw": { "titleMin": "30", "descMax": -1, "ogDescMin": null, "weights": { "required": "x", "recommended": -2, "best-practice": 4 } }, "expected": { "titleMin": 30, "titleMax": 60, "descMin": 70, "descMax": 160, "ogDescMin": 50, "ogDescMax": 200, "weights": { "required": 10, "recommended": 5, "best-practice": 4 } } },
+    { "name": "weights not an object", "raw": { "weights": 7 }, "expected": "defaults" },
+    { "name": "unknown fields are dropped", "raw": { "titleMin": 25, "extra": true }, "expected": { "titleMin": 25, "titleMax": 60, "descMin": 70, "descMax": 160, "ogDescMin": 50, "ogDescMax": 200, "weights": { "required": 10, "recommended": 5, "best-practice": 3 } } }
+  ]
+}

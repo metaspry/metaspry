@@ -1,9 +1,8 @@
 import { writable } from 'svelte/store';
-import { watchKey } from './storage/watch';
+import { persisted } from './storage/persisted';
 
 export type Theme = 'light' | 'dark';
 
-const STORAGE_KEY = 'theme';
 const DEFAULT_THEME: Theme = 'light';
 
 /** Read synchronously by static/scripts/boot.js before first paint. */
@@ -31,42 +30,29 @@ function systemTheme(): Theme {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
-function readStorage(): Promise<Theme> {
-  return new Promise((resolve) => {
-    if (typeof chrome === 'undefined' || !chrome.storage?.local) {
-      resolve(systemTheme());
-      return;
-    }
-    chrome.storage.local.get(STORAGE_KEY, (result) => {
-      const stored = result[STORAGE_KEY];
-      if (stored === 'dark') resolve('dark');
-      else if (stored === 'light') resolve('light');
-      else resolve(systemTheme());
-    });
-  });
+/** A stored choice; anything else is "no choice" (follow the OS on load, ignore as a change). */
+export function parseTheme(raw: unknown): Theme | undefined {
+  return raw === 'dark' || raw === 'light' ? raw : undefined;
 }
 
-function writeStorage(next: Theme): void {
-  if (typeof chrome === 'undefined' || !chrome.storage?.local) return;
-  chrome.storage.local.set({ [STORAGE_KEY]: next });
-}
+// Theme is written by toggleTheme only (a user action), so there is no store write to suppress.
+const backing = persisted<Theme>(
+  {
+    key: 'theme',
+    fallback: systemTheme,
+    parse: parseTheme,
+    write: 'explicit',
+    onInit: (store) => store.subscribe(applyClass),
+  },
+  theme,
+);
 
-export async function initTheme(): Promise<void> {
-  const initial = await readStorage();
-  applyClass(initial);
-  theme.set(initial);
-  theme.subscribe(applyClass);
-  // Theme is written by toggleTheme only, so there is no write to suppress here.
-  watchKey(STORAGE_KEY, (raw) => {
-    if (raw !== 'dark' && raw !== 'light') return;
-    theme.set(raw);
-  });
-}
+export const initTheme = backing.init;
 
 export function toggleTheme(): void {
   theme.update((current) => {
     const next: Theme = current === 'dark' ? 'light' : 'dark';
-    writeStorage(next);
+    backing.write(next);
     return next;
   });
 }

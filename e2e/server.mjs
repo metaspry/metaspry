@@ -18,9 +18,17 @@ const TYPES = {
 const HEADERS = {
   '/noindex-header.html': { 'x-robots-tag': 'noindex' },
 };
+// Paths that answer with a redirect (Compare's "this URL redirected" note).
+const REDIRECTS = {
+  '/members-only.html': '/login.html',
+};
 
 createServer(async (req, res) => {
   const path = new URL(req.url ?? '/', 'http://localhost').pathname;
+  if (REDIRECTS[path]) {
+    res.writeHead(302, { location: REDIRECTS[path] }).end();
+    return;
+  }
   const file = normalize(join(ROOT, path.endsWith('/') ? `${path}index.html` : path));
   if (!file.startsWith(ROOT)) {
     res.writeHead(403).end();

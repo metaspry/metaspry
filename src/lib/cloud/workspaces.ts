@@ -6,6 +6,8 @@
 import { writable, get } from 'svelte/store';
 import { firestoreSdk } from './sdk';
 import { cloudUser } from './auth';
+import { report } from '../diagnostics';
+import { toast } from '../toast';
 
 export interface CloudWorkspace {
   id: string;
@@ -70,14 +72,20 @@ export async function fetchWorkspaces(uid: string): Promise<void> {
         };
       })
       .filter((w) => w.role === 'owner' || w.role === 'member');
+    // The user changed while this was in flight: their own fetch has (or will) set the list.
+    if (get(cloudUser)?.uid !== uid) return;
     workspaces.set(list);
     // If the saved target workspace is gone / no longer writable, fall back to personal.
     const cur = get(syncScope);
     if (cur.kind === 'workspace' && !list.some((w) => w.id === cur.wsId)) {
       setSyncScope({ kind: 'personal' });
+      // It used to switch silently, so a team member's scans started landing in Personal unnoticed
+      // (UX review 2026-10-25, Medium 20).
+      toast(`You no longer have access to ${cur.name}. New scans save to Personal.`, 'default');
     }
-  } catch {
-    workspaces.set([]);
+  } catch (err) {
+    report(err, 'cloud.workspaces');
+    if (get(cloudUser)?.uid === uid) workspaces.set([]);
   }
 }
 
@@ -91,7 +99,10 @@ export function initCloudWorkspaces(): void {
     syncScope.set({ kind: 'personal' });
     if (u) {
       void fetchWorkspaces(u.uid);
-      void loadScope(u.uid).then((s) => syncScope.set(s));
+      // Dropped when another account signed in before it loaded (architecture review 2026-10-26, High 5).
+      void loadScope(u.uid).then((s) => {
+        if (get(cloudUser)?.uid === u.uid) syncScope.set(s);
+      });
     } else {
       workspaces.set([]);
     }

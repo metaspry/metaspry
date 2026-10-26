@@ -1,0 +1,12 @@
+{
+  "_comment": "Scan identity vectors authored by the extension (architecture review 2026-10-26, High 3). `key` is what the scan is filed under (cloud/scan-identity.ts normalizeScanUrl: fragment dropped, one trailing slash dropped except the root); `id` is scanIdFor(key). `rawId` is scanIdFor(input), what the app's bulk-audit.ts and monitor-rescan.ts compute today: wherever it differs from `id`, the same page lands in two cloud documents. See docs/contract/README.md.",
+  "version": 1,
+  "vectors": [
+    { "input": "https://example.com/", "key": "https://example.com/", "id": "szuv6rc", "rawId": "szuv6rc" },
+    { "input": "https://metaspry.com/blog", "key": "https://metaspry.com/blog", "id": "s1ywz5c5", "rawId": "s1ywz5c5" },
+    { "input": "https://metaspry.com/blog/", "key": "https://metaspry.com/blog", "id": "s1ywz5c5", "rawId": "s1v8m4yc" },
+    { "input": "https://metaspry.com/blog/#comments", "key": "https://metaspry.com/blog", "id": "s1ywz5c5", "rawId": "s1tldjb1" },
+    { "input": "https://metaspry.com/pricing?plan=pro#faq", "key": "https://metaspry.com/pricing?plan=pro", "id": "smtuzd1", "rawId": "saqxfds" },
+    { "input": "HTTPS://Metaspry.com/Docs/", "key": "https://metaspry.com/Docs", "id": "s1ywc3oq", "rawId": "s130y1y1" }
+  ]
+}

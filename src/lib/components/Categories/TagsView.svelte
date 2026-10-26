@@ -19,7 +19,9 @@
     return out;
   }
 
-  $: allTags = [...syntheticTags(meta), ...meta.tags];
+  // A stable key per tag: a page with the same tag twice (exactly what the duplicate check reports)
+  // gave two identical `source:key:value` keys (UX review 2026-10-25, Medium 25).
+  $: allTags = [...syntheticTags(meta), ...meta.tags].map((t, i) => ({ ...t, uid: i }));
 
   $: searchLower = search.trim().toLowerCase();
 
@@ -57,13 +59,15 @@
   <SearchInput bind:value={search} />
   <CategoryChips {active} {counts} on:change={(e) => (active = e.detail)} />
   <ExportBar {meta} />
+  <!-- Filter results are announced politely (UX review 2026-10-25, Medium 23); silent when unfiltered. -->
+  <p class="sr-only" role="status">{searchLower || active !== 'all' ? `${visible.length} of ${allTags.length} tags shown` : ''}</p>
   {#if visible.length === 0}
     <p class="py-6 text-center text-sm ms-muted">
       No matches for current filter.
     </p>
   {:else}
     <div class="flex flex-wrap gap-3">
-      {#each visible as tag (tag.source + ':' + tag.key + ':' + tag.value)}
+      {#each visible as tag (tag.uid)}
         <TagCard {tag} />
       {/each}
     </div>

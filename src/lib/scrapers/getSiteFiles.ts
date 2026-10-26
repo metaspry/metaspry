@@ -1,3 +1,4 @@
+import { report } from '../diagnostics';
 import type {
   LlmsInfo,
   LlmsSection,
@@ -23,6 +24,80 @@ const SITEMAP_CONCURRENCY = 6;
 
 /** Marker for a child the budget stopped us reading, so the caller can flag the total. */
 export const BUDGET_ERROR = 'Not read - sitemap fetch budget reached.';
+/** Marker for an index child on a private or local address (or not http(s)): never requested. */
+export const BLOCKED_TARGET_ERROR = 'Not read - private or local address.';
+const PRIVATE_REDIRECT_ERROR = 'Redirected to a private network address.';
+/**
+ * robots.txt `Sitemap:` lines tried before the well-known paths. They were all tried, one after
+ * another, so a robots.txt with thousands of lines drove thousands of 4 s fetches (review High 4).
+ */
+export const MAX_ROBOTS_SITEMAPS = 5;
+/** How long the signed-in upload waits for site files before it writes the scan without them. */
+export const UPLOAD_SITE_FILES_WAIT_MS = 8000;
+
+const IPV4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+
+function privateIpv4(a: number, b: number): boolean {
+  return (
+    a === 0 || a === 10 || a === 127 ||
+    (a === 100 && b >= 64 && b <= 127) || // CGNAT
+    (a === 169 && b === 254) || // link-local, cloud metadata
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168)
+  );
+}
+
+/**
+ * Loopback, private, link-local or CGNAT addresses and local-only names. `hostname` as
+ * `URL.hostname` gives it (IPv6 in brackets, IPv4 already normalised from forms like `0x7f.1`).
+ */
+export function isPrivateHost(hostname: string): boolean {
+  const h = hostname.toLowerCase().replace(/\.$/, '');
+  if (h === 'localhost' || /\.(localhost|local|internal|lan|home\.arpa)$/.test(h)) return true;
+  const v4 = h.match(IPV4);
+  if (v4) return privateIpv4(Number(v4[1]), Number(v4[2]));
+  if (!h.startsWith('[')) return false;
+  const v6 = h.slice(1, -1);
+  if (v6 === '::1' || v6 === '::') return true;
+  if (/^f[cd][0-9a-f]{0,2}:/.test(v6) || /^fe[89ab][0-9a-f]?:/.test(v6)) return true;
+  // IPv4-mapped: URL serialises ::ffff:192.168.0.1 as ::ffff:c0a8:1.
+  const mappedHex = v6.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (mappedHex) {
+    const hi = parseInt(mappedHex[1] as string, 16);
+    return privateIpv4(hi >> 8, hi & 0xff);
+  }
+  const mappedDot = v6.match(/^::ffff:(\d{1,3})\.(\d{1,3})\.\d{1,3}\.\d{1,3}$/);
+  return !!mappedDot && privateIpv4(Number(mappedDot[1]), Number(mappedDot[2]));
+}
+
+/**
+ * May a sitemap URL the site declared (robots.txt `Sitemap:`, a sitemap index `<loc>`) be fetched
+ * for a page on `pageHost`? http(s) only. Another public host is fine: search engines accept a
+ * sitemap on a CDN or bucket when robots.txt declares it. A private, loopback or local address,
+ * or a single-label name (`http://intranet/`, which DNS search suffixes can resolve inside the
+ * user's network), only when it is the page's own host (a dev server, the e2e fixture site).
+ */
+function allowedTarget(url: string, pageHost: string): boolean {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return false;
+  }
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') return false;
+  const host = u.hostname;
+  if (host === pageHost) return true;
+  const singleLabel = !host.includes('.') && !host.startsWith('[');
+  return !singleLabel && !isPrivateHost(host);
+}
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return '';
+  }
+}
 
 /** Fetch budget for one `fetchSiteFiles` call. */
 interface Budget {
@@ -69,9 +144,17 @@ interface FetchedDoc {
   error?: string;
 }
 
-async function fetchText(url: string): Promise<FetchedDoc> {
+async function fetchText(url: string, pageHost: string): Promise<FetchedDoc> {
   const res = await fetchWithTimeout(url);
   if (!res) return { ok: false, text: '', contentType: '', status: 0, error: 'Request failed or timed out.' };
+  // fetch follows redirects without showing the hops; the final URL is all there is. A public
+  // site redirecting into the user's network gets nothing read, shown or uploaded.
+  // The final URL passes the same test as a request would (ultra review 2026-10-26, F2): a single-
+  // label host (`http://intranet/`) or a private address other than the page's own was let through.
+  const finalHost = hostOf(res.url || url);
+  if (finalHost && !allowedTarget(res.url || url, pageHost)) {
+    return { ok: false, text: '', contentType: '', status: res.status, error: PRIVATE_REDIRECT_ERROR };
+  }
   if (!res.ok) return { ok: false, text: '', contentType: res.headers.get('content-type') ?? '', status: res.status, error: `HTTP ${res.status}` };
   const text = await res.text();
   const cut = text.length > MAX_BODY;
@@ -174,9 +257,10 @@ function parseSitemapXml(raw: string): ParsedSitemap | null {
 }
 
 async function tryParseSitemap(
-  url: string
+  url: string,
+  pageHost: string
 ): Promise<{ ok: true; parsed: ParsedSitemap } | { ok: false; error: string; tooLarge?: boolean }> {
-  const fetched = await fetchText(url);
+  const fetched = await fetchText(url, pageHost);
   if (!fetched.ok) {
     return { ok: false, error: fetched.error ?? 'Fetch failed.' };
   }
@@ -199,12 +283,16 @@ async function tryParseSitemap(
   return { ok: true, parsed };
 }
 
-async function resolveSitemap(url: string, depth: number, budget: Budget): Promise<SitemapChild> {
+async function resolveSitemap(url: string, depth: number, budget: Budget, pageHost: string): Promise<SitemapChild> {
+  // An index can list any URL; one in the user's network is never requested.
+  if (!allowedTarget(url, pageHost)) {
+    return { url, urlCount: 0, isIndex: false, error: BLOCKED_TARGET_ERROR };
+  }
   if (budget.left <= 0) {
     return { url, urlCount: 0, isIndex: false, error: BUDGET_ERROR };
   }
   budget.left -= 1;
-  const res = await tryParseSitemap(url);
+  const res = await tryParseSitemap(url, pageHost);
   if (!res.ok) {
     return { url, urlCount: 0, isIndex: false, error: res.error };
   }
@@ -214,7 +302,7 @@ async function resolveSitemap(url: string, depth: number, budget: Budget): Promi
   }
   const childLocs = parsed.locs.slice(0, MAX_CHILDREN);
   const children = await mapLimit(childLocs, SITEMAP_CONCURRENCY, (loc) =>
-    resolveSitemap(loc, depth + 1, budget)
+    resolveSitemap(loc, depth + 1, budget, pageHost)
   );
   const total = children.reduce((sum, c) => sum + c.urlCount, 0);
   return { url, urlCount: total, isIndex: true };
@@ -233,7 +321,7 @@ function emptySitemap(error?: string): SitemapInfo {
   };
 }
 
-async function buildSitemapFromParsed(_sourceUrl: string, parsed: ParsedSitemap): Promise<SitemapInfo> {
+async function buildSitemapFromParsed(parsed: ParsedSitemap, pageHost: string): Promise<SitemapInfo> {
   if (!parsed.isIndex) {
     return {
       present: true,
@@ -250,7 +338,7 @@ async function buildSitemapFromParsed(_sourceUrl: string, parsed: ParsedSitemap)
   const childLocs = allChildLocs.slice(0, MAX_CHILDREN);
   const budget: Budget = { left: MAX_SITEMAP_FETCHES };
   const children = await mapLimit(childLocs, SITEMAP_CONCURRENCY, (loc) =>
-    resolveSitemap(loc, 1, budget)
+    resolveSitemap(loc, 1, budget, pageHost)
   );
   const total = children.reduce((sum, c) => sum + c.urlCount, 0);
   // Children we could not read contribute 0, so the total is a floor, not a count. Say so rather
@@ -279,11 +367,17 @@ const COMMON_SITEMAP_PATHS = [
 ];
 
 async function buildSitemap(baseUrl: string, robotsSitemaps: string[]): Promise<SitemapInfo> {
+  const pageHost = hostOf(baseUrl);
   const candidates: string[] = [];
-  // 1. URLs declared in robots.txt — highest priority signal
+  const skipped: string[] = [];
+  // 1. URLs declared in robots.txt — highest priority signal. Only the first MAX_ROBOTS_SITEMAPS,
+  // and none in the user's network: the file is the scanned site's to write, hostile or not.
   for (const u of robotsSitemaps) {
+    if (candidates.length >= MAX_ROBOTS_SITEMAPS) break;
     const resolved = resolvePath(baseUrl, u);
-    if (resolved && !candidates.includes(resolved)) candidates.push(resolved);
+    if (!resolved || candidates.includes(resolved) || skipped.includes(resolved)) continue;
+    if (allowedTarget(resolved, pageHost)) candidates.push(resolved);
+    else skipped.push(resolved);
   }
   // 2. Common well-known paths
   for (const path of COMMON_SITEMAP_PATHS) {
@@ -293,10 +387,13 @@ async function buildSitemap(baseUrl: string, robotsSitemaps: string[]): Promise<
   if (candidates.length === 0) return emptySitemap('Invalid base URL.');
 
   let lastError = 'No sitemap found at known locations.';
+  // Every candidate answered "not here" (404 / 410, or an HTML fallback page): the sitemap is
+  // missing, not unknown. The Site chip reads this instead of parsing the error text (F3).
+  let allNotFound = true;
   for (const candidate of candidates) {
-    const res = await tryParseSitemap(candidate);
+    const res = await tryParseSitemap(candidate, pageHost);
     if (res.ok) {
-      const built = await buildSitemapFromParsed(candidate, res.parsed);
+      const built = await buildSitemapFromParsed(res.parsed, pageHost);
       if (candidate === candidates[0]) return built;
       return { ...built, error: `Found at fallback location: ${candidate}` };
     }
@@ -307,8 +404,15 @@ async function buildSitemap(baseUrl: string, robotsSitemaps: string[]): Promise<
       return { ...emptySitemap(res.error), present: true };
     }
     lastError = `${candidate}: ${res.error}`;
+    if (!/^HTTP (404|410)$/.test(res.error) && !/returned HTML/i.test(res.error)) allNotFound = false;
   }
-  return emptySitemap(`Tried ${candidates.length} location(s). Last error — ${lastError}`);
+  const skippedNote = skipped.length
+    ? ` Skipped ${skipped.length} robots.txt sitemap(s) on a private or local address: ${skipped.slice(0, 3).join(', ')}${skipped.length > 3 ? ', ...' : ''}.`
+    : '';
+  return {
+    ...emptySitemap(`Tried ${candidates.length} location(s). Last error — ${lastError}${skippedNote}`),
+    ...(allNotFound ? { notFound: true } : {}),
+  };
 }
 
 function parseLlms(raw: string, baseUrl: string): LlmsSection[] {
@@ -342,7 +446,7 @@ async function buildRobots(baseUrl: string): Promise<RobotsInfo> {
   if (!target) {
     return { present: false, raw: null, groups: [], sitemaps: [], error: 'Invalid base URL.' };
   }
-  const fetched = await fetchText(target);
+  const fetched = await fetchText(target, hostOf(baseUrl));
   if (!fetched.ok) {
     return { present: false, raw: null, groups: [], sitemaps: [], ...(fetched.error ? { error: fetched.error } : {}) };
   }
@@ -363,7 +467,7 @@ async function buildLlms(baseUrl: string): Promise<LlmsInfo> {
   if (!target) {
     return { present: false, raw: null, sections: [], error: 'Invalid base URL.' };
   }
-  const fetched = await fetchText(target);
+  const fetched = await fetchText(target, hostOf(baseUrl));
   if (!fetched.ok) {
     return { present: false, raw: null, sections: [], ...(fetched.error ? { error: fetched.error } : {}) };
   }
@@ -415,4 +519,33 @@ export function fetchSiteFilesCached(
     if (cache.get(origin) === pending) cache.delete(origin);
   });
   return pending;
+}
+
+/**
+ * Site files for the signed-in upload: the same cached fetch the Site and AI tabs read, but the
+ * upload waits at most `waitMs` for it and then writes the scan without them (review High 4). A
+ * slow or hostile site held the upload until every sitemap fetch had timed out, and in popup mode
+ * the popup could close first, so the scan never synced.
+ */
+export function siteFilesForUpload(
+  baseUrl: string,
+  scanKey: number,
+  waitMs: number = UPLOAD_SITE_FILES_WAIT_MS,
+  fetcher: (baseUrl: string) => Promise<SiteFiles> = fetchSiteFiles,
+): Promise<SiteFiles | undefined> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(undefined), waitMs);
+    fetchSiteFilesCached(baseUrl, scanKey, fetcher).then(
+      (files) => {
+        clearTimeout(timer);
+        resolve(files);
+      },
+      (err) => {
+        clearTimeout(timer);
+        // The scan is still written; the failure is kept for a bug report (diagnostics.ts).
+        report(err, 'scan.site-files');
+        resolve(undefined);
+      },
+    );
+  });
 }

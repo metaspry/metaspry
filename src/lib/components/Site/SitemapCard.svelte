@@ -1,10 +1,16 @@
 <script lang="ts">
   import { safeHref } from '../../util/safe-href';
+  import { FOCUS_RING } from '../toolbar';
   import { tooltip } from '../../actions/tooltip';
   import type { SitemapInfo } from '../../scrapers/SiteFiles';
-  import { bandClasses } from '../../audit/band';
+  import { bandClasses, CHIP_NEUTRAL } from '../../audit/band';
+  import { fileChip, type SiteChip } from './chip';
 
   export let sitemap: SitemapInfo;
+
+  // Found / Missing / Couldn't check / Blocks all (chip.ts, UX review 2026-10-25 Medium 17).
+  const chipClass = (tone: SiteChip['tone']): string => (tone === 'neutral' ? CHIP_NEUTRAL : bandClasses(tone).chip);
+  $: chip = fileChip(sitemap, { label: 'Missing', tone: 'fail' });
 
   let showChildren = false;
 </script>
@@ -12,11 +18,7 @@
 <section class="overflow-hidden rounded-2xl border border-white/40 bg-white/50 shadow-md shadow-indigo-500/5 dark:border-white/10 dark:bg-white/5">
   <header class="flex items-center justify-between border-b border-white/40 px-4 py-2 dark:border-white/10">
     <h4 class="text-sm font-semibold text-slate-900 dark:text-slate-50">sitemap.xml</h4>
-    {#if sitemap.present}
-      <span class="rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-wider {bandClasses('good').chip}">Found</span>
-    {:else}
-      <span class="rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-wider {bandClasses('fail').chip}">Missing</span>
-    {/if}
+    <span class="rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-wider {chipClass(chip.tone)}">{chip.label}</span>
   </header>
   <div class="space-y-2 px-4 py-3 text-xs">
     {#if sitemap.present}
@@ -30,7 +32,7 @@
         </p>
         {#if sitemap.children.length > 0}
           <div class="space-y-1">
-            <button type="button" on:click={() => (showChildren = !showChildren)} class="text-[0.6875rem] font-medium text-indigo-600 hover:underline dark:text-indigo-300">
+            <button type="button" on:click={() => (showChildren = !showChildren)} aria-expanded={showChildren} class="inline-flex min-h-[1.5rem] items-center rounded text-[0.6875rem] font-medium text-indigo-700 hover:underline dark:text-indigo-300 {FOCUS_RING}">
               {showChildren ? 'Hide child sitemaps' : `Show ${sitemap.children.length} child sitemap${sitemap.children.length === 1 ? '' : 's'}`}
             </button>
             {#if showChildren}

@@ -31,6 +31,36 @@ const STORAGE_KEY = 'settings';
 
 export const settings = writable<Settings>(DEFAULT_SETTINGS);
 
+const num = (v: unknown, fallback: number): number => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : fallback);
+
+/**
+ * The one way a stored settings value (chrome.storage, the personal or a workspace cloud document)
+ * becomes `Settings` (architecture review 2026-10-26, Medium 10). It used to be four different
+ * spreads, and only the workspace path checked the values: an all-zero or non-numeric legacy
+ * document scored every page 0 here and normally in the app. Anything non-numeric or negative falls
+ * back to the default; all-zero weights fall back to the default weights, like the app's
+ * `mergeAuditSettings` and the server's `sanitizeSettings` (`contract/settings-normalize.json`).
+ */
+export function normalizeAuditSettings(raw: unknown): Settings {
+  const d = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const w = (d.weights && typeof d.weights === 'object' ? d.weights : {}) as Record<string, unknown>;
+  const weights = {
+    required: num(w.required, DEFAULT_SETTINGS.weights.required),
+    recommended: num(w.recommended, DEFAULT_SETTINGS.weights.recommended),
+    'best-practice': num(w['best-practice'], DEFAULT_SETTINGS.weights['best-practice']),
+  };
+  const allZero = weights.required + weights.recommended + weights['best-practice'] <= 0;
+  return {
+    titleMin: num(d.titleMin, DEFAULT_SETTINGS.titleMin),
+    titleMax: num(d.titleMax, DEFAULT_SETTINGS.titleMax),
+    descMin: num(d.descMin, DEFAULT_SETTINGS.descMin),
+    descMax: num(d.descMax, DEFAULT_SETTINGS.descMax),
+    ogDescMin: num(d.ogDescMin, DEFAULT_SETTINGS.ogDescMin),
+    ogDescMax: num(d.ogDescMax, DEFAULT_SETTINGS.ogDescMax),
+    weights: allZero ? { ...DEFAULT_SETTINGS.weights } : weights,
+  };
+}
+
 function readStorage(): Promise<Settings> {
   return new Promise((resolve) => {
     if (typeof chrome === 'undefined' || !chrome.storage?.local) {
@@ -38,16 +68,8 @@ function readStorage(): Promise<Settings> {
       return;
     }
     chrome.storage.local.get(STORAGE_KEY, (result) => {
-      const stored = result[STORAGE_KEY] as Partial<Settings> | undefined;
-      if (!stored) {
-        resolve(DEFAULT_SETTINGS);
-        return;
-      }
-      resolve({
-        ...DEFAULT_SETTINGS,
-        ...stored,
-        weights: { ...DEFAULT_SETTINGS.weights, ...(stored.weights ?? {}) },
-      });
+      const stored = result[STORAGE_KEY];
+      resolve(stored ? normalizeAuditSettings(stored) : DEFAULT_SETTINGS);
     });
   });
 }
@@ -67,6 +89,16 @@ export function applySettingsWithoutPersisting(next: Settings): void {
   guard.applyExternal(() => settings.set(next));
 }
 
+/**
+ * True while the store is being set from outside this surface's own edits: another surface's
+ * write (the watch) or the cloud pull. The cloud push must not fire then (architecture review
+ * 2026-10-26, High 5): every open surface used to re-upload the edit the other surface had already
+ * pushed.
+ */
+export function settingsChangeIsExternal(): boolean {
+  return guard.suppressed;
+}
+
 function writeStorage(next: Settings): void {
   if (guard.suppressed) return;
   if (typeof chrome === 'undefined' || !chrome.storage?.local) return;
@@ -78,14 +110,7 @@ export async function initSettings(): Promise<void> {
   settings.set(initial);
   settings.subscribe(writeStorage);
   watchKey(STORAGE_KEY, (raw) => {
-    const stored = (raw ?? undefined) as Partial<Settings> | undefined;
-    const next: Settings = stored
-      ? {
-          ...DEFAULT_SETTINGS,
-          ...stored,
-          weights: { ...DEFAULT_SETTINGS.weights, ...(stored.weights ?? {}) },
-        }
-      : DEFAULT_SETTINGS;
+    const next = raw ? normalizeAuditSettings(raw) : DEFAULT_SETTINGS;
     guard.applyExternal(() => settings.set(next));
   });
 }

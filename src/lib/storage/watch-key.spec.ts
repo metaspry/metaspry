@@ -59,3 +59,24 @@ describe('watchKey', () => {
     expect(() => watchKey('history', () => {})).not.toThrow();
   });
 });
+
+describe('watchKey unsubscribe', () => {
+  it('returns a function that removes exactly its own listener', async () => {
+    const { fakeStorage } = await import('../../test/fake-storage');
+    const fake = fakeStorage();
+    vi.stubGlobal('chrome', fake.chrome);
+    const a = vi.fn();
+    const b = vi.fn();
+    const stopA = watchKey('history', a);
+    watchKey('history', b);
+    stopA();
+    await fake.external('history', []);
+    expect(a).not.toHaveBeenCalled();
+    expect(b).toHaveBeenCalledTimes(1);
+    vi.unstubAllGlobals();
+  });
+
+  it('returns a no-op outside the extension runtime', () => {
+    expect(() => watchKey('history', () => {})()).not.toThrow();
+  });
+});

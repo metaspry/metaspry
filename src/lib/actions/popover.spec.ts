@@ -14,6 +14,8 @@ interface FakeEl {
   querySelectorAll: (sel: string) => FakeEl[];
   hasAttribute: (k: string) => boolean;
   setAttribute: (k: string, v: string) => void;
+  addEventListener: (type: string, fn: unknown) => void;
+  removeEventListener: (type: string, fn: unknown) => void;
 }
 
 const doc = {
@@ -38,6 +40,9 @@ function el(name: string, children: FakeEl[] = [], selector?: string): FakeEl {
     querySelectorAll: (sel) => (sel === FOCUSABLE ? children : []),
     hasAttribute: (k) => self.attrs.has(k),
     setAttribute: (k, v) => self.attrs.set(k, v),
+    // The panel's own focusout listener (focus leaving a non-modal panel); exercised in the DOM spec.
+    addEventListener: () => {},
+    removeEventListener: () => {},
   };
   return self;
 }

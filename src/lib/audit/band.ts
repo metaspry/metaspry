@@ -4,7 +4,9 @@
  * ring, Compare numbers) goes through here so the hues and the 80 / 50 cut-offs cannot drift, and
  * so they match the web app's `bandForScore` / `bandLabel`.
  */
-export type Band = 'good' | 'warn' | 'fail';
+import { bandForScore, capBand as contractCapBand, hasFailingRequired as contractHasFailingRequired, type ScoreBand } from '../contract/scan-contract';
+
+export type Band = ScoreBand;
 
 /** A rule result as far as the band cap cares. `status` may also be `pending` (not a fail). */
 export interface BandRule {
@@ -12,15 +14,13 @@ export interface BandRule {
   status?: string;
 }
 
-/** Does any rule with severity `required` have status `fail`? */
+/** Does any rule with severity `required` have status `fail`? (The shared contract's.) */
 export function hasFailingRequired(rules: readonly BandRule[] | null | undefined): boolean {
-  return (rules ?? []).some((r) => !!r && r.severity === 'required' && r.status === 'fail');
+  return contractHasFailingRequired(rules);
 }
 
 /** The required-fail cap (2026-09-30): `good` becomes `warn`; `warn` and `fail` are unchanged. */
-export function capBand(band: Band, requiredFailing: boolean): Band {
-  return requiredFailing && band === 'good' ? 'warn' : band;
-}
+export const capBand: (band: Band, requiredFailing: boolean) => Band = contractCapBand;
 
 /**
  * Score band: 80+ good, 50-79 warn, under 50 fail; capped at `warn` when any `required` rule fails
@@ -28,8 +28,7 @@ export function capBand(band: Band, requiredFailing: boolean): Band {
  * table as the web app's `bandFor` and the server engine's `band()`.
  */
 export function bandFor(score: number, rules?: readonly BandRule[] | null): Band {
-  const b: Band = score >= 80 ? 'good' : score >= 50 ? 'warn' : 'fail';
-  return capBand(b, hasFailingRequired(rules));
+  return capBand(bandForScore(score), hasFailingRequired(rules));
 }
 
 /** Stand-in rule list for a stored result that kept only "a required rule failed" (local History). */

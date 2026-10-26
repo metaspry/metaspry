@@ -5,6 +5,7 @@
   import { popover } from '../../actions/popover';
   import { FOCUS_RING } from '../toolbar';
   import { dur } from '../../motion';
+  import { DIGIT_RANGE, TAB_NAMES } from '../../tabs/registry';
 
   const TITLE_ID = 'shortcuts-help-title';
 
@@ -15,8 +16,8 @@
   // `single`: a single-key shortcut that Settings > Preferences can turn off (WCAG 2.1.4).
   const rows: { key: string; label: string; single: boolean }[] = [
     { key: '/', label: 'Focus search', single: true },
-    { key: '1 – 6', label: 'Switch to Tags / Previews / Audit / Site / AI / Compare', single: true },
-    { key: 'r', label: 'Re-scan current page', single: true },
+    { key: DIGIT_RANGE, label: `Switch to ${TAB_NAMES}`, single: true },
+    { key: 'r', label: 'Re-scan this page', single: true },
     { key: '?', label: 'Toggle this help', single: false },
     { key: 'Esc', label: 'Close drawers and modals', single: false },
   ];

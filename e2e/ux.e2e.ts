@@ -209,3 +209,74 @@ test.describe('steady, light open (items 11, 12)', () => {
     expect(blurred).toBeLessThanOrEqual(1);
   });
 });
+
+test.describe('Compare explains what happened (UX review 2026-10-25, Medium 18)', () => {
+  test('a missing page reads "Page not found", not a raw status line', async ({ openSurface }) => {
+    const { ext } = await openSurface('/');
+    await scanFromLanding(ext);
+    await openTab(ext, 'Compare');
+    const panel = ext.getByRole('tabpanel');
+    await panel.getByRole('textbox', { name: 'URL to compare' }).fill(`${SITE}/does-not-exist.html`);
+    await panel.getByRole('button', { name: 'Compare' }).click();
+    await expect(panel.getByRole('alert')).toHaveText('Page not found (HTTP 404). Check the URL.');
+  });
+
+  test('a URL that redirects to a sign-in page says so above the rows', async ({ openSurface }) => {
+    const { ext } = await openSurface('/');
+    await scanFromLanding(ext);
+    await openTab(ext, 'Compare');
+    const panel = ext.getByRole('tabpanel');
+    await panel.getByRole('textbox', { name: 'URL to compare' }).fill(`${SITE}/members-only.html`);
+    await panel.getByRole('button', { name: 'Compare' }).click();
+    await expect(panel.getByText(`This URL redirected to ${SITE}/login.html.`, { exact: false })).toBeVisible();
+    await expect(panel.getByRole('list', { name: 'Tag differences' })).toBeVisible();
+  });
+});
+
+test.describe('header menus and the keyboard (UX review 2026-10-25, Medium 22)', () => {
+  test('arrow keys inside History stay in History; Tab out of it closes it', async ({ openSurface }) => {
+    const { ext } = await openSurface('/');
+    await scanFromLanding(ext);
+    await ext.getByRole('button', { name: 'History' }).click();
+    const panel = ext.getByRole('dialog', { name: 'Recent scans' });
+    await expect(panel).toBeVisible();
+    await panel.locator('button').first().focus();
+    await ext.keyboard.press('ArrowRight');
+    expect(await panel.evaluate((el) => el.contains(document.activeElement))).toBe(true);
+
+    for (let i = 0; i < 12 && (await panel.count()) > 0; i++) await ext.keyboard.press('Tab');
+    await expect(panel).toHaveCount(0);
+  });
+});
+
+test.describe('status is announced, duplicates render (UX review 2026-10-25, Mediums 23 and 25)', () => {
+  test('the Site and AI tabs announce what they found; the Tags filter announces its count', async ({ openSurface }) => {
+    const { ext } = await openSurface('/');
+    await scanFromLanding(ext);
+
+    await ext.getByRole('tabpanel').locator('input[data-shortcut="search"]').fill('og:');
+    await expect(ext.getByRole('tabpanel').getByRole('status').filter({ hasText: /^\d+ of \d+ tags shown$/ })).toBeAttached();
+
+    await openTab(ext, 'Site');
+    await expect(ext.getByRole('tabpanel').getByRole('status').filter({ hasText: 'robots.txt found, sitemap found, llms.txt found' })).toBeAttached();
+    await openTab(ext, 'AI');
+    await expect(ext.getByRole('tabpanel').getByRole('status').filter({ hasText: /^AI readiness: / })).toBeAttached();
+  });
+
+  test('a tag repeated with the same value shows twice', async ({ openSurface }) => {
+    const { ext } = await openSurface('/dup.html');
+    await scanFromLanding(ext);
+    await ext.getByRole('tabpanel').locator('input[data-shortcut="search"]').fill('Same twice');
+    await expect(ext.getByRole('tabpanel').getByText('Same twice', { exact: true })).toHaveCount(2);
+  });
+});
+
+test('a dead og:image is called out, not drawn as a placeholder (UX review 2026-10-25, Medium 21)', async ({ openSurface }) => {
+  const { ext } = await openSurface('/broken-image.html');
+  await scanFromLanding(ext);
+  await openTab(ext, 'Previews');
+  const panel = ext.getByRole('tabpanel');
+  await expect(panel.getByText("og:image didn't load", { exact: false })).toBeVisible();
+  await expect(panel.getByText('og:image failed to load').first()).toBeVisible();
+  await expect(panel.locator('img[src$="missing-image.png"]')).toHaveCount(0);
+});

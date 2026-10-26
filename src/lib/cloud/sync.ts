@@ -4,20 +4,13 @@
  * (deterministic id) so history shows the latest state per URL, not duplicates.
  */
 import { firestoreSdk } from './sdk';
-import type { PageMeta } from '../scrapers/PageMeta';
+import type { PageMeta, TagCategory } from '../scrapers/PageMeta';
 import type { AuditResult, RuleStatus } from '../audit/AuditResult';
 import type { SiteFiles } from '../scrapers/SiteFiles';
 import type { SyncScope } from './workspaces';
 import { bandFor } from '../audit/band';
-
-const SCAN_SCHEMA_VERSION = 1;
-
-/** Stable, Firestore-safe doc id from a URL (djb2 hash). */
-function scanIdFor(url: string): string {
-  let h = 5381;
-  for (let i = 0; i < url.length; i++) h = ((h << 5) + h + url.charCodeAt(i)) >>> 0;
-  return 's' + h.toString(36);
-}
+// The version and the id come from the contract shared with the app (contract/scan-contract.ts).
+import { SCAN_SCHEMA_VERSION, scanIdFor } from '../contract/scan-contract';
 
 function mapStatus(s: RuleStatus): 'pass' | 'warn' | 'fail' {
   if (s === 'pass') return 'pass';
@@ -32,6 +25,30 @@ function hostnameOf(url: string): string {
     return '';
   }
 }
+
+/**
+ * Firestore rejects a document over 1 MiB; `pageMeta.tags` copied every tag of a page captured up to
+ * 3 MB (architecture review 2026-10-26, High 5). Each value is cut to TAG_VALUE_MAX characters and
+ * the list to TAG_MAX entries; `tagCount` stays the true count. Real pages are far under both.
+ */
+export const TAG_VALUE_MAX = 2000;
+export const TAG_MAX = 300;
+
+/**
+ * The site-files summary caps, the server's (`app/functions/src/site-files.ts` MAX_*), so the app's
+ * Site tab shows the same for an extension scan as for a bulk or monitor scan (architecture review
+ * 2026-10-26, Medium 15; the extension cut robots groups at 8 and llms at 15 x 15).
+ */
+export const SITE_SUMMARY_CAPS = { robotGroups: 30, sitemapSample: 10, sitemapChildren: 20, llmsSections: 20, llmsLinks: 20 } as const;
+
+/** The app renders `category` as the group heading; these are the server engine's labels. */
+export const CATEGORY_LABEL: Record<TagCategory, string> = {
+  og: 'Open Graph',
+  twitter: 'Twitter',
+  seo: 'SEO',
+  basic: 'Basic',
+  other: 'Other',
+};
 
 /** Build the cloud payload. Undefined fields are dropped on write (ignoreUndefinedProperties). */
 export function toScanPayload(
@@ -48,7 +65,7 @@ export function toScanPayload(
     ? {
         robots: {
           present: siteFiles.robots.present,
-          groups: siteFiles.robots.groups.slice(0, 8).map((g) => ({
+          groups: siteFiles.robots.groups.slice(0, SITE_SUMMARY_CAPS.robotGroups).map((g) => ({
             userAgents: g.userAgents,
             disallow: g.disallow.length,
             allow: g.allow.length,
@@ -60,20 +77,20 @@ export function toScanPayload(
           isIndex: siteFiles.sitemap.isIndex,
           urlCount: siteFiles.sitemap.urlCount,
           childCount: siteFiles.sitemap.childCount,
-          children: siteFiles.sitemap.children.slice(0, 20).map((c) => ({
+          children: siteFiles.sitemap.children.slice(0, SITE_SUMMARY_CAPS.sitemapChildren).map((c) => ({
             url: c.url,
             urlCount: c.urlCount,
             isIndex: c.isIndex,
             error: c.error,
           })),
-          sample: siteFiles.sitemap.sample.slice(0, 10),
+          sample: siteFiles.sitemap.sample.slice(0, SITE_SUMMARY_CAPS.sitemapSample),
           truncated: siteFiles.sitemap.truncated,
         },
         llms: {
           present: siteFiles.llms.present,
-          sections: siteFiles.llms.sections.slice(0, 15).map((s) => ({
+          sections: siteFiles.llms.sections.slice(0, SITE_SUMMARY_CAPS.llmsSections).map((s) => ({
             heading: s.heading,
-            links: s.links.slice(0, 15),
+            links: s.links.slice(0, SITE_SUMMARY_CAPS.llmsLinks),
           })),
         },
       }
@@ -99,7 +116,11 @@ export function toScanPayload(
       ogImage: tagValue('og:image') ?? tagValue('twitter:image'),
       favicon: meta.icon ?? undefined,
       tagCount: meta.tags.length,
-      tags: meta.tags.map((t) => ({ key: t.key, value: t.value, category: t.category })),
+      tags: meta.tags.slice(0, TAG_MAX).map((t) => ({
+        key: t.key,
+        value: t.value.length > TAG_VALUE_MAX ? t.value.slice(0, TAG_VALUE_MAX) : t.value,
+        category: CATEGORY_LABEL[t.category],
+      })),
     },
     audit: {
       score: auditResult.score,
@@ -125,6 +146,8 @@ export interface UploadResult {
   hadPrevious: boolean;
   /** That document's `scannedAt`, or null when there was none. */
   previousScannedAt: number | null;
+  /** The workspace the scan was saved to, or null for Personal (the compare link's scope). */
+  workspaceId: string | null;
 }
 
 export async function uploadScan(
@@ -133,7 +156,7 @@ export async function uploadScan(
   scope: SyncScope = { kind: 'personal' }
 ): Promise<UploadResult> {
   const id = scanIdFor(payload.url);
-  const { db, doc, getDoc, setDoc, serverTimestamp } = await firestoreSdk();
+  const { db, doc, runTransaction, serverTimestamp } = await firestoreSdk();
   const ref =
     scope.kind === 'workspace'
       ? doc(db, 'workspaces', scope.wsId, 'scans', id)
@@ -145,17 +168,27 @@ export async function uploadScan(
   // description, canonical, ogImage and favicon — with merge those are DROPPED from the write and
   // the document keeps the previous scan's values, so the web app would show a stale robots/sitemap
   // summary or a description the site has since removed, beside a fresh score and timestamp.
-  const existing = await getDoc(ref);
-  const prev = existing.data();
-  await setDoc(ref, {
-    ...payload,
-    workspaceId: scope.kind === 'workspace' ? scope.wsId : null,
-    starred: prev?.starred ?? false,
-    createdAt: prev?.createdAt ?? serverTimestamp(),
+  // In a transaction (architecture review 2026-10-26, High 5): a read then a separate write let two
+  // surfaces, or two quick re-scans, interleave and drop a `starred` set in between.
+  return runTransaction(db, async (tx) => {
+    const existing = await tx.get(ref);
+    const prev = existing.data();
+    tx.set(ref, {
+      ...payload,
+      // No site files this time (the upload stopped waiting for a slow site, or the fetch failed):
+      // keep the ones the document already has. The whole-document write otherwise erased the
+      // app's Site tab on every slow re-scan (ultra review 2026-10-26, F0). A completed fetch,
+      // including one that found nothing, still replaces them.
+      ...(payload.siteFiles === undefined && prev?.siteFiles !== undefined ? { siteFiles: prev.siteFiles } : {}),
+      workspaceId: scope.kind === 'workspace' ? scope.wsId : null,
+      starred: prev?.starred ?? false,
+      createdAt: prev?.createdAt ?? serverTimestamp(),
+    });
+    return {
+      id,
+      hadPrevious: existing.exists(),
+      previousScannedAt: typeof prev?.scannedAt === 'number' ? prev.scannedAt : null,
+      workspaceId: scope.kind === 'workspace' ? scope.wsId : null,
+    };
   });
-  return {
-    id,
-    hadPrevious: existing.exists(),
-    previousScannedAt: typeof prev?.scannedAt === 'number' ? prev.scannedAt : null,
-  };
 }

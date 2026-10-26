@@ -1,10 +1,16 @@
 <script lang="ts">
   import { safeHref } from '../../util/safe-href';
+  import { FOCUS_RING } from '../toolbar';
   import { tooltip } from '../../actions/tooltip';
-  import { bandClasses } from '../../audit/band';
+  import { bandClasses, CHIP_NEUTRAL } from '../../audit/band';
   import type { RobotsInfo } from '../../scrapers/SiteFiles';
+  import { robotsChip, type SiteChip } from './chip';
 
   export let robots: RobotsInfo;
+
+  // Found / Missing / Couldn't check / Blocks all (chip.ts, UX review 2026-10-25 Medium 17).
+  const chipClass = (tone: SiteChip['tone']): string => (tone === 'neutral' ? CHIP_NEUTRAL : bandClasses(tone).chip);
+  $: chip = robotsChip(robots);
 
   let showRaw = false;
 </script>
@@ -12,11 +18,7 @@
 <section class="overflow-hidden rounded-2xl border border-white/40 bg-white/50 shadow-md shadow-indigo-500/5 dark:border-white/10 dark:bg-white/5">
   <header class="flex items-center justify-between border-b border-white/40 px-4 py-2 dark:border-white/10">
     <h4 class="text-sm font-semibold text-slate-900 dark:text-slate-50">robots.txt</h4>
-    {#if robots.present}
-      <span class="rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-wider {bandClasses('good').chip}">Found</span>
-    {:else}
-      <span class="rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-wider {bandClasses('fail').chip}">Missing</span>
-    {/if}
+    <span class="rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-wider {chipClass(chip.tone)}">{chip.label}</span>
   </header>
   <div class="space-y-2 px-4 py-3 text-xs">
     {#if robots.present}
@@ -56,11 +58,11 @@
         </div>
       {/if}
       {#if robots.raw}
-        <button type="button" on:click={() => (showRaw = !showRaw)} class="text-[0.6875rem] font-medium text-indigo-600 hover:underline dark:text-indigo-300">
+        <button type="button" on:click={() => (showRaw = !showRaw)} aria-expanded={showRaw} class="inline-flex min-h-[1.5rem] items-center rounded text-[0.6875rem] font-medium text-indigo-700 hover:underline dark:text-indigo-300 {FOCUS_RING}">
           {showRaw ? 'Hide raw' : 'Show raw'}
         </button>
         {#if showRaw}
-          <pre class="max-h-48 overflow-auto rounded-lg bg-slate-900/80 p-2 text-[0.6875rem] text-slate-100 dark:bg-slate-950/80">{robots.raw}</pre>
+          <pre class="max-h-48 overflow-auto overscroll-contain rounded-lg bg-slate-900/80 p-2 text-[0.6875rem] text-slate-100 dark:bg-slate-950/80">{robots.raw}</pre>
         {/if}
       {/if}
     {:else}

@@ -17,9 +17,27 @@ vi.mock('firebase/firestore', () => ({
     lastSetOptions = options;
   },
   serverTimestamp: () => 'server-time',
+  // The transaction runs its body against the same store; `set` records the options like setDoc.
+  runTransaction: async (_db: unknown, body: (tx: unknown) => Promise<unknown>) => {
+    transactions++;
+    return body({
+      get: async (ref: { path: string }) => {
+        const data = store.get(ref.path);
+        return { exists: () => data !== undefined, data: () => data };
+      },
+      set: (ref: { path: string }, data: Record<string, unknown>, options?: unknown) => {
+        store.set(ref.path, data);
+        lastSetOptions = options;
+      },
+    });
+  },
 }));
+let transactions = 0;
 
-import { uploadScan, type toScanPayload } from './sync';
+import { uploadScan, toScanPayload, TAG_MAX, TAG_VALUE_MAX, SITE_SUMMARY_CAPS } from './sync';
+import type { SiteFiles } from '../scrapers/SiteFiles';
+import { getMetaTags } from '../scrapers/getMetaTags';
+import { audit } from '../audit/rules';
 
 const payload = (url: string) =>
   ({ url, scannedAt: 2_000, starred: false }) as unknown as ReturnType<typeof toScanPayload>;
@@ -64,6 +82,7 @@ describe('uploadScan', () => {
       name: 'Acme',
     });
     expect(store.get(`workspaces/ws1/scans/${r.id}`)).toMatchObject({ workspaceId: 'ws1' });
+    expect(r.workspaceId).toBe('ws1');
     expect(r.hadPrevious).toBe(false);
   });
 
@@ -73,5 +92,83 @@ describe('uploadScan', () => {
     const r = await uploadScan('u1', payload('https://acme.com/'));
     expect(r.hadPrevious).toBe(true);
     expect(r.previousScannedAt).toBeNull();
+  });
+});
+
+describe('uploadScan writes atomically (architecture review 2026-10-26, High 5)', () => {
+  it('reads the previous document and writes the new one in one transaction', async () => {
+    const before = transactions;
+    await uploadScan('u1', payload('https://acme.com/tx'));
+    expect(transactions).toBe(before + 1);
+  });
+});
+
+describe('toScanPayload stays under the Firestore document limit', () => {
+  it('cuts long tag values and caps the tag list; tagCount stays true', () => {
+    const big = 'x'.repeat(TAG_VALUE_MAX + 500);
+    const metas = Array.from({ length: TAG_MAX + 50 }, (_, i) => `<meta name="k${i}" content="${big}">`).join('');
+    const html = `<html><head><title>T</title>${metas}</head></html>`;
+    const meta = getMetaTags(new DOMParser().parseFromString(html, 'text/html').documentElement, 'https://a.com/');
+    const p = toScanPayload(meta, audit(meta), 'https://a.com/');
+    expect(p.pageMeta.tagCount).toBe(TAG_MAX + 50);
+    expect(p.pageMeta.tags).toHaveLength(TAG_MAX);
+    expect(p.pageMeta.tags.every((t) => t.value.length <= TAG_VALUE_MAX)).toBe(true);
+    expect(new TextEncoder().encode(JSON.stringify(p)).length).toBeLessThan(1_000_000);
+  });
+});
+
+describe('toScanPayload matches what the app renders for a server scan (architecture review 2026-10-26, Medium 15)', () => {
+  const meta = getMetaTags(
+    new DOMParser().parseFromString(
+      '<html><head><title>T</title><meta property="og:title" content="x"><meta property="article:section" content="y"><meta name="twitter:card" content="summary"><meta name="description" content="d"><meta name="viewport" content="w"><meta name="fb:app_id" content="1"></head></html>',
+      'text/html',
+    ).documentElement,
+    'https://a.com/',
+  );
+
+  it('tag categories use the server labels the app shows as headings', () => {
+    const p = toScanPayload(meta, audit(meta), 'https://a.com/');
+    const cat = Object.fromEntries(p.pageMeta.tags.map((t) => [t.key, t.category]));
+    expect(cat).toMatchObject({
+      'og:title': 'Open Graph',
+      'article:section': 'Open Graph',
+      'twitter:card': 'Twitter',
+      description: 'SEO',
+      viewport: 'Basic',
+      'fb:app_id': 'Other',
+    });
+  });
+
+  it('site-file summaries use the server caps', () => {
+    const many = <T>(n: number, f: (i: number) => T): T[] => Array.from({ length: n }, (_, i) => f(i));
+    const siteFiles = {
+      robots: { present: true, groups: many(40, (i) => ({ userAgents: [`bot${i}`], disallow: [], allow: [] })), sitemaps: [] },
+      sitemap: { present: true, isIndex: true, urlCount: 0, childCount: 30, children: many(30, (i) => ({ url: `u${i}`, urlCount: 1, isIndex: false })), sample: many(15, (i) => `s${i}`), truncated: false },
+      llms: { present: true, sections: many(25, (i) => ({ heading: `h${i}`, links: many(25, (j) => ({ label: `l${j}`, url: `x${j}` })) })) },
+    } as unknown as SiteFiles;
+    const s = toScanPayload(meta, audit(meta), 'https://a.com/', siteFiles).siteFiles!;
+    expect(s.robots.groups).toHaveLength(SITE_SUMMARY_CAPS.robotGroups);
+    expect(s.sitemap.children).toHaveLength(SITE_SUMMARY_CAPS.sitemapChildren);
+    expect(s.sitemap.sample).toHaveLength(SITE_SUMMARY_CAPS.sitemapSample);
+    expect(s.llms.sections).toHaveLength(SITE_SUMMARY_CAPS.llmsSections);
+    expect(s.llms.sections[0]!.links).toHaveLength(SITE_SUMMARY_CAPS.llmsLinks);
+    expect(SITE_SUMMARY_CAPS).toEqual({ robotGroups: 30, sitemapSample: 10, sitemapChildren: 20, llmsSections: 20, llmsLinks: 20 });
+  });
+});
+
+describe('a re-scan without site files keeps the stored ones (ultra review F0)', () => {
+  it('an upload whose site-files wait timed out does not erase the previous summary', async () => {
+    const withFiles = { ...payload('https://acme.com/sf'), siteFiles: { robots: { present: true } } };
+    const first = await uploadScan('u1', withFiles as unknown as ReturnType<typeof toScanPayload>);
+    await uploadScan('u1', payload('https://acme.com/sf'));
+    expect(store.get(`users/u1/scans/${first.id}`)?.siteFiles).toEqual({ robots: { present: true } });
+  });
+
+  it('a completed fetch still replaces them', async () => {
+    const a = { ...payload('https://acme.com/sf2'), siteFiles: { robots: { present: true } } };
+    const b = { ...payload('https://acme.com/sf2'), siteFiles: { robots: { present: false } } };
+    const r = await uploadScan('u1', a as unknown as ReturnType<typeof toScanPayload>);
+    await uploadScan('u1', b as unknown as ReturnType<typeof toScanPayload>);
+    expect(store.get(`users/u1/scans/${r.id}`)?.siteFiles).toEqual({ robots: { present: false } });
   });
 });

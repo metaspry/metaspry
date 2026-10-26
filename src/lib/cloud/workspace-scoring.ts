@@ -9,7 +9,7 @@
 import { writable, derived, type Readable } from 'svelte/store';
 import { firestoreSdk } from './sdk';
 import { syncScope, workspaces } from './workspaces';
-import { DEFAULT_SETTINGS, type Settings } from '../storage/settings';
+import { DEFAULT_SETTINGS, normalizeAuditSettings, type Settings } from '../storage/settings';
 
 export interface WorkspaceRules {
   wsId: string;
@@ -22,32 +22,8 @@ export function workspacePlanEntitled(plan: unknown): boolean {
   return plan !== 'inactive';
 }
 
-const num = (v: unknown, fallback: number): number => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : fallback);
-
-/**
- * A stored settings document merged over the defaults; anything non-numeric falls back. All-zero
- * weights fall back to the default weights, like the app's `mergeAuditSettings`, so a page scores
- * the same here as in the app instead of 0.
- */
-export function normalizeAuditSettings(raw: unknown): Settings {
-  const d = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
-  const w = (d.weights && typeof d.weights === 'object' ? d.weights : {}) as Record<string, unknown>;
-  const weights = {
-    required: num(w.required, DEFAULT_SETTINGS.weights.required),
-    recommended: num(w.recommended, DEFAULT_SETTINGS.weights.recommended),
-    'best-practice': num(w['best-practice'], DEFAULT_SETTINGS.weights['best-practice']),
-  };
-  const allZero = weights.required + weights.recommended + weights['best-practice'] <= 0;
-  return {
-    titleMin: num(d.titleMin, DEFAULT_SETTINGS.titleMin),
-    titleMax: num(d.titleMax, DEFAULT_SETTINGS.titleMax),
-    descMin: num(d.descMin, DEFAULT_SETTINGS.descMin),
-    descMax: num(d.descMax, DEFAULT_SETTINGS.descMax),
-    ogDescMin: num(d.ogDescMin, DEFAULT_SETTINGS.ogDescMin),
-    ogDescMax: num(d.ogDescMax, DEFAULT_SETTINGS.ogDescMax),
-    weights: allZero ? { ...DEFAULT_SETTINGS.weights } : weights,
-  };
-}
+/** Moved to `storage/settings.ts` (one normaliser for every read path); re-exported here. */
+export { normalizeAuditSettings } from '../storage/settings';
 
 /**
  * The settings that score a scan: the target workspace's rules when it is entitled, else the

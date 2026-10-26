@@ -27,7 +27,8 @@ const BASIC_KEYS = new Set([
 
 export function categorize(rawKey: string): TagCategory {
   const key = rawKey.toLowerCase();
-  if (key.startsWith('og:')) return 'og';
+  // article:* is Open Graph's article namespace (as in the server engine's categorize).
+  if (key.startsWith('og:') || key.startsWith('article:')) return 'og';
   if (key.startsWith('twitter:')) return 'twitter';
   if (SEO_KEYS.has(key)) return 'seo';
   if (BASIC_KEYS.has(key)) return 'basic';

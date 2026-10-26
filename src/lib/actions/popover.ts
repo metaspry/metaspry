@@ -108,8 +108,22 @@ export function popover(node: HTMLElement, opts: PopoverOptions) {
     o.onClose();
   };
 
+  // A non-modal panel closes when keyboard focus moves to a control outside it (UX review
+  // 2026-10-25, Medium 22): Tab out of History used to leave it open over the results. Focus that
+  // goes nowhere (`relatedTarget` null: another window, a click on non-focusable text) keeps it.
+  const onFocusOut = (event: FocusEvent) => {
+    // Only the top layer: opening a panel above this one moves focus into it, which is not leaving.
+    if (o.modal || !isTop(layer)) return;
+    const next = event.relatedTarget;
+    if (!(next instanceof Node) || node.contains(next)) return;
+    const trigger = returnTarget();
+    if (trigger && trigger.contains(next)) return;
+    o.onClose();
+  };
+
   document.addEventListener('keydown', onKey);
   document.addEventListener('pointerdown', onPointerDown);
+  node.addEventListener('focusout', onFocusOut);
   focusIn();
 
   return {
@@ -120,6 +134,7 @@ export function popover(node: HTMLElement, opts: PopoverOptions) {
       release();
       document.removeEventListener('keydown', onKey);
       document.removeEventListener('pointerdown', onPointerDown);
+      node.removeEventListener('focusout', onFocusOut);
       // Focus goes back only when it was inside the panel or fell to <body> with it. A user who
       // pressed another control keeps that focus.
       const active = document.activeElement;

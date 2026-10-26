@@ -10,7 +10,9 @@
     cloudSignOut,
   } from "../../cloud/auth";
   import { initCloudSettingsSync } from "../../cloud/settings";
-  import { initCloudPlan, APP_URL } from "../../cloud/plan";
+  import { initCloudPlan } from "../../cloud/plan";
+  import { APP_URL } from "../../app-url";
+  import { openTab } from "../../tabs/open-tab";
   import { initialsFor } from "../../cloud/initials";
   import { signInErrorMessage, googleSignInErrorMessage } from "../../cloud/auth-errors";
   import { tooltip } from "../../actions/tooltip";
@@ -25,6 +27,8 @@
     type CloudWorkspace,
   } from "../../cloud/workspaces";
   import { initWorkspaceScoring } from "../../cloud/workspace-scoring";
+  import { report } from "../../diagnostics";
+  import { toast } from "../../toast";
 
   let open = false;
   let trigger: HTMLButtonElement | null = null;
@@ -71,8 +75,14 @@
   }
 
   async function out() {
-    await cloudSignOut();
-    open = false;
+    try {
+      await cloudSignOut();
+      open = false;
+    } catch (e) {
+      // Had no catch: a failed sign-out left the menu open with nothing said.
+      report(e, "cloud.sign-out");
+      toast("Couldn't sign out. Check your connection and try again.", "error");
+    }
   }
 
   function close() {
@@ -89,12 +99,9 @@
   }
 
   function openApp() {
-    // Guarded like every other chrome.* entry point: `npm run dev` renders this component in a
-    // plain browser, where `chrome` is undefined and the click would throw.
-    if (typeof chrome === "undefined" || !chrome.tabs) return;
     // `active: true` on purpose, unlike History's background tab: the user is deliberately leaving
     // for the web app, so letting the popup close is the wanted behaviour.
-    chrome.tabs.create({ url: `${APP_URL}/dashboard`, active: true });
+    openTab(`${APP_URL}/dashboard`, { active: true });
   }
 
   // The sync-target list is a `role="menu"` of `menuitemradio`s: arrow keys, Home and End move
@@ -160,7 +167,7 @@
       bind:this={trigger}
       type="button"
       on:click={() => (open = !open)}
-      aria-label={$scanSync.kind === "error" ? "Account and sync target, last scan not saved" : "Account and sync target"}
+      aria-label={$scanSync.kind === "error" ? `Account, saving to ${targetLabel}, last scan not saved` : `Account, saving to ${targetLabel}`}
       aria-expanded={open}
       use:tooltip={`Signed in as ${$cloudUser.email} - saving scans to ${targetLabel}`}
       class="flex h-9 max-w-[170px] items-center gap-1.5 rounded-xl border border-slate-200/70 bg-white/70 py-0.5 pl-0.5 pr-2 text-xs font-medium text-slate-700 transition hover:bg-white dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 {FOCUS_RING}"
@@ -247,7 +254,7 @@
               on:click={() => pickWorkspace(w)}
               class="ms-menu-item {FOCUS_RING}"
             >
-              <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[0.6875rem] font-bold text-white" style="background: linear-gradient(135deg,#6a55e0,#9b8bff)">{(w.name[0] ?? "W").toUpperCase()}</span>
+              <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[0.6875rem] font-bold text-white" style="background: linear-gradient(135deg,#4f46e5,#6d28d9)">{(w.name[0] ?? "W").toUpperCase()}</span>
               <span class="min-w-0 flex-1 truncate">{w.name}</span>
               {#if checked}<span class="text-indigo-600 dark:text-indigo-300" aria-hidden="true">✓</span>{/if}
             </button>

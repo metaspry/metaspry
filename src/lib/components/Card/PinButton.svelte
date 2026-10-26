@@ -1,6 +1,6 @@
 <script lang="ts">
   import { pinned, togglePinned, isPinned } from '../../storage/pinned';
-  import { toast } from '../Toast/toast';
+  import { toast } from '../../toast';
   import { tooltip } from '../../actions/tooltip';
   import { bandClasses } from '../../audit/band';
   import { FOCUS_RING } from '../toolbar';
@@ -36,11 +36,11 @@
     : `ms-muted hover:bg-white/60 dark:hover:bg-white/10 ${PIN_HOVER}`}"
 >
   {#if active}
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-4 w-4">
+    <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-4 w-4">
       <path d="m12 2 2.7 6.2 6.8.6-5.2 4.5 1.6 6.7L12 16.7 6.1 20l1.6-6.7L2.5 8.8l6.8-.6z" />
     </svg>
   {:else}
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4">
+    <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4">
       <path d="m12 2 2.7 6.2 6.8.6-5.2 4.5 1.6 6.7L12 16.7 6.1 20l1.6-6.7L2.5 8.8l6.8-.6z" />
     </svg>
   {/if}

@@ -29,3 +29,52 @@ describe('analyzeAeo indexability', () => {
     expect(indexable(snip).state).toBe('warn');
   });
 });
+
+function doc(head: string, body: string): HTMLElement {
+  return new DOMParser().parseFromString(`<html><head>${head}</head><body>${body}</body></html>`, 'text/html').documentElement;
+}
+const check = (r: ReturnType<typeof analyzeAeo>, id: string) => r.checks.find((c) => c.id === id)!;
+
+describe('analyzeAeo parity with the server analyzer (architecture review 2026-10-26)', () => {
+  it('author and date are not asked of a page that is not an article', () => {
+    const c = check(analyzeAeo(doc('<meta property="og:type" content="website">', '<h1>Home</h1>'), null, 'https://a.com/'), 'aeo-author-date');
+    expect(c.state).toBe('info');
+    expect(c.detail).toContain('Not an article page');
+  });
+
+  it('an article without them still needs work, and with them passes', () => {
+    const art = '<meta property="og:type" content="article">';
+    expect(check(analyzeAeo(doc(art, '<h1>Post</h1>'), null, 'https://a.com/p'), 'aeo-author-date').state).toBe('warn');
+    const full = `${art}<meta name="author" content="Ada"><meta property="article:published_time" content="2026-10-01">`;
+    expect(check(analyzeAeo(doc(full, '<h1>Post</h1>'), null, 'https://a.com/p'), 'aeo-author-date').state).toBe('pass');
+  });
+
+  it('a JSON-LD BlogPosting counts as an article', () => {
+    const ld = '<script type="application/ld+json">{"@type": "BlogPosting", "headline": "x"}</script>';
+    expect(check(analyzeAeo(doc(ld, '<h1>Post</h1>'), null, 'https://a.com/p'), 'aeo-author-date').state).toBe('warn');
+  });
+
+  it('curly quotes count as a quotation lever, like straight ones', () => {
+    const levers = (body: string) => check(analyzeAeo(doc('', body), null, 'https://a.com/'), 'aeo-geo-levers').detail;
+    expect(levers('<p>No quotes here at all</p>')).toMatch(/^0\/3/);
+    expect(levers('<p>She said \u201Cship it\u201D today</p>')).toMatch(/^1\/3/);
+    expect(levers('<p>She said "ship it" today</p>')).toMatch(/^1\/3/);
+  });
+});
+
+describe('analyzeAeo honesty (UX review 2026-10-25, Medium 16)', () => {
+  it('site files that could not be fetched are reported, and the chip is not "ready"', () => {
+    const page = doc('<meta property="og:type" content="website">', '<h1>How it works?</h1>');
+    expect(analyzeAeo(page, null, 'https://a.com/').chip).toBe('ready');
+    const r = analyzeAeo(page, null, 'https://a.com/', undefined, true);
+    expect(check(r, 'aeo-site-files').state).toBe('warn');
+    expect(r.chip).toBe('needs-work');
+  });
+
+  it('no dead-end "Run a cloud scan"; the lever claim is hedged', () => {
+    const r = analyzeAeo(doc('', '<h1>x</h1>'), null, 'https://a.com/');
+    expect(check(r, 'aeo-raw-html').detail).not.toContain('cloud scan');
+    expect(check(r, 'aeo-raw-html').detail).toContain("web app's Scan box");
+    expect(check(r, 'aeo-geo-levers').detail).toContain('experimentally linked');
+  });
+});

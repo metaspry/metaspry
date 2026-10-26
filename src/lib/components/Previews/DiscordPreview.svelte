@@ -21,7 +21,7 @@
       <p class="line-clamp-3 text-xs text-slate-300">{description}</p>
       {#if image}
         <div class="mt-1 aspect-[2/1] w-full overflow-hidden rounded">
-          <img src={image} alt="" class="h-full w-full object-cover" loading="lazy" />
+          <img src={image} alt="" class="h-full w-full object-cover" loading="lazy" referrerpolicy="no-referrer" />
         </div>
       {/if}
     </div>

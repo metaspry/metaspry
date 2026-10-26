@@ -1,8 +1,10 @@
+import { getHtmlRequest, parseGetHtmlResponse, type CaptureFailure } from '../messaging/protocol';
+
 export interface PageHtml {
   html: HTMLElement | null;
   url: string;
   /** Why there is no HTML, when the background script could say. */
-  reason?: 'unscriptable' | 'no-tab';
+  reason?: CaptureFailure;
   /** `chrome.tabs.Tab.favIconUrl` for the scanned tab, when Chrome had resolved one. */
   favIconUrl?: string;
 }
@@ -54,27 +56,27 @@ export const CAPTURE_TIMEOUT_MS = 15_000;
  * Rejects after `timeoutMs` so a page that never answers cannot leave the scan loading forever.
  */
 export async function getHTML(windowId?: number, timeoutMs = CAPTURE_TIMEOUT_MS): Promise<PageHtml> {
-  const request = typeof windowId === 'number' ? { message: 'getHTML', windowId } : { message: 'getHTML' };
+  const request = getHtmlRequest(windowId);
   return new Promise((resolve, reject) => {
     let settled = false;
     const timer = setTimeout(() => {
       settled = true;
       reject(new Error(`Timed out waiting for the page after ${Math.round(timeoutMs / 1000)} s.`));
     }, timeoutMs);
-    const onResponse = (response: any) => {
+    const onResponse = (raw: unknown) => {
       // A dead message port sets lastError; reading it also stops Chrome logging it as unchecked.
       const lastError = chrome.runtime.lastError;
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      const response = parseGetHtmlResponse(raw);
       if (!response) {
         reject(new Error(lastError?.message ?? 'No response from background script.'));
         return;
       }
-      const url = typeof response.url === 'string' ? response.url : '';
-      const reason = response.reason === 'unscriptable' || response.reason === 'no-tab' ? response.reason : undefined;
+      const { url, reason } = response;
       // Spread-in only when present: `exactOptionalPropertyTypes` forbids an explicit undefined.
-      const icon = typeof response.favIconUrl === 'string' && response.favIconUrl ? { favIconUrl: response.favIconUrl } : {};
+      const icon = response.favIconUrl ? { favIconUrl: response.favIconUrl } : {};
       if (response.html) {
         // DOMParser is guaranteed inert: subresources don't load, scripts
         // don't execute, even when the resulting document is later

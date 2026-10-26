@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { getHtmlRequest, parseGetHtmlResponse } from '../messaging/protocol';
 
 // static/scripts/background.js is a classic service worker that nothing bundles, so the test
 // runs its source against a fake `chrome` and drives the getHTML message handler it registers.
@@ -37,9 +38,18 @@ function loadBackground(tabs: Tab[] | undefined, injected: unknown, opts: { thro
   return {
     executeScript,
     query,
-    ask(request: Record<string, unknown> = { message: 'getHTML', windowId: 7 }): Promise<Record<string, unknown>> {
-      return new Promise((resolve) => {
-        onMessage?.(request, {}, (r) => resolve(r as Record<string, unknown>));
+    ask(request: object = getHtmlRequest(7)): Promise<Record<string, unknown>> {
+      return new Promise((resolve, reject) => {
+        onMessage?.(request, {}, (r) => {
+          // Every reply on every path is already a canonical GetHtmlResponse (the typed protocol).
+          // Rejected, not thrown: a throw here runs outside the test and would surface as a timeout.
+          try {
+            expect(parseGetHtmlResponse(r)).toEqual(r);
+            resolve(r as Record<string, unknown>);
+          } catch (err) {
+            reject(err);
+          }
+        });
       });
     },
   };
@@ -90,7 +100,7 @@ describe('background getHTML handler', () => {
     const bg = loadBackground([tabA], [{ result: { html: '<html></html>' } }]);
     await bg.ask();
     expect(bg.query.mock.calls[0]?.[0]).toEqual({ active: true, windowId: 7 });
-    await bg.ask({ message: 'getHTML' });
+    await bg.ask(getHtmlRequest());
     expect(bg.query.mock.calls[1]?.[0]).toEqual({ active: true, lastFocusedWindow: true });
   });
 

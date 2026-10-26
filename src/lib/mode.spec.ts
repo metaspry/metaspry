@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { get } from 'svelte/store';
 
 const toastSpy = vi.fn();
-vi.mock('./components/Toast/toast', () => ({ toast: (...a: unknown[]) => toastSpy(...a) }));
+vi.mock('./toast', () => ({ toast: (...a: unknown[]) => toastSpy(...a) }));
 
 import { mode, switchMode, setMode } from './mode';
 

@@ -1,0 +1,66 @@
+# Full QA pass on every PR and every push to main: type-check, unit + integration, build (with the
+# manifest version stamp and the remote-code guard), e2e against the built unpacked extension.
+# Whatever `npm run qa` runs is what CI runs (AGENTS.md section 3.18).
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # Whether the contract secret exists, without putting the token in any step's environment
+      # (npm ci runs third-party install scripts).
+      - name: Contract check enabled?
+        id: contract
+        run: echo "enabled=${{ secrets.APP_CONTRACT_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      # Scan contract drift against the app (ultra review 2026-10-26, F6). The app repo is private, so
+      # this runs only once an APP_CONTRACT_TOKEN secret (read access to metaspry/app) is set; without
+      # it the step is skipped and `npm run qa` below says the comparison was skipped.
+      - name: Check out the app's contract fixture
+        if: steps.contract.outputs.enabled == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: metaspry/app
+          token: ${{ secrets.APP_CONTRACT_TOKEN }}
+          path: .app-contract
+          sparse-checkout: functions/test/fixtures
+          persist-credentials: false
+      - name: Scan contract matches the app
+        if: steps.contract.outputs.enabled == 'true'
+        env:
+          CONTRACT_REQUIRED: '1'
+        run: node scripts/check-contract.mjs --theirs .app-contract/functions/test/fixtures/scan-contract.json
+      - run: npm run qa
+        env:
+          CI: 'true'
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7

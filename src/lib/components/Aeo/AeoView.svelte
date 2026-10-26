@@ -4,6 +4,7 @@
   import type { SiteFiles } from '../../scrapers/SiteFiles';
   import { analyzeAeo, type AeoResult, type AeoState, type IndexingVerdict } from '../../audit/aeo';
   import { bandClasses } from '../../audit/band';
+  import { report } from '../../diagnostics';
 
   export let html: HTMLElement | null;
   export let baseUrl: string;
@@ -20,6 +21,7 @@
   let errorMessage = '';
   let result: AeoResult | null = null;
   let siteFiles: SiteFiles | null = null;
+  let siteFilesFailed = false;
   let loaded = false;
 
   // Band tokens (R2-29; the -500 dots had no dark variant and were 1.9-2.25:1 in light). Info is not
@@ -47,8 +49,11 @@
     errorMessage = '';
     try {
       siteFiles = baseUrl ? await fetchSiteFilesCached(baseUrl, scanKey) : null;
-    } catch {
-      siteFiles = null; // site checks just get skipped
+    } catch (err) {
+      // The site checks are skipped, and the result says so (`aeo-site-files`).
+      report(err, 'ai.site-files');
+      siteFiles = null;
+      siteFilesFailed = true;
     }
     loaded = true;
     loading = false;
@@ -59,7 +64,7 @@
   function analyze(verdict: IndexingVerdict | null) {
     if (!html) return;
     try {
-      result = analyzeAeo(html, siteFiles, baseUrl, verdict ?? undefined);
+      result = analyzeAeo(html, siteFiles, baseUrl, verdict ?? undefined, siteFilesFailed);
       errorMessage = '';
     } catch (err) {
       errorMessage = err instanceof Error ? err.message : String(err);
@@ -73,8 +78,11 @@
 </script>
 
 <div class="flex flex-col gap-3">
+  <p class="sr-only" role="status">
+    {loading ? 'Checking AI readiness' : result ? `AI readiness: ${result.chip === 'ready' ? 'AI-ready' : 'needs work'}` : ''}
+  </p>
   {#if loading}
-    <div class="flex items-center gap-2 rounded-2xl border border-white/40 bg-white/40 px-3 py-2 text-xs text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
+    <div class="flex items-center gap-2 rounded-2xl border border-white/40 bg-white/40 px-3 py-2 text-xs text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300" aria-hidden="true">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" class="h-4 w-4 animate-spin">
         <path d="M21 12a9 9 0 1 1-6.2-8.5" />
       </svg>

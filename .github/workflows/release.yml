@@ -1,0 +1,72 @@
+# Tagged release: push `vX.Y.Z` (matching package.json) and this builds the store zip from that
+# exact commit, after the full QA pass. The zip and its sha256 land as a workflow artifact and on
+# a DRAFT GitHub release; uploading to the Chrome Web Store stays manual (AGENTS.md section 4.4).
+#
+# Two jobs so the write-scoped token never sits next to `npm ci` and the project's own scripts:
+# `package` runs everything with a read-only token, `draft` only downloads the artifact and calls gh.
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Tag must equal package.json version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          VERSION="v$(node -p "require('./package.json').version")"
+          if [ "$TAG" != "$VERSION" ]; then
+            echo "::error::Tag $TAG does not match package.json $VERSION"
+            exit 1
+          fi
+      - run: npm ci
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - run: npm run qa
+        env:
+          CI: 'true'
+      # qa already built build/ from this commit; package-zip re-checks the manifest version and
+      # the remote-code guard before it writes anything.
+      - name: Package
+        run: node scripts/package-zip.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: metaspry-${{ github.ref_name }}
+          path: |
+            metaspry-${{ github.ref_name }}.zip
+            metaspry-${{ github.ref_name }}.zip.sha256
+          if-no-files-found: error
+
+  draft:
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write # create the draft release
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: metaspry-${{ github.ref_name }}
+      - name: Draft GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" "metaspry-$TAG.zip" "metaspry-$TAG.zip.sha256" \
+            --repo "$GITHUB_REPOSITORY" --draft --verify-tag \
+            --title "Metaspry $TAG" --notes "Store zip built by CI from $GITHUB_SHA. sha256: $(cut -d' ' -f1 "metaspry-$TAG.zip.sha256")"

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { FOCUS_RING } from '../toolbar';
   export let value: string;
 
   const MAX = 240;
@@ -25,6 +26,7 @@
   <button
     type="button"
     on:click={() => (expanded = !expanded)}
-    class="ml-1 inline text-[0.6875rem] font-medium text-indigo-600 hover:underline dark:text-indigo-300"
+    aria-expanded={expanded}
+    class="ml-1 inline-flex min-h-[1.5rem] items-center rounded text-[0.6875rem] font-medium text-indigo-700 hover:underline dark:text-indigo-300 {FOCUS_RING}"
   >{expanded ? 'Show less' : 'Show more'}</button>
 {/if}

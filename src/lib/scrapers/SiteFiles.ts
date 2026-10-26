@@ -33,6 +33,8 @@ export interface SitemapInfo {
   children: SitemapChild[];
   sample: string[];
   truncated: boolean;
+  /** Every location answered "not here" (404 / 410 / an HTML fallback): missing, not unknown. */
+  notFound?: boolean;
   error?: string;
 }
 

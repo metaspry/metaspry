@@ -20,6 +20,7 @@
   import { describeScanError } from "../scrapers/scan-error";
   import { normalizeScanUrl, scanUrlFor } from "../cloud/scan-identity";
   import { displayUrl, followActiveTab, getHostWindowId, hostOf, tabState } from "../tabs/follow-tab";
+  import { RESULT_TABS, isResultTab, type ResultTabId } from "../tabs/registry";
   import { getMetaTags } from "../scrapers/getMetaTags";
   import { resolveIcon } from "../scrapers/icon";
   import type { PageMeta } from "../scrapers/PageMeta";
@@ -41,13 +42,14 @@
   import { syncScope } from "../cloud/workspaces";
   import { toScanPayload, uploadScan, type UploadResult } from "../cloud/sync";
   import { guardUnload, resetSyncFor, trackUpload } from "../cloud/sync-status";
-  import { fetchSiteFilesCached } from "../scrapers/getSiteFiles";
-  import { toast } from "../components/Toast/toast";
+  import { siteFilesForUpload } from "../scrapers/getSiteFiles";
+  import { toast } from "../toast";
   import { modalOpen } from "../layers";
+  import { report } from "../diagnostics";
   import { get } from "svelte/store";
 
   type View = "landing" | "loading" | "error" | "results";
-  type ActiveTab = "tags" | "previews" | "audit" | "site" | "aeo" | "compare";
+  type ActiveTab = ResultTabId;
 
   let view: View = "landing";
   let pageMeta: PageMeta | null = null;
@@ -116,14 +118,8 @@
         ? `This tab changed. Results are for ${scannedLabel}.`
         : "This tab changed.";
 
-  const tabs: TabDef[] = [
-    { id: "tags", label: "Tags" },
-    { id: "previews", label: "Previews" },
-    { id: "audit", label: "Audit" },
-    { id: "site", label: "Site" },
-    { id: "aeo", label: "AI" },
-    { id: "compare", label: "Compare" },
-  ];
+  // The one tab list (tabs/registry.ts): the strip, the digit shortcuts and the help read it.
+  const tabs: TabDef[] = RESULT_TABS.map((t) => ({ id: t.id, label: t.label }));
 
   function isPageEmpty(meta: PageMeta): boolean {
     return meta.tags.length === 0 && !meta.title && !meta.canonical && !meta.icon;
@@ -243,22 +239,24 @@
       if (cu && pageUrl) {
         const scope = get(syncScope);
         const key = scanKey;
+        // This scan's own values: a second scan can commit while the site files load (up to 8 s)
+        // and reassign `pageUrl` / `pageIcon`; reading them inside the callback filed this scan
+        // under the other page's document (ultra review 2026-10-26, follow-up U0).
+        const url = pageUrl;
+        const icon = pageIcon;
         // Tracked, not swallowed (UX review item 1): the account menu shows Saving / Saved / the
         // reason it failed, and a failure toasts. The menu used to say "Synced" whatever happened.
         const out = await trackUpload(scope.kind === "workspace" ? scope.name : "Personal", async () => {
           // Best-effort: include site files (robots/sitemap/llms) so the app's Site tab populates.
-          // The same fetch the Site and AI tabs read (one per scan).
-          let siteFiles;
-          try {
-            siteFiles = await fetchSiteFilesCached(new URL(pageUrl).origin, key);
-          } catch {
-            siteFiles = undefined;
-          }
-          const payloadMeta: PageMeta = { ...meta, icon: pageIcon ?? meta.icon };
-          return uploadScan(cu.uid, toScanPayload(payloadMeta, finalResult, pageUrl, siteFiles), scope);
+          // The same fetch the Site and AI tabs read (one per scan), but a slow site does not hold
+          // the upload: after a few seconds the scan is written without them.
+          const siteFiles = await siteFilesForUpload(url, key);
+          const payloadMeta: PageMeta = { ...meta, icon: icon ?? meta.icon };
+          return uploadScan(cu.uid, toScanPayload(payloadMeta, finalResult, url, siteFiles), scope);
         });
         // Also dropped when the user signed out (or switched account) while the write was in flight.
         if (out.ok && id === scrapeId && get(cloudUser)?.uid === cu.uid) cloudScan = out.value;
+        if (!out.ok) report(out.message, "scan.upload");
         if (!out.ok && get(cloudUser)?.uid === cu.uid) toast(out.message, "error");
       }
     } catch (error) {
@@ -338,16 +336,7 @@
   $: noindexRule = auditResult?.rules.find((r) => r.id === "noindex") ?? null;
   $: documentTitle = view === "results" && activeTabLabel ? `Metaspry - ${activeTabLabel}` : "Metaspry";
 
-  function isActiveTab(v: string): v is ActiveTab {
-    return (
-      v === "tags" ||
-      v === "previews" ||
-      v === "audit" ||
-      v === "site" ||
-      v === "aeo" ||
-      v === "compare"
-    );
-  }
+  const isActiveTab = isResultTab;
 
   function onTabChange(event: CustomEvent<string>) {
     if (isActiveTab(event.detail)) {
@@ -391,6 +380,9 @@
   function onToolbarKey(event: KeyboardEvent) {
     const keys = ["ArrowLeft", "ArrowRight", "Home", "End"];
     if (!keys.includes(event.key)) return;
+    // The History panel renders inside this toolbar: its own keys are its own (UX review 2026-10-25,
+    // Medium 22: arrows from a history row walked out through the toolbar buttons).
+    if ((event.target as HTMLElement | null)?.closest('[role="dialog"]')) return;
     const group = event.currentTarget as HTMLElement;
     const items = Array.from(group.querySelectorAll<HTMLElement>("button:not([disabled])"));
     const index = items.indexOf(document.activeElement as HTMLElement);
@@ -543,18 +535,18 @@
           <circle cx="12" cy="12" r="10" stroke-width="1.5" />
         </svg>
         <span class="flex-1">
-          Popup closes when you switch tabs.
+          Popup closes when you click away or switch tabs.
           <button
             type="button"
             on:click={() => switchMode('sidepanel')}
-            class="font-semibold underline underline-offset-2 hover:opacity-80"
+            class="inline-flex min-h-[1.5rem] items-center rounded font-semibold underline underline-offset-2 hover:opacity-80 {FOCUS_RING}"
           >Use side panel</button>
         </span>
         <button
           type="button"
           aria-label="Dismiss"
           on:click={dismissPopupHint}
-          class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full transition hover:bg-amber-200/60 dark:hover:bg-amber-500/20"
+          class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full transition hover:bg-amber-200/60 dark:hover:bg-amber-500/20 {FOCUS_RING}"
         >
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-3 w-3">
             <path d="M18 6L6 18M6 6l12 12" />
@@ -635,31 +627,37 @@
         {#key scanKey}
         {#if visited.has("tags")}
           <div role="tabpanel" id="panel-tags" aria-labelledby="tab-tags" hidden={activeTab !== "tags"}>
+            <h2 class="sr-only">{RESULT_TABS.find((t) => t.id === "tags")?.label}</h2>
             <TagsView meta={pageMeta} />
           </div>
         {/if}
         {#if visited.has("previews")}
           <div role="tabpanel" id="panel-previews" aria-labelledby="tab-previews" hidden={activeTab !== "previews"}>
+            <h2 class="sr-only">{RESULT_TABS.find((t) => t.id === "previews")?.label}</h2>
             <Preview meta={pageMeta} {pageUrl} icon={pageIcon} />
           </div>
         {/if}
         {#if visited.has("audit")}
           <div role="tabpanel" id="panel-audit" aria-labelledby="tab-audit" hidden={activeTab !== "audit"}>
+            <h2 class="sr-only">{RESULT_TABS.find((t) => t.id === "audit")?.label}</h2>
             <Audit result={auditResult} meta={pageMeta} {cloudScan} weights={$effectiveSettings.weights} />
           </div>
         {/if}
         {#if visited.has("site")}
           <div role="tabpanel" id="panel-site" aria-labelledby="tab-site" hidden={activeTab !== "site"}>
+            <h2 class="sr-only">{RESULT_TABS.find((t) => t.id === "site")?.label}</h2>
             <SiteView baseUrl={pageUrl} {scanKey} />
           </div>
         {/if}
         {#if visited.has("aeo")}
           <div role="tabpanel" id="panel-aeo" aria-labelledby="tab-aeo" hidden={activeTab !== "aeo"}>
+            <h2 class="sr-only">{RESULT_TABS.find((t) => t.id === "aeo")?.label}</h2>
             <AeoView html={pageHtml} baseUrl={pageUrl} {scanKey} indexing={noindexRule ? { blocked: noindexRule.status === "fail", detail: noindexRule.detail } : null} />
           </div>
         {/if}
         {#if visited.has("compare")}
           <div role="tabpanel" id="panel-compare" aria-labelledby="tab-compare" hidden={activeTab !== "compare"}>
+            <h2 class="sr-only">{RESULT_TABS.find((t) => t.id === "compare")?.label}</h2>
             <CompareView leftMeta={pageMeta} leftUrl={pageUrl} leftScore={auditResult.score} leftRules={auditResult.rules} />
           </div>
         {/if}

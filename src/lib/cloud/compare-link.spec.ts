@@ -8,6 +8,13 @@ describe('compareChangedHref', () => {
     );
   });
 
+  it('a workspace scan carries its workspace, so the app opens it in that scope', () => {
+    expect(compareChangedHref('abc', 'ws 1')).toBe(
+      'https://app.metaspry.com/compare?a=scan%3Aabc%40prev&b=scan%3Aabc&ws=ws%201'
+    );
+    expect(compareChangedHref('abc', null)).toBe(compareChangedHref('abc'));
+  });
+
   it('passes ids with _ and - through untouched', () => {
     expect(compareChangedHref('s1_x-9')).toBe(
       'https://app.metaspry.com/compare?a=scan%3As1_x-9%40prev&b=scan%3As1_x-9'
